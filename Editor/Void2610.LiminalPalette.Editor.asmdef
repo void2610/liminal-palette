@@ -1,0 +1,21 @@
+{
+    "name": "Void2610.LiminalPalette.Editor",
+    "rootNamespace": "Void2610.LiminalPalette.Editor",
+    "references": [
+        "Void2610.LiminalPalette",
+        "Void2610.LiminalPalette.UI",
+        "Void2610.LiminalPalette.Player",
+        "Void2610.LiminalPalette.Ipc"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

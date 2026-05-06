@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="palette-root" class="palette-root">
+        <!-- 上部タブ: command / log / history。タブは PaletteView から動的に追加される。 -->
+        <ui:VisualElement name="palette-tabs" class="palette-tabs" />
+
+        <!-- 検索ボックス -->
+        <ui:VisualElement name="palette-header" class="palette-header">
+            <ui:TextField name="search-input" class="palette-search" />
+        </ui:VisualElement>
+
+        <!-- 列ヘッダ: List 行と同じ列幅で並ぶ -->
+        <ui:VisualElement name="palette-column-header" class="palette-column-header">
+            <ui:Label class="palette-column-header-mark" text=" " />
+            <ui:Label class="palette-column-header-path" text="Name" />
+            <ui:Label class="palette-column-header-description" text="Description" />
+            <ui:Label class="palette-column-header-current" text="Current" />
+        </ui:VisualElement>
+
+        <!-- メイン: 結果リスト -->
+        <ui:ListView name="results-list" class="palette-results"
+                     fixed-item-height="28" virtualization-method="FixedHeight"
+                     show-bound-collection-size="false" show-foldout-header="false" />
+
+        <!-- 下部固定パネル: Cmd / Status / 引数 / Run ボタン / 結果 -->
+        <ui:VisualElement name="palette-bottom" class="palette-bottom">
+            <ui:Label name="bottom-cmd" class="palette-bottom-cmd" text="Cmd:" />
+            <ui:Label name="bottom-status" class="palette-bottom-status" text="Status:" />
+            <ui:VisualElement name="argument-panel" class="palette-arguments palette-arguments-empty" />
+            <ui:VisualElement name="palette-bottom-actions" class="palette-bottom-actions">
+                <ui:Button name="run-button" class="palette-run-button" text="Run Command" />
+            </ui:VisualElement>
+            <ui:VisualElement name="result-view" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</UXML>

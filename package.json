@@ -1,0 +1,24 @@
+{
+  "name": "com.void2610.liminal-palette",
+  "version": "0.1.0",
+  "displayName": "LiminalPalette",
+  "description": "VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグコンソール / コマンド実行ライブラリ。[ConsoleCommand] を付けた C# メソッドを Editor / Runtime / HTTP API の 3 経路から統一的に実行できる。",
+  "unity": "6000.3",
+  "license": "MIT",
+  "author": {
+    "name": "void2610",
+    "url": "https://github.com/void2610"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/void2610/liminal-palette.git"
+  },
+  "keywords": [
+    "debug",
+    "console",
+    "command-palette",
+    "ui-toolkit",
+    "developer-tools"
+  ],
+  "dependencies": {}
+}

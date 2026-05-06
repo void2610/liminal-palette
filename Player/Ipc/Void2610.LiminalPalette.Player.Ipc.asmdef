@@ -1,0 +1,21 @@
+{
+    "name": "Void2610.LiminalPalette.Player.Ipc",
+    "rootNamespace": "Void2610.LiminalPalette.Player.Ipc",
+    "references": [
+        "Void2610.LiminalPalette",
+        "Void2610.LiminalPalette.UI",
+        "Void2610.LiminalPalette.Player",
+        "Void2610.LiminalPalette.Ipc"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_EDITOR || DEVELOPMENT_BUILD"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

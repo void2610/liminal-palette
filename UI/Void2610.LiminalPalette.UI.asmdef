@@ -1,0 +1,16 @@
+{
+    "name": "Void2610.LiminalPalette.UI",
+    "rootNamespace": "Void2610.LiminalPalette.UI",
+    "references": [
+        "Void2610.LiminalPalette"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

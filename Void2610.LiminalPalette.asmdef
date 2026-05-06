@@ -1,0 +1,16 @@
+{
+    "name": "Void2610.LiminalPalette",
+    "rootNamespace": "Void2610.LiminalPalette",
+    "references": [
+        "R3.Unity"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

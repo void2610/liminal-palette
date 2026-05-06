@@ -1,0 +1,25 @@
+# Unity package 開発リポジトリ用 .gitignore
+# このリポジトリは UPM パッケージのソースのみを保持する。
+# .meta ファイルは Unity が利用側プロジェクトでも参照するため除外しない。
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Rider / Visual Studio / IDE
+.idea/
+.vs/
+.vscode/
+*.csproj
+*.sln
+*.user
+*.userprefs
+
+# C# ビルド成果物 (利用側 Unity プロジェクトが生成するため、本リポジトリでは追跡しない)
+[Bb]in/
+[Oo]bj/
+*.pidb
+*.suo
+*.userprefs

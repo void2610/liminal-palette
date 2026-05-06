@@ -1,0 +1,21 @@
+/* テーマ色の参照定義 (コメントとして残す)。
+   Phase 3 までは USS Variables (var(--lp-*)) を使っていたが、Runtime UIDocument では
+   :root も子孫継承も解決が機能せず色が落ちる事象を確認したため、PaletteStyles.uss に直接 rgb で書き戻した。
+   テーマ切替機能 (ライト/ダーク) は Phase 4 以降で再設計する想定。
+
+   参考値 (実際の値は PaletteStyles.uss に直書き):
+     --lp-bg              : rgb(18, 18, 20)
+     --lp-bg-elevated     : rgb(28, 28, 32)
+     --lp-bg-row-selected : rgb(56, 64, 82)
+     --lp-fg              : rgb(228, 228, 228)
+     --lp-fg-dim          : rgb(150, 150, 150)
+     --lp-accent          : rgb(96, 170, 230)
+     --lp-match           : rgb(255, 200, 80)
+     --lp-success         : rgb(110, 210, 110)
+     --lp-error           : rgb(230, 110, 110)
+     --lp-border          : rgb(45, 45, 50)
+     --lp-tab-active-bg   : rgb(230, 230, 230)
+     --lp-tab-active-fg   : rgb(22, 22, 22)
+     --lp-run             : rgb(64, 152, 64)
+     --lp-run-hover       : rgb(92, 188, 92)
+*/

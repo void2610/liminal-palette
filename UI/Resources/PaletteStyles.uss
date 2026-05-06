@@ -1,0 +1,299 @@
+/* ============================================================
+   Layout (色とスペーシングのみ。flex 方向は PaletteView がインラインで強制)
+   reference image (ss.png) の見た目を踏襲:
+     [Tabs] [Search] [Column header] [List] [Bottom: Cmd / Status / Run]
+
+   Phase 3: USS Variables (var(--lp-*)) は Runtime UIDocument で解決されないことを確認したため、
+   全色を直接 rgb で書く。色の全体像は PaletteVariables.uss のコメント参照。
+   ============================================================ */
+
+.palette-root {
+    flex-grow: 1;
+    /* Runtime ではゲーム画面が薄く透けるよう半透明。Editor の EditorWindow ではドッキング前提で
+       ウィンドウ背景が常に下にあるため透明度の影響は無視できる。 */
+    background-color: rgba(18, 18, 20, 0.88);
+    color: rgb(228, 228, 228);
+}
+
+/* ----- Tab bar (top) ----- */
+
+.palette-tabs {
+    flex-shrink: 0;
+    background-color: rgba(18, 18, 20, 0.88);
+    padding-left: 6px;
+    padding-top: 4px;
+    padding-bottom: 0;
+}
+
+.palette-tab {
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    margin-right: 2px;
+    background-color: rgba(28, 28, 32, 0.88);
+    border-color: rgb(45, 45, 50);
+    border-width: 1px;
+    border-bottom-width: 0;
+    color: rgb(150, 150, 150);
+    -unity-text-align: middle-center;
+    cursor: link;
+}
+
+.palette-tab:hover {
+    color: rgb(228, 228, 228);
+}
+
+.palette-tab-active {
+    background-color: rgb(230, 230, 230);
+    color: rgb(22, 22, 22);
+    border-color: rgb(230, 230, 230);
+    -unity-font-style: bold;
+}
+
+/* ----- Search ----- */
+
+.palette-header {
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.palette-search {
+    margin: 0;
+    font-size: 12px;
+}
+
+/* TextField の中身 (Inner TextElement) にも明示的に色を流し込む。
+   Runtime UIDocument の Default Theme は黒文字を初期値とするため、明示しないと不可読になる。 */
+.palette-search > * > .unity-text-element {
+    font-size: 12px;
+    color: rgb(228, 228, 228);
+}
+
+.palette-search > .unity-base-text-field__input {
+    background-color: rgba(28, 28, 32, 0.88);
+    color: rgb(228, 228, 228);
+    border-color: rgb(45, 45, 50);
+}
+
+/* 引数入力欄など、パレット内のすべての TextField の入力部分 (Inner) のデフォルト色を上書きする。
+   Runtime UIDocument のデフォルトテーマは TextField を白背景・黒寄り文字で描画するが、
+   パレットのダーク基調と組み合わさると背景白・文字白で実質不可読になる。
+   .palette-search > ... の selector は specificity が高いので検索バーは既存の指定が優先される。 */
+.unity-base-text-field__input {
+    background-color: rgba(28, 28, 32, 0.88);
+    color: rgb(228, 228, 228);
+    border-color: rgb(45, 45, 50);
+}
+
+/* ----- Column header (テーブル風の見出し) ----- */
+
+.palette-column-header {
+    flex-shrink: 0;
+    height: 22px;
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: rgba(28, 28, 32, 0.88);
+    border-color: rgb(45, 45, 50);
+    border-bottom-width: 1px;
+}
+
+.palette-column-header-mark {
+    width: 14px;
+    flex-shrink: 0;
+}
+
+.palette-column-header-path {
+    color: rgb(228, 228, 228);
+    font-size: 11px;
+    -unity-text-align: middle-left;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.palette-column-header-description {
+    color: rgb(228, 228, 228);
+    font-size: 11px;
+    -unity-text-align: middle-left;
+    width: 240px;
+    flex-shrink: 0;
+}
+
+.palette-column-header-current {
+    color: rgb(228, 228, 228);
+    font-size: 11px;
+    -unity-text-align: middle-left;
+    width: 80px;
+    flex-shrink: 0;
+}
+
+/* ----- Results list ----- */
+
+.palette-results {
+    background-color: rgba(18, 18, 20, 0.88);
+    border-color: rgb(45, 45, 50);
+    border-width: 0;
+}
+
+.palette-row {
+    padding-left: 10px;
+    padding-right: 10px;
+    height: 28px;
+}
+
+.palette-row-selected {
+    background-color: rgb(56, 64, 82);
+}
+
+.palette-row-history-mark {
+    color: rgb(150, 150, 150);
+    width: 14px;
+    flex-shrink: 0;
+    font-size: 11px;
+}
+
+.palette-row-path {
+    color: rgb(228, 228, 228);
+    -unity-text-align: middle-left;
+    font-size: 12px;
+}
+
+.palette-row-description {
+    color: rgb(150, 150, 150);
+    -unity-text-align: middle-left;
+    font-size: 11px;
+    width: 240px;
+    flex-shrink: 0;
+}
+
+.palette-row-current {
+    color: rgb(228, 228, 228);
+    -unity-text-align: middle-left;
+    font-size: 11px;
+    width: 80px;
+    flex-shrink: 0;
+}
+
+.lp-input-error {
+    border-color: rgb(230, 110, 110);
+    border-width: 1px;
+}
+
+/* ============================================================
+   Bottom panel (画面下に常時表示する固定パネル)
+   ============================================================ */
+
+.palette-bottom {
+    flex-shrink: 0;
+    background-color: rgba(18, 18, 20, 0.88);
+    border-top-width: 1px;
+    border-top-color: rgb(45, 45, 50);
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.palette-bottom-cmd {
+    color: rgb(228, 228, 228);
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+
+.palette-bottom-status {
+    color: rgb(150, 150, 150);
+    font-size: 12px;
+}
+
+.palette-arguments {
+    /* 引数フィールド。実 flex-direction はインラインで設定。 */
+    margin-top: 6px;
+}
+
+.palette-arguments-empty {
+    display: none;
+}
+
+.palette-arg-row {
+    margin-bottom: 4px;
+}
+
+.palette-arg-label {
+    color: rgb(150, 150, 150);
+    font-size: 11px;
+    margin-bottom: 2px;
+}
+
+.palette-bottom-actions {
+    margin-top: 4px;
+}
+
+.palette-run-button {
+    background-color: rgb(64, 152, 64);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    border-width: 0;
+    border-radius: 3px;
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 12px;
+}
+
+.palette-run-button:hover {
+    background-color: rgb(92, 188, 92);
+}
+
+/* ----- Result view (Status の下、必要なときだけ表示) ----- */
+
+.palette-result-view {
+    margin-top: 6px;
+}
+
+.palette-result-view-hidden {
+    display: none;
+}
+
+.palette-result-status {
+    margin-bottom: 2px;
+}
+
+.palette-result-badge-success {
+    color: rgb(110, 210, 110);
+    -unity-font-style: bold;
+    margin-right: 8px;
+    font-size: 11px;
+}
+
+.palette-result-badge-error {
+    color: rgb(230, 110, 110);
+    -unity-font-style: bold;
+    margin-right: 8px;
+    font-size: 11px;
+}
+
+.palette-result-duration {
+    color: rgb(150, 150, 150);
+    font-size: 11px;
+}
+
+.palette-result-value {
+    color: rgb(228, 228, 228);
+    margin-bottom: 2px;
+    white-space: normal;
+    font-size: 11px;
+}
+
+.palette-result-error {
+    color: rgb(230, 110, 110);
+    margin-bottom: 2px;
+    white-space: normal;
+    font-size: 11px;
+}
+
+.palette-result-logs {
+    color: rgb(150, 150, 150);
+    font-size: 10px;
+    max-height: 80px;
+}

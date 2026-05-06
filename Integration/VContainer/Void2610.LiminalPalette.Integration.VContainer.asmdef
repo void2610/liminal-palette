@@ -1,0 +1,17 @@
+{
+    "name": "Void2610.LiminalPalette.Integration.VContainer",
+    "rootNamespace": "Void2610.LiminalPalette.Integration.VContainer",
+    "references": [
+        "Void2610.LiminalPalette",
+        "VContainer"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

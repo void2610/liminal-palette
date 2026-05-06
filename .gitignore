@@ -7,6 +7,8 @@
 Thumbs.db
 *.swp
 *~
+# Unity の `Folder~/` 慣習 (Documentation~ / AISkills~ 等) は追跡対象に含める
+!*~/
 
 # Rider / Visual Studio / IDE
 .idea/

@@ -84,6 +84,22 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ---
 
+## AI Agent 連携 (Claude Code Skills)
+
+Claude Code から HTTP API を叩くための **Agent Skills** を package に同梱している。利用側プロジェクトを Unity で開いた状態で:
+
+```
+Tools > LiminalPalette > Install AI Skills...
+```
+
+を選ぶと、プロジェクトルートの `.claude/skills/` に 8 個の `lp-*` skill (lp-overview / lp-find-port / lp-list-commands / lp-execute / lp-get-state / lp-get-logs / lp-list-scenarios / lp-run-scenario) がコピーされる。Claude Code を再起動すれば skill が認識され、「LP のコマンド一覧」「Player/Health/Set を 50 で実行」のような指示で curl 操作が自動選択される。
+
+アンインストール: `Tools > LiminalPalette > Uninstall AI Skills`。
+
+skill ファイル本体は package 内の `AISkills~/` に同梱されており、上書きインストールで常に LP の最新版に同期する。
+
+---
+
 ## ドキュメント
 
 詳細は `Documentation~/` 配下を参照:

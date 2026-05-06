@@ -127,7 +127,8 @@ namespace Void2610.LiminalPalette.UI
         private const int MaxLogLines = 20;
 
         /// <summary>結果領域を非表示にする (再オープン時)。</summary>
-        public void Clear()
+        // VisualElement.Clear() (子要素削除) を意図的にシャドウし、結果領域専用の「非表示化」セマンティクスを公開する。
+        public new void Clear()
         {
             AddToClassList("palette-result-view-hidden");
         }

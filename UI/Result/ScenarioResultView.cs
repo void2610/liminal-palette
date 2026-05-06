@@ -73,7 +73,8 @@ namespace Void2610.LiminalPalette.UI
             }
         }
 
-        public void Clear()
+        // VisualElement.Clear() を意図的にシャドウし、ステップ行の削除と非表示化をまとめて行う公開 API として再定義する。
+        public new void Clear()
         {
             AddToClassList("palette-result-view-hidden");
             style.display = DisplayStyle.None;

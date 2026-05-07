@@ -1309,6 +1309,8 @@ namespace Void2610.LiminalPalette.UI
             }
             if (_controller.SelectedCommand == null) return;
             await _controller.ExecuteSelectedAsync(_currentArgValues);
+            // 実行後にパラメータパネルをリビルドして入力をクリア
+            RebuildArgumentPanel(_controller.SelectedCommand);
         }
 
         // ------------------------------------------------------------

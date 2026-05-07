@@ -181,18 +181,19 @@ namespace Void2610.LiminalPalette
             return true;
         }
 
-        // memberType = ReactiveProperty<T> or Observable<T>。T を取り出す。
+        // memberType = ReactiveProperty<T> / ReadOnlyReactiveProperty<T> / Observable<T>。T を取り出す。
         // 該当しない型なら null。
         private static Type ExtractObservableValueType(Type memberType)
         {
-            // 直接 ReactiveProperty<T>
             var t = memberType;
             while (t != null && t != typeof(object))
             {
                 if (t.IsGenericType)
                 {
                     var def = t.GetGenericTypeDefinition();
-                    if (def == typeof(ReactiveProperty<>) || def == typeof(Observable<>))
+                    if (def == typeof(ReactiveProperty<>) ||
+                        def == typeof(ReadOnlyReactiveProperty<>) ||
+                        def == typeof(Observable<>))
                     {
                         return t.GetGenericArguments()[0];
                     }
@@ -202,13 +203,19 @@ namespace Void2610.LiminalPalette
             return null;
         }
 
+        // ReactiveProperty<T> または ReadOnlyReactiveProperty<T> かどうか判定する。
+        // どちらも CurrentValue / Value プロパティで現在値を読める。
         private static bool IsReactiveProperty(Type memberType)
         {
             var t = memberType;
             while (t != null && t != typeof(object))
             {
-                if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(ReactiveProperty<>))
-                    return true;
+                if (t.IsGenericType)
+                {
+                    var def = t.GetGenericTypeDefinition();
+                    if (def == typeof(ReactiveProperty<>) || def == typeof(ReadOnlyReactiveProperty<>))
+                        return true;
+                }
                 t = t.BaseType;
             }
             return false;

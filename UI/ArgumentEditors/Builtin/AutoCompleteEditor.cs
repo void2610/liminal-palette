@@ -36,19 +36,19 @@ namespace Void2610.LiminalPalette.UI
             suggestionList.style.maxHeight = MaxVisibleItems * 22;
             suggestionList.style.display = DisplayStyle.None;
 
-            // フィルタ後の唯一の候補を保持
-            string soleMatchValue = null;
+            // フィルタ後の先頭候補を保持（候補リスト表示中のみ有効）
+            string topMatchValue = null;
 
             // テキスト変更時にフィルタ + onChanged
             field.RegisterValueChangedCallback(e =>
             {
                 onChanged(e.newValue);
-                soleMatchValue = RebuildSuggestions(suggestionList, field, param, e.newValue, onChanged);
+                topMatchValue = RebuildSuggestions(suggestionList, field, param, e.newValue, onChanged);
             });
 
             // フォーカス取得時に候補表示
             field.RegisterCallback<FocusInEvent>(_ =>
-                soleMatchValue = RebuildSuggestions(suggestionList, field, param, field.value, onChanged));
+                topMatchValue = RebuildSuggestions(suggestionList, field, param, field.value, onChanged));
 
             // フォーカス喪失時に候補非表示（少し遅延してクリックを拾えるようにする）
             field.RegisterCallback<FocusOutEvent>(_ =>
@@ -58,11 +58,11 @@ namespace Void2610.LiminalPalette.UI
             // 戻り値: 補完が実行されたらtrue
             Func<bool> tryComplete = () =>
             {
-                if (soleMatchValue == null) return false;
-                field.SetValueWithoutNotify(soleMatchValue);
-                onChanged(soleMatchValue);
+                if (topMatchValue == null) return false;
+                field.SetValueWithoutNotify(topMatchValue);
+                onChanged(topMatchValue);
                 suggestionList.style.display = DisplayStyle.None;
-                soleMatchValue = null;
+                topMatchValue = null;
                 return true;
             };
 
@@ -140,8 +140,8 @@ namespace Void2610.LiminalPalette.UI
 
             list.style.display = matchedItems.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // 候補が1件だけならそのvalueを返す
-            return matchedItems.Count == 1 ? matchedItems[0].Value : null;
+            // 候補があれば先頭のvalueを返す
+            return matchedItems.Count > 0 ? matchedItems[0].Value : null;
         }
 
         private static IReadOnlyList<ChoiceItem> GetChoiceItems(ParameterDescriptor param)

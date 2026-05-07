@@ -1136,12 +1136,9 @@ namespace Void2610.LiminalPalette.UI
                     break;
                 case KeyCode.Return:
                 case KeyCode.KeypadEnter:
-                    // 引数パネルにフォーカスがある場合、AutoComplete補完を試みる
-                    if (IsArgumentFieldFocused() && TryAutoComplete())
-                    {
-                        evt.StopImmediatePropagation();
-                        break;
-                    }
+                    // 候補表示中なら先頭候補で確定してから実行
+                    if (IsArgumentFieldFocused())
+                        TryAutoComplete();
                     // Logs モードは閲覧専用のため Enter を無視する (再実行は History モードの責務)。
                     if (_mode != ViewMode.Logs)
                     {

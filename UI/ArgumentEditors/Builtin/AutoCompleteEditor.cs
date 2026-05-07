@@ -7,13 +7,19 @@ namespace Void2610.LiminalPalette.UI
 {
     /// <summary>
     /// string パラメータに動的/静的候補がある場合のオートコンプリートUI。
-    /// TextField + 候補リスト構成。入力でフィルタ、クリックまたはEnterでvalueを確定。
+    /// TextField + 候補リスト構成。入力でフィルタ、クリックでvalueを確定。
+    /// 候補が1件の場合、PaletteViewからTryCompleteを呼ぶとEnterで自動確定できる。
     /// </summary>
     internal sealed class AutoCompleteEditor
     {
         private const int MaxVisibleItems = 8;
         private const string SuggestionListClass = "lp-autocomplete-list";
         private const string SuggestionItemClass = "lp-autocomplete-item";
+
+        /// <summary>
+        /// rootのuserDataに格納するキー。PaletteViewからアクセスする。
+        /// </summary>
+        internal const string TryCompleteKey = "lp-autocomplete-try-complete";
 
         public VisualElement Build(ParameterDescriptor param, Action<object> onChanged)
         {
@@ -48,19 +54,19 @@ namespace Void2610.LiminalPalette.UI
             field.RegisterCallback<FocusOutEvent>(_ =>
                 field.schedule.Execute(() => suggestionList.style.display = DisplayStyle.None).ExecuteLater(150));
 
-            // Tabキーで候補が1つなら自動確定（EnterはPaletteViewのRun実行に使われるため）
-            field.RegisterCallback<KeyDownEvent>(e =>
+            // PaletteViewからEnter時に呼ばれる補完確定関数
+            // 戻り値: 補完が実行されたらtrue
+            Func<bool> tryComplete = () =>
             {
-                if (e.keyCode != KeyCode.Tab) return;
-                if (soleMatchValue == null) return;
-
+                if (soleMatchValue == null) return false;
                 field.SetValueWithoutNotify(soleMatchValue);
                 onChanged(soleMatchValue);
                 suggestionList.style.display = DisplayStyle.None;
                 soleMatchValue = null;
-                e.PreventDefault();
-                e.StopPropagation();
-            });
+                return true;
+            };
+
+            root.userData = tryComplete;
 
             root.Add(field);
             root.Add(suggestionList);

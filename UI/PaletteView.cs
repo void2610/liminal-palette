@@ -1136,6 +1136,12 @@ namespace Void2610.LiminalPalette.UI
                     break;
                 case KeyCode.Return:
                 case KeyCode.KeypadEnter:
+                    // 引数パネルにフォーカスがある場合、AutoComplete補完を試みる
+                    if (IsArgumentFieldFocused() && TryAutoComplete())
+                    {
+                        evt.StopImmediatePropagation();
+                        break;
+                    }
                     // Logs モードは閲覧専用のため Enter を無視する (再実行は History モードの責務)。
                     if (_mode != ViewMode.Logs)
                     {
@@ -1148,9 +1154,6 @@ namespace Void2610.LiminalPalette.UI
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Tab:
-                    // 引数パネル内のTextFieldにフォーカスがある場合はAutoComplete補完に委譲
-                    if (!evt.shiftKey && IsArgumentFieldFocused())
-                        break;
                     if (evt.shiftKey)
                     {
                         _searchInput.Focus();
@@ -1214,6 +1217,24 @@ namespace Void2610.LiminalPalette.UI
             _resultsList.RefreshItems();
             if (_mode == ViewMode.Logs) UpdateBottomLogs();
             else UpdateBottomHistory();
+        }
+
+        /// <summary>
+        /// 引数パネル内のAutoCompleteEditorの補完を試みる。
+        /// 候補が1件に絞り込まれていれば確定してtrueを返す。
+        /// </summary>
+        private bool TryAutoComplete()
+        {
+            for (var i = 0; i < _argumentPanel.childCount; i++)
+            {
+                var row = _argumentPanel[i];
+                for (var j = 0; j < row.childCount; j++)
+                {
+                    if (row[j].userData is Func<bool> tryComplete && tryComplete())
+                        return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>引数パネル内のTextFieldにフォーカスがあるかどうか</summary>

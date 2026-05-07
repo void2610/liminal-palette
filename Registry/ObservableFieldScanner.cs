@@ -146,12 +146,12 @@ namespace Void2610.LiminalPalette
             Func<object, object> readCurrent;
             if (isReactiveProperty)
             {
-                // ReactiveProperty<T> は CurrentValue (R3) または Value プロパティ。
-                // R3 の ReactiveProperty<T> は public T Value { get; set; } を持つ。
-                var valueProp = memberType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+                // ReactiveProperty<T> は Value、ReadOnlyReactiveProperty<T> は CurrentValue を持つ。
+                var valueProp = memberType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance)
+                    ?? memberType.GetProperty("CurrentValue", BindingFlags.Public | BindingFlags.Instance);
                 if (valueProp == null)
                 {
-                    outError = "ReactiveProperty<T>.Value not found (R3 API mismatch?)";
+                    outError = "ReactiveProperty<T>.Value / CurrentValue not found (R3 API mismatch?)";
                     return false;
                 }
                 readCurrent = instance =>

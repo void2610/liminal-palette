@@ -40,6 +40,12 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public float Max { get; }
 
+        /// <summary>
+        /// 動的候補を返すファクトリ。nullなら静的Choicesを使う。
+        /// 呼び出しのたびに最新の候補を返す。
+        /// </summary>
+        public Func<IReadOnlyList<ChoiceItem>> DynamicChoices { get; }
+
         public ParameterDescriptor(
             string name,
             Type type,
@@ -49,7 +55,8 @@ namespace Void2610.LiminalPalette
             string description,
             IReadOnlyList<string> choices,
             float min = float.NaN,
-            float max = float.NaN)
+            float max = float.NaN,
+            Func<IReadOnlyList<ChoiceItem>> dynamicChoices = null)
         {
             Name = name;
             Type = type;
@@ -60,6 +67,7 @@ namespace Void2610.LiminalPalette
             Choices = choices ?? Array.Empty<string>();
             Min = min;
             Max = max;
+            DynamicChoices = dynamicChoices;
         }
     }
 }

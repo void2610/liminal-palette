@@ -40,6 +40,22 @@ namespace Void2610.LiminalPalette.UI
             }
         }
 
+        private static readonly AutoCompleteEditor _autoCompleteEditor = new AutoCompleteEditor();
+
+        /// <summary>
+        /// ParameterDescriptor を見て最適なエディタを返す。
+        /// string型でChoices/DynamicChoicesがある場合はAutoCompleteEditorを優先。
+        /// </summary>
+        public static IParameterEditor Resolve(ParameterDescriptor param)
+        {
+            if (param.Type == typeof(string)
+                && (param.DynamicChoices != null || param.Choices.Count > 0))
+            {
+                return new AutoCompleteEditorAdapter(_autoCompleteEditor, param);
+            }
+            return Resolve(param.Type);
+        }
+
         /// <summary>type を扱える最初のエディタを返す。Fallback が末尾にあるため null は返らない。</summary>
         public static IParameterEditor Resolve(Type type)
         {
@@ -55,6 +71,27 @@ namespace Void2610.LiminalPalette.UI
             // 万一テストで Clear だけ呼んで標準を再登録しなかった場合の防御。
             throw new InvalidOperationException(
                 $"No IParameterEditor registered for {type.Name}. Did you call Clear() without Register()?");
+        }
+
+        /// <summary>
+        /// AutoCompleteEditor を IParameterEditor として扱うアダプタ。
+        /// ParameterDescriptor を保持し、Build時に渡す。
+        /// </summary>
+        private sealed class AutoCompleteEditorAdapter : IParameterEditor
+        {
+            private readonly AutoCompleteEditor _editor;
+            private readonly ParameterDescriptor _param;
+
+            public AutoCompleteEditorAdapter(AutoCompleteEditor editor, ParameterDescriptor param)
+            {
+                _editor = editor;
+                _param = param;
+            }
+
+            public bool CanHandle(Type type) => type == typeof(string);
+
+            public UnityEngine.UIElements.VisualElement Build(ParameterDescriptor param, Action<object> onChanged)
+                => _editor.Build(_param, onChanged);
         }
 
         /// <summary>登録済みエディタをすべて削除する (テスト向け)。Reset 後は ResetToDefaults() で再登録すること。</summary>

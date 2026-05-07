@@ -1093,7 +1093,7 @@ namespace Void2610.LiminalPalette.UI
                 label.AddToClassList("palette-arg-label");
                 row.Add(label);
 
-                var editor = ParameterEditorRegistry.Resolve(param.Type);
+                var editor = ParameterEditorRegistry.Resolve(param);
                 var paramName = param.Name;
                 var ve = editor.Build(param, value => _currentArgValues[paramName] = value);
                 row.Add(ve);

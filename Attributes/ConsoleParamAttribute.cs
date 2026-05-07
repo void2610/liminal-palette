@@ -32,5 +32,12 @@ namespace Void2610.LiminalPalette
         /// 対象型は Min と同じ (数値型および対応する <see cref="System.Nullable{T}"/>)。
         /// </summary>
         public float Max { get; set; } = float.NaN;
+
+        /// <summary>
+        /// <see cref="IChoicesProvider"/> を実装した型。ランタイムで候補を動的に生成する。
+        /// <see cref="Choices"/> (静的) と併用した場合、ChoicesProvider が優先される。
+        /// Activator.CreateInstance で生成するため、パラメータレスコンストラクタが必要。
+        /// </summary>
+        public Type ChoicesProvider { get; set; }
     }
 }

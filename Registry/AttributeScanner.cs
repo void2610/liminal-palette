@@ -152,6 +152,20 @@ namespace Void2610.LiminalPalette
                 var min = paramAttr != null ? paramAttr.Min : float.NaN;
                 var max = paramAttr != null ? paramAttr.Max : float.NaN;
 
+                // 動的候補プロバイダの解決
+                Func<IReadOnlyList<ChoiceItem>> dynamicChoices = null;
+                if (paramAttr?.ChoicesProvider != null)
+                {
+                    var providerType = paramAttr.ChoicesProvider;
+                    if (!typeof(IChoicesProvider).IsAssignableFrom(providerType))
+                    {
+                        error = $"parameter '{pi.Name}': ChoicesProvider type '{providerType.Name}' does not implement IChoicesProvider";
+                        return false;
+                    }
+                    var provider = (IChoicesProvider)Activator.CreateInstance(providerType);
+                    dynamicChoices = () => provider.GetChoices();
+                }
+
                 parameters[i] = new ParameterDescriptor(
                     pi.Name,
                     pi.ParameterType,
@@ -161,7 +175,8 @@ namespace Void2610.LiminalPalette
                     description,
                     choices,
                     min: min,
-                    max: max);
+                    max: max,
+                    dynamicChoices: dynamicChoices);
             }
 
             var isAsync = IsAsyncReturn(method.ReturnType);

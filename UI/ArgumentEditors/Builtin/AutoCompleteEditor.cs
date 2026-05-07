@@ -7,7 +7,7 @@ namespace Void2610.LiminalPalette.UI
 {
     /// <summary>
     /// string パラメータに動的/静的候補がある場合のオートコンプリートUI。
-    /// TextField + 候補リスト構成。入力でフィルタ、クリックでvalueを確定。
+    /// TextField + 候補リスト構成。入力でフィルタ、クリックまたはEnterでvalueを確定。
     /// </summary>
     internal sealed class AutoCompleteEditor
     {
@@ -30,27 +30,46 @@ namespace Void2610.LiminalPalette.UI
             suggestionList.style.maxHeight = MaxVisibleItems * 22;
             suggestionList.style.display = DisplayStyle.None;
 
+            // フィルタ後の唯一の候補を保持
+            string soleMatchValue = null;
+
             // テキスト変更時にフィルタ + onChanged
             field.RegisterValueChangedCallback(e =>
             {
                 onChanged(e.newValue);
-                RebuildSuggestions(suggestionList, field, param, e.newValue, onChanged);
+                soleMatchValue = RebuildSuggestions(suggestionList, field, param, e.newValue, onChanged);
             });
 
             // フォーカス取得時に候補表示
             field.RegisterCallback<FocusInEvent>(_ =>
-                RebuildSuggestions(suggestionList, field, param, field.value, onChanged));
+                soleMatchValue = RebuildSuggestions(suggestionList, field, param, field.value, onChanged));
 
             // フォーカス喪失時に候補非表示（少し遅延してクリックを拾えるようにする）
             field.RegisterCallback<FocusOutEvent>(_ =>
                 field.schedule.Execute(() => suggestionList.style.display = DisplayStyle.None).ExecuteLater(150));
+
+            // Enterキーで候補が1つなら自動確定
+            field.RegisterCallback<KeyDownEvent>(e =>
+            {
+                if (e.keyCode != KeyCode.Return && e.keyCode != KeyCode.KeypadEnter) return;
+                if (soleMatchValue == null) return;
+
+                field.SetValueWithoutNotify(soleMatchValue);
+                onChanged(soleMatchValue);
+                suggestionList.style.display = DisplayStyle.None;
+                soleMatchValue = null;
+                e.StopPropagation();
+            });
 
             root.Add(field);
             root.Add(suggestionList);
             return root;
         }
 
-        private static void RebuildSuggestions(
+        /// <summary>
+        /// 候補リストを再構築する。候補が1件だけならそのvalueを返す。
+        /// </summary>
+        private static string RebuildSuggestions(
             ScrollView list, TextField field, ParameterDescriptor param,
             string filter, Action<object> onChanged)
         {
@@ -60,11 +79,11 @@ namespace Void2610.LiminalPalette.UI
             if (choices == null || choices.Count == 0)
             {
                 list.style.display = DisplayStyle.None;
-                return;
+                return null;
             }
 
             var filterLower = (filter ?? "").ToLowerInvariant();
-            var matched = 0;
+            var matchedItems = new List<ChoiceItem>();
 
             for (var i = 0; i < choices.Count; i++)
             {
@@ -75,6 +94,11 @@ namespace Void2610.LiminalPalette.UI
                     && !item.DisplayName.ToLowerInvariant().Contains(filterLower))
                     continue;
 
+                matchedItems.Add(item);
+            }
+
+            foreach (var item in matchedItems)
+            {
                 // 表示: "日本語名 (内部値)" or 同じなら値のみ
                 var labelText = item.DisplayName != item.Value
                     ? $"{item.DisplayName} ({item.Value})"
@@ -105,10 +129,12 @@ namespace Void2610.LiminalPalette.UI
                 });
 
                 list.Add(label);
-                matched++;
             }
 
-            list.style.display = matched > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            list.style.display = matchedItems.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+
+            // 候補が1件だけならそのvalueを返す
+            return matchedItems.Count == 1 ? matchedItems[0].Value : null;
         }
 
         private static IReadOnlyList<ChoiceItem> GetChoiceItems(ParameterDescriptor param)

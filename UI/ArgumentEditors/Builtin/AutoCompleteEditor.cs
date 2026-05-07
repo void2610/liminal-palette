@@ -48,16 +48,17 @@ namespace Void2610.LiminalPalette.UI
             field.RegisterCallback<FocusOutEvent>(_ =>
                 field.schedule.Execute(() => suggestionList.style.display = DisplayStyle.None).ExecuteLater(150));
 
-            // Enterキーで候補が1つなら自動確定
+            // Tabキーで候補が1つなら自動確定（EnterはPaletteViewのRun実行に使われるため）
             field.RegisterCallback<KeyDownEvent>(e =>
             {
-                if (e.keyCode != KeyCode.Return && e.keyCode != KeyCode.KeypadEnter) return;
+                if (e.keyCode != KeyCode.Tab) return;
                 if (soleMatchValue == null) return;
 
                 field.SetValueWithoutNotify(soleMatchValue);
                 onChanged(soleMatchValue);
                 suggestionList.style.display = DisplayStyle.None;
                 soleMatchValue = null;
+                e.PreventDefault();
                 e.StopPropagation();
             });
 

@@ -1148,6 +1148,9 @@ namespace Void2610.LiminalPalette.UI
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Tab:
+                    // 引数パネル内のTextFieldにフォーカスがある場合はAutoComplete補完に委譲
+                    if (!evt.shiftKey && IsArgumentFieldFocused())
+                        break;
                     if (evt.shiftKey)
                     {
                         _searchInput.Focus();
@@ -1211,6 +1214,18 @@ namespace Void2610.LiminalPalette.UI
             _resultsList.RefreshItems();
             if (_mode == ViewMode.Logs) UpdateBottomLogs();
             else UpdateBottomHistory();
+        }
+
+        /// <summary>引数パネル内のTextFieldにフォーカスがあるかどうか</summary>
+        private bool IsArgumentFieldFocused()
+        {
+            var focused = focusController?.focusedElement as VisualElement;
+            while (focused != null)
+            {
+                if (focused == _argumentPanel) return true;
+                focused = focused.parent;
+            }
+            return false;
         }
 
         private static VisualElement FindFocusableDescendant(VisualElement root)

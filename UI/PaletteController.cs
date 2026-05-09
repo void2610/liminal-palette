@@ -23,6 +23,11 @@ namespace Void2610.LiminalPalette.UI
         private readonly ICommandExecutor _executor;
         private readonly ICommandHistory _history;
 
+        // タブ切替や検索とは独立に常に適用される base フィルタ。null なら無効。
+        // ランタイム (Play Mode / Player ビルド) では cmd => !cmd.IsEditorOnly を渡し、
+        // Editor 専用コマンド (Unity MenuItem 自動収集分など) を一律で表示対象から外す用途。
+        private readonly Func<CommandDescriptor, bool> _baseFilter;
+
         public string Query { get; private set; } = "";
         public IReadOnlyList<RankedCommand> Results { get; private set; } = Array.Empty<RankedCommand>();
         public int SelectedIndex { get; private set; } = 0;
@@ -58,10 +63,24 @@ namespace Void2610.LiminalPalette.UI
         public ICommandHistory History => _history;
 
         public PaletteController(ICommandRegistry registry, ICommandExecutor executor, ICommandHistory history)
+            : this(registry, executor, history, baseFilter: null)
+        {
+        }
+
+        /// <summary>
+        /// baseFilter を指定するコンストラクタ。タブ Filter とは別にレジストリ全件に対して常時適用される。
+        /// 主な用途は Runtime 側で IsEditorOnly コマンドを除外すること。
+        /// </summary>
+        public PaletteController(
+            ICommandRegistry registry,
+            ICommandExecutor executor,
+            ICommandHistory history,
+            Func<CommandDescriptor, bool> baseFilter)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _executor = executor ?? throw new ArgumentNullException(nameof(executor));
             _history = history ?? throw new ArgumentNullException(nameof(history));
+            _baseFilter = baseFilter;
 
             // 初期表示として全件を計算しておく。
             RecomputeResults();
@@ -190,14 +209,25 @@ namespace Void2610.LiminalPalette.UI
             // KeepState は何もしない (前回の Query / SelectedIndex を保持)。
         }
 
+        // 2 つのフィルタ (baseFilter とタブ Filter) を AND 結合した述語を返す。null は「素通し」扱い。
+        // どちらも null なら null を返し、呼び出し側でフィルタ自体をスキップできるようにする。
+        private bool PassesFilters(CommandDescriptor cmd)
+        {
+            if (_baseFilter != null && !_baseFilter(cmd)) return false;
+            if (Filter != null && !Filter(cmd)) return false;
+            return true;
+        }
+
         // 検索結果の再計算。クエリ有無で 2 系統のロジックに分岐する。
-        // Filter (タブ) があれば全コマンドを絞ってから検索を当てる。
+        // baseFilter (Runtime での IsEditorOnly 除外など) と タブ Filter を AND で適用してから検索を当てる。
         private void RecomputeResults()
         {
             var all = _registry.All;
-            // Filter で先に絞る。null なら全件。
-            var pool = Filter == null ? (IReadOnlyList<CommandDescriptor>)all
-                : all.Where(Filter).ToList();
+            // baseFilter とタブ Filter を AND で先に絞る。両方 null なら全件。
+            var hasAnyFilter = _baseFilter != null || Filter != null;
+            var pool = hasAnyFilter
+                ? (IReadOnlyList<CommandDescriptor>)all.Where(PassesFilters).ToList()
+                : (IReadOnlyList<CommandDescriptor>)all;
             var list = new List<RankedCommand>(Math.Min(pool.Count, MaxResults));
 
             if (string.IsNullOrEmpty(Query))
@@ -212,7 +242,7 @@ namespace Void2610.LiminalPalette.UI
                     var path = _history.RecentPaths[i];
                     var cmd = _registry.Find(path);
                     if (cmd == null) continue;
-                    if (Filter != null && !Filter(cmd)) continue;
+                    if (!PassesFilters(cmd)) continue;
                     list.Add(new RankedCommand(cmd, 0, Array.Empty<int>(), fromHistory: true));
                 }
                 // 残りをアルファベット順で。履歴に既出のものは除外する。

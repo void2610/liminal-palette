@@ -62,7 +62,10 @@ namespace Void2610.LiminalPalette.Editor
                         {
                             EditorApplication.ExecuteMenuItem(stripped);
                             return null;
-                        });
+                        },
+                        // EditorApplication.ExecuteMenuItem は Editor 専用 API のため、Play Mode / Player ビルドの
+                        // ランタイムパレット UI には出さない (PaletteController の baseFilter で除外する)。
+                        isEditorOnly: true);
                     registry.Register(descriptor);
                     registered++;
                 }

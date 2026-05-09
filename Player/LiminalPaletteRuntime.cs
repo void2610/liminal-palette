@@ -150,10 +150,15 @@ namespace Void2610.LiminalPalette.Player
             if (_viewBuilt) return;
             _viewBuilt = true;
 
+            // Runtime (Play Mode / Player ビルド) では IsEditorOnly コマンド (Unity MenuItem 自動収集など、
+            // EditorApplication.ExecuteMenuItem に依存する Editor 専用エントリ) を一律で表示対象から外す。
+            // baseFilter はタブ切替や検索クエリと独立に常時適用されるので、ユーザーがどのタブにいても
+            // Editor 専用コマンドは出てこなくなる。
             _controller = new PaletteController(
                 CommandRegistry.Default,
                 new CommandExecutor(CommandRegistry.Default),
-                new PlayerPrefsCommandHistory());
+                new PlayerPrefsCommandHistory(),
+                baseFilter: cmd => !cmd.IsEditorOnly);
 
             _view = new PaletteView(_controller);
             _view.CloseRequested += Hide;

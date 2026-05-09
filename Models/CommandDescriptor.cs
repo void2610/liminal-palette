@@ -43,6 +43,13 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public Func<object[], object> Invoker { get; }
 
+        /// <summary>
+        /// Editor 専用コマンドかどうか。true の場合、Play Mode / Player ビルドのランタイムパレット UI からは
+        /// 表示対象から除外される (Unity の [MenuItem] を自動収集した "Menu/..." 系などが該当)。
+        /// レジストリ登録自体は共通なので Editor 側 Window では引き続き見える。
+        /// </summary>
+        public bool IsEditorOnly { get; }
+
         public CommandDescriptor(
             string path,
             string description,
@@ -51,7 +58,7 @@ namespace Void2610.LiminalPalette
             Type returnType,
             bool isAsync,
             MethodInfo method)
-            : this(path, description, aliases, parameters, returnType, isAsync, method, null)
+            : this(path, description, aliases, parameters, returnType, isAsync, method, null, false)
         {
         }
 
@@ -64,6 +71,20 @@ namespace Void2610.LiminalPalette
             bool isAsync,
             MethodInfo method,
             Func<object[], object> invoker)
+            : this(path, description, aliases, parameters, returnType, isAsync, method, invoker, false)
+        {
+        }
+
+        public CommandDescriptor(
+            string path,
+            string description,
+            IReadOnlyList<string> aliases,
+            IReadOnlyList<ParameterDescriptor> parameters,
+            Type returnType,
+            bool isAsync,
+            MethodInfo method,
+            Func<object[], object> invoker,
+            bool isEditorOnly)
         {
             Path = path;
             Name = ExtractName(path);
@@ -75,6 +96,7 @@ namespace Void2610.LiminalPalette
             IsAsync = isAsync;
             Method = method;
             Invoker = invoker;
+            IsEditorOnly = isEditorOnly;
         }
 
         // パスの末尾セグメント。"/" を含まないなら全体がそのまま Name となる。

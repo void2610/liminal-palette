@@ -106,6 +106,32 @@ namespace Void2610.LiminalPalette.Tests.UI
         }
 
         [Test]
+        public void WhitespaceQuery_MatchesAcrossSeparator()
+        {
+            // "open prefab" のように空白を含むクエリでも、target 側に空白が無い "Editor/Open/Prefabs"
+            // にマッチしてほしい (各トークンが順に subsequence 一致すれば成立)。
+            var r = FuzzyMatcher.Match("open prefab", "Editor/Open/Prefabs");
+            Assert.IsTrue(r.Matched);
+            Assert.Greater(r.Score, 0);
+        }
+
+        [Test]
+        public void WhitespaceQuery_TokensMustBeOrdered()
+        {
+            // "prefab open" は target に対して先に "prefab" → 後ろに "open" の順では存在しないので NoMatch。
+            var r = FuzzyMatcher.Match("prefab open", "Editor/Open/Prefabs");
+            Assert.IsFalse(r.Matched);
+        }
+
+        [Test]
+        public void WhitespaceQuery_MultipleSpacesAndTabsAreTreatedAsSeparators()
+        {
+            // 連続する空白やタブも区切りとして扱う (空トークンは捨てる)。
+            var r = FuzzyMatcher.Match("open\t\t prefab", "Editor/Open/Prefabs");
+            Assert.IsTrue(r.Matched);
+        }
+
+        [Test]
         public void PerformanceUnder1000Targets_FinishesInUnder10ms()
         {
             // パフォーマンス回帰検出用。1000 件規模で 10ms 以内 (CI で揺らぐので余裕を持って 50ms でガード)。

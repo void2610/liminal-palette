@@ -25,6 +25,27 @@ namespace Void2610.LiminalPalette.UI
             if (string.IsNullOrEmpty(query)) return new MatchResult(true, 0, Array.Empty<int>());
             if (string.IsNullOrEmpty(target)) return MatchResult.NoMatch;
 
+            // クエリに空白が含まれる場合はトークン分割して順次マッチさせる。
+            // 例: "open prefab" を "Editor/Open/Prefabs" に当てるとき、target 側に空白が無くても
+            // "open" → "Open" の後に続けて "prefab" → "Prefab" を当ててマッチさせたい。
+            for (var i = 0; i < query.Length; i++)
+            {
+                if (query[i] == ' ' || query[i] == '\t')
+                {
+                    return MatchTokens(query, target);
+                }
+            }
+
+            return MatchSingle(query, target, 0);
+        }
+
+        // 単一トークンの subsequence マッチ。startIndex から target を走査する。
+        // startIndex > 0 のときは「直前のトークンが消費した位置の続き」から探すことを意味する。
+        private static MatchResult MatchSingle(string query, string target, int startIndex)
+        {
+            if (string.IsNullOrEmpty(query)) return new MatchResult(true, 0, Array.Empty<int>());
+            if (startIndex >= target.Length) return MatchResult.NoMatch;
+
             // 貪欲法: query の各文字に対して target を左から走査し、最初に case-insensitive 一致した位置を採用する。
             // 計画書通り 1000 件規模なら十分高速。後でより高度なマッチングが必要になったら DP に置き換える。
             var matchedIndices = new int[query.Length];
@@ -33,7 +54,7 @@ namespace Void2610.LiminalPalette.UI
             var score = 0;
             var consecutiveRun = 0;
 
-            for (var ti = 0; ti < target.Length && qi < query.Length; ti++)
+            for (var ti = startIndex; ti < target.Length && qi < query.Length; ti++)
             {
                 if (!CharEqualsIgnoreCase(query[qi], target[ti])) continue;
 
@@ -79,6 +100,34 @@ namespace Void2610.LiminalPalette.UI
             if (score < 0) score = 0;
             return new MatchResult(true, score, matchedIndices);
         }
+
+        // 空白区切りクエリのマッチ。各トークンを順に MatchSingle で解決し、後続トークンは
+        // 直前トークンが消費した最終位置の次から探す (トークン間の順序は維持する)。
+        private static MatchResult MatchTokens(string query, string target)
+        {
+            var tokens = query.Split(TokenSeparators, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0) return new MatchResult(true, 0, Array.Empty<int>());
+
+            var allIndices = new List<int>(query.Length);
+            var totalScore = 0;
+            var startFrom = 0;
+            for (var i = 0; i < tokens.Length; i++)
+            {
+                var r = MatchSingle(tokens[i], target, startFrom);
+                if (!r.Matched) return MatchResult.NoMatch;
+                totalScore += r.Score;
+                for (var k = 0; k < r.MatchedIndices.Count; k++) allIndices.Add(r.MatchedIndices[k]);
+                if (r.MatchedIndices.Count > 0)
+                {
+                    startFrom = r.MatchedIndices[r.MatchedIndices.Count - 1] + 1;
+                }
+            }
+
+            if (totalScore < 0) totalScore = 0;
+            return new MatchResult(true, totalScore, allIndices.ToArray());
+        }
+
+        private static readonly char[] TokenSeparators = { ' ', '\t' };
 
         /// <summary>
         /// target に加えてエイリアス文字列も候補としてスコアリングする。最高スコアを採用するが、

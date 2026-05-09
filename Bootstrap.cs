@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 #if UNITY_EDITOR
@@ -37,8 +39,25 @@ namespace Void2610.LiminalPalette
 
             try
             {
+                // テスト専用アセンブリ (慣例的に末尾 ".Tests" / ".EditorTests" / ".PlayModeTests") は
+                // 通常のパレットに出したくないフィクスチャコマンド (Test/Vector など) を含むため除外する。
+                // 単体テスト側は AttributeScanner.Scan に明示的に Tests アセンブリを渡すので影響しない。
                 var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                var commands = AttributeScanner.Scan(assemblies);
+                var filtered = new List<Assembly>(assemblies.Length);
+                for (var i = 0; i < assemblies.Length; i++)
+                {
+                    var asm = assemblies[i];
+                    if (asm == null) continue;
+                    var name = asm.GetName().Name ?? "";
+                    if (name.EndsWith(".Tests", StringComparison.Ordinal)
+                        || name.EndsWith(".EditorTests", StringComparison.Ordinal)
+                        || name.EndsWith(".PlayModeTests", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                    filtered.Add(asm);
+                }
+                var commands = AttributeScanner.Scan(filtered);
 
                 // ここで Clear() は呼ばない: Editor の DomainReload 後は Default が空に作り直されており、
                 // _initialized で重複起動も防いでいるため Clear は不要。逆に Clear すると、
@@ -51,11 +70,11 @@ namespace Void2610.LiminalPalette
 
                 // Phase 5a: [ConsoleObservableField] のスキャン。
                 // ReactiveProperty<T> / Observable<T> を発見して ObservableFieldRegistry.Default に投入。
-                ObservableFieldScanner.ScanAll();
+                ObservableFieldScanner.ScanAll(filtered);
 
                 // Phase 5b: [ConsoleScenario] のスキャン。
                 // IEnumerable<ScenarioStep> を返すメソッドを発見して ScenarioRegistry.Default に投入。
-                ScenarioScanner.ScanAll();
+                ScenarioScanner.ScanAll(filtered);
             }
             catch (Exception ex)
             {

@@ -19,10 +19,19 @@ namespace Void2610.LiminalPalette
     {
         public static void ScanAll()
         {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (var ai = 0; ai < assemblies.Length; ai++)
+            ScanAll(AppDomain.CurrentDomain.GetAssemblies());
+        }
+
+        /// <summary>
+        /// 指定したアセンブリ列のみをスキャンする。Bootstrap でテストアセンブリを除外する用途に使う。
+        /// 内部の ShouldSkip も別途適用されるので、フレームワーク系をフィルタする責務は呼び出し側にない。
+        /// </summary>
+        public static void ScanAll(IEnumerable<Assembly> assemblies)
+        {
+            if (assemblies == null) return;
+            foreach (var asm in assemblies)
             {
-                var asm = assemblies[ai];
+                if (asm == null) continue;
                 if (ShouldSkip(asm)) continue;
 
                 Type[] types;

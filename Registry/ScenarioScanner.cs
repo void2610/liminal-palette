@@ -41,7 +41,15 @@ namespace Void2610.LiminalPalette
         /// <summary>全 Assembly をスキャンして ScenarioRegistry.Default に登録する。</summary>
         public static void ScanAll()
         {
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            ScanAll(AppDomain.CurrentDomain.GetAssemblies());
+        }
+
+        /// <summary>
+        /// 指定したアセンブリ列のみをスキャンして ScenarioRegistry.Default に登録する。
+        /// Bootstrap でテストアセンブリを除外する用途に使う。
+        /// </summary>
+        public static void ScanAll(IEnumerable<Assembly> assemblies)
+        {
             var descriptors = Scan(assemblies);
             for (var i = 0; i < descriptors.Count; i++)
             {

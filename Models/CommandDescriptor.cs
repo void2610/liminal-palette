@@ -44,11 +44,13 @@ namespace Void2610.LiminalPalette
         public Func<object[], object> Invoker { get; }
 
         /// <summary>
-        /// Editor 専用コマンドかどうか。true の場合、Play Mode / Player ビルドのランタイムパレット UI からは
-        /// 表示対象から除外される (Unity の [MenuItem] を自動収集した "Menu/..." 系などが該当)。
+        /// Editor 専用コマンドかどうか。Path の prefix から自動判定する:
+        ///   - "Editor/..."  : 利用側が手書きで [ConsoleCommand("Editor/...")] と宣言した Editor 専用コマンド
+        ///   - "Menu/..."    : EditorMenuItemBootstrap が Unity の [MenuItem] から自動収集したコマンド
+        /// true の場合、Play Mode / Player ビルドのランタイムパレット UI からは表示対象外。
         /// レジストリ登録自体は共通なので Editor 側 Window では引き続き見える。
         /// </summary>
-        public bool IsEditorOnly { get; }
+        public bool IsEditorOnly => IsEditorOnlyPath(Path);
 
         public CommandDescriptor(
             string path,
@@ -58,7 +60,7 @@ namespace Void2610.LiminalPalette
             Type returnType,
             bool isAsync,
             MethodInfo method)
-            : this(path, description, aliases, parameters, returnType, isAsync, method, null, false)
+            : this(path, description, aliases, parameters, returnType, isAsync, method, null)
         {
         }
 
@@ -71,20 +73,6 @@ namespace Void2610.LiminalPalette
             bool isAsync,
             MethodInfo method,
             Func<object[], object> invoker)
-            : this(path, description, aliases, parameters, returnType, isAsync, method, invoker, false)
-        {
-        }
-
-        public CommandDescriptor(
-            string path,
-            string description,
-            IReadOnlyList<string> aliases,
-            IReadOnlyList<ParameterDescriptor> parameters,
-            Type returnType,
-            bool isAsync,
-            MethodInfo method,
-            Func<object[], object> invoker,
-            bool isEditorOnly)
         {
             Path = path;
             Name = ExtractName(path);
@@ -96,7 +84,15 @@ namespace Void2610.LiminalPalette
             IsAsync = isAsync;
             Method = method;
             Invoker = invoker;
-            IsEditorOnly = isEditorOnly;
+        }
+
+        // Path の prefix で Editor 専用かどうかを判定する。Editor / Menu の 2 つは「自明に Editor 専用」として
+        // 予約 prefix 扱いし、利用側はこの 2 つから選んで命名するだけでランタイムから自動的に隠れる。
+        private static bool IsEditorOnlyPath(string p)
+        {
+            if (string.IsNullOrEmpty(p)) return false;
+            return p.StartsWith("Editor/", StringComparison.OrdinalIgnoreCase)
+                || p.StartsWith("Menu/", StringComparison.OrdinalIgnoreCase);
         }
 
         // パスの末尾セグメント。"/" を含まないなら全体がそのまま Name となる。

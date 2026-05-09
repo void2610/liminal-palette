@@ -50,6 +50,8 @@ namespace Void2610.LiminalPalette.Editor
                     // 表示用とは別に suffix を除去した版を invoker 内で使う。
                     var stripped = StripShortcutSuffix(menuPath);
 
+                    // パス prefix "Menu/" 自体が予約済みで、CommandDescriptor.IsEditorOnly が
+                    // 自動的に true を返すため、ランタイムパレットからは除外される。
                     var descriptor = new CommandDescriptor(
                         path: commandPath,
                         description: $"Editor menu: {menuPath}",
@@ -62,10 +64,7 @@ namespace Void2610.LiminalPalette.Editor
                         {
                             EditorApplication.ExecuteMenuItem(stripped);
                             return null;
-                        },
-                        // EditorApplication.ExecuteMenuItem は Editor 専用 API のため、Play Mode / Player ビルドの
-                        // ランタイムパレット UI には出さない (PaletteController の baseFilter で除外する)。
-                        isEditorOnly: true);
+                        });
                     registry.Register(descriptor);
                     registered++;
                 }

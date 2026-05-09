@@ -318,10 +318,26 @@ prefix マッチで関連付け: 選択コマンドの Path から最後の `/` 
 
 慣例として:
 
-- 名詞 / カテゴリで階層化: `Player/Health/Set`、`Editor/Time/SetTimeScale`
+- 名詞 / カテゴリで階層化: `Player/Health/Set`、`Enemy/Spawn`
 - 大文字始まり (PascalCase)
 - 検索時は大小区別なしでマッチするので、好きな大文字使いで OK
 - 末尾は動詞の命令形が読みやすい (`Set`、`Reload`、`Reset`、`Toggle`、`Spawn`)
+
+### 予約 prefix (Editor 専用扱い)
+
+以下 2 つの prefix で始まるパスは「Editor 専用コマンド」として
+`CommandDescriptor.IsEditorOnly` が自動的に true を返し、Play Mode /
+Player ビルドのランタイムパレット UI から除外される。Editor 側 Window では
+従来どおり表示される (登録自体は同じレジストリ)。
+
+| prefix | 用途 |
+|---|---|
+| `Editor/...` | 利用側が手書きする Editor 専用コマンド (`EditorUtility` / `Selection` / `PlayerSettings` 等を使うもの) |
+| `Menu/...` | `EditorMenuItemBootstrap` が Unity の `[MenuItem]` から自動収集する分。利用側は通常使わない |
+
+ランタイムでも実行可能なコマンドにはこれらの prefix を付けないこと。
+セーブデータパスを Finder で開く類は `Editor/Assets/Show Persistent Data`、
+ランタイムでも叩きたい体力セットは `Player/Health/Set` のように分ける。
 
 避けるべき:
 - `My/Cmd/` (末尾スラッシュは例外)

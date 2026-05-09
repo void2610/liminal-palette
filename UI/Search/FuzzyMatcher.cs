@@ -101,8 +101,9 @@ namespace Void2610.LiminalPalette.UI
             return new MatchResult(true, score, matchedIndices);
         }
 
-        // 空白区切りクエリのマッチ。各トークンを順に MatchSingle で解決し、後続トークンは
-        // 直前トークンが消費した最終位置の次から探す (トークン間の順序は維持する)。
+        // 空白区切りクエリのマッチ。各トークンを独立に target 全体へ subsequence マッチさせ、
+        // すべてのトークンが (順序に関係なく) マッチすれば成立とする。
+        // VSCode コマンドパレットと同様、"open prefab" でも "prefab open" でも同じ結果を出すための仕様。
         private static MatchResult MatchTokens(string query, string target)
         {
             var tokens = query.Split(TokenSeparators, StringSplitOptions.RemoveEmptyEntries);
@@ -110,21 +111,19 @@ namespace Void2610.LiminalPalette.UI
 
             var allIndices = new List<int>(query.Length);
             var totalScore = 0;
-            var startFrom = 0;
             for (var i = 0; i < tokens.Length; i++)
             {
-                var r = MatchSingle(tokens[i], target, startFrom);
+                var r = MatchSingle(tokens[i], target, 0);
                 if (!r.Matched) return MatchResult.NoMatch;
                 totalScore += r.Score;
                 for (var k = 0; k < r.MatchedIndices.Count; k++) allIndices.Add(r.MatchedIndices[k]);
-                if (r.MatchedIndices.Count > 0)
-                {
-                    startFrom = r.MatchedIndices[r.MatchedIndices.Count - 1] + 1;
-                }
             }
 
             if (totalScore < 0) totalScore = 0;
-            return new MatchResult(true, totalScore, allIndices.ToArray());
+            // ハイライト位置は重複しうるので昇順ソートして返す (重複除去はしない: 描画側で許容)。
+            var indicesArray = allIndices.ToArray();
+            Array.Sort(indicesArray);
+            return new MatchResult(true, totalScore, indicesArray);
         }
 
         private static readonly char[] TokenSeparators = { ' ', '\t' };

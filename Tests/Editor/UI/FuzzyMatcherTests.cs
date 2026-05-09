@@ -116,11 +116,13 @@ namespace Void2610.LiminalPalette.Tests.UI
         }
 
         [Test]
-        public void WhitespaceQuery_TokensMustBeOrdered()
+        public void WhitespaceQuery_TokensAreOrderIndependent()
         {
-            // "prefab open" は target に対して先に "prefab" → 後ろに "open" の順では存在しないので NoMatch。
+            // VSCode コマンドパレット同様、トークンの順序は問わない。
+            // "prefab open" でも "open prefab" と同じく "Editor/Open/Prefabs" にマッチする。
             var r = FuzzyMatcher.Match("prefab open", "Editor/Open/Prefabs");
-            Assert.IsFalse(r.Matched);
+            Assert.IsTrue(r.Matched);
+            Assert.Greater(r.Score, 0);
         }
 
         [Test]

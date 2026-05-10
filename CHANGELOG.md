@@ -17,6 +17,9 @@
 ### Changed
 - CLI コマンド名を `lp` から `liminal` に変更 (`lp` は macOS の line printer ユーティリティと衝突するため)。`Tools~/lp/` → `Tools~/liminal/`、AI Skill 名も `lp-*` → `liminal-*` にリネーム。AISkillsInstaller の Uninstall は legacy `lp-*` ディレクトリも自動的に掃除する。
 
+### Fixed
+- `/api/v1/health` が HTTP ワーカースレッドから `Application.productName` / `Application.dataPath` を呼び 500 になるバグを修正 (#5)。Editor / Runtime bootstrap がメインスレッドで取得済みの値を `HealthEndpoint` のコンストラクタに渡すように変更。
+
 ## [0.1.0] - 2026-05-06
 
 ### Added

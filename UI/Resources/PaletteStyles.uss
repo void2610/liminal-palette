@@ -13,6 +13,10 @@
        ウィンドウ背景が常に下にあるため透明度の影響は無視できる。 */
     background-color: rgba(18, 18, 20, 0.88);
     color: rgb(228, 228, 228);
+    /* Unity 既定の Inter フォントは日本語グリフを持たないため、WebGL 等システムフォント不在の環境で
+       日本語が tofu (□) になる。Dynamic atlas モードの Noto Sans JP FontAsset を全体に適用して
+       Latin / 日本語の双方を網羅する。font は子孫に継承されるので :root 相当の本セレクタだけで足りる。 */
+    -unity-font-definition: url("project://database/Packages/com.void2610.liminal-palette/UI/Resources/Fonts/NotoSansJP.asset");
 }
 
 /* ----- Tab bar (top) ----- */

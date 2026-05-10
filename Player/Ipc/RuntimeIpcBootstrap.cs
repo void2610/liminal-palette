@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using UnityEngine;
 using Void2610.LiminalPalette.Ipc;
@@ -92,7 +93,16 @@ namespace Void2610.LiminalPalette.Player.Ipc
         {
             var token = TokenStore.LoadOrCreate();
             var router = new IpcRouter(new TokenAuthenticator(token));
-            router.Register("GET", "/api/v1/health", new HealthEndpoint("runtime"));
+
+            // Unity API はメインスレッド専用なので bootstrap (= ここはメインスレッド) で
+            // 取得済みの値を HealthEndpoint に渡す。HTTP ワーカースレッドから直接呼ぶと
+            // "can only be called from the main thread" で 500 になる。
+            var projectName = Application.productName ?? "";
+            var dataPath = Application.dataPath;
+            var projectPath = string.IsNullOrEmpty(dataPath)
+                ? ""
+                : (Path.GetDirectoryName(dataPath) ?? "");
+            router.Register("GET", "/api/v1/health", new HealthEndpoint("runtime", projectName, projectPath));
             router.Register("GET", "/api/v1/commands", new ListCommandsEndpoint());
             router.Register("POST", "/api/v1/execute", new ExecuteCommandEndpoint());
             router.Register("GET", "/api/v1/logs", new ListLogsEndpoint());

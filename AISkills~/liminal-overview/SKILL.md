@@ -40,6 +40,7 @@ liminal health   # → ok ... が出れば設定 OK
 
 | やりたいこと | 使うスキル | `liminal` サブコマンド |
 |---|---|---|
+| 新規プロジェクトの環境確認 / 固定ポート設定 | (直接実行) | `liminal init [--port N --runtime-port M]` |
 | LP が起動しているか確認 | `/liminal-find-port` | `liminal health` / `liminal doctor` |
 | 利用できるコマンドを発見 | `/liminal-list-commands` | `liminal commands [--filter Player/]` |
 | コマンドを実行する | `/liminal-execute` | `liminal exec <path> key=value...` |

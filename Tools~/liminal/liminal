@@ -3,6 +3,7 @@
 # 依存は Python 3 標準ライブラリのみ。chmod +x で動かす想定。
 #
 # 使い方:
+#   liminal init [--port 7613] [--runtime-port 7700]
 #   liminal health
 #   liminal doctor [--prune-stale]
 #   liminal commands [--filter Player/]
@@ -40,6 +41,12 @@ DEFAULT_TOKEN_PATH = Path.home() / ".liminal-palette" / "token"
 DEFAULT_CACHE_PATH = Path.home() / ".liminal-palette" / "ports.json"
 TIMEOUT_SEC = 10
 PROBE_TIMEOUT_SEC = 0.4  # discovery 中の /health probe 用 (本リクエストとは別)
+# IDE (VS Code 等) で ProjectSettings/LiminalPalette.json の autocomplete / validation 用 schema URL。
+# liminal project set-port / liminal init で書き出すファイルに埋め込む。
+PROJECT_CONFIG_SCHEMA_URL = (
+    "https://raw.githubusercontent.com/void2610/liminal-palette/main/"
+    "Documentation~/schemas/LiminalPalette.schema.json"
+)
 
 # -- 端末カラー (TTY のみ) ------------------------------------------------
 
@@ -726,6 +733,41 @@ def _project_show(args):
         print(_dim("  (no listener for this project — Unity Editor not running?)"))
 
 
+def _read_project_config(cfg_path: Path) -> dict:
+    """LiminalPalette.json を読んで dict として返す。ファイルなし / 壊れていれば {}。"""
+    if not cfg_path.is_file():
+        return {}
+    try:
+        raw = cfg_path.read_text(encoding="utf-8")
+    except OSError as e:
+        raise SystemExit(_red(f"read error: {cfg_path}: {e}"))
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        print(_yellow(f"warning: {cfg_path} の JSON パースに失敗。上書きします。"))
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_project_config(cfg_path: Path, existing: dict, updates: dict) -> dict:
+    """existing をベースに updates をマージして書き出す。
+    `$schema` を先頭に保つ (既存値が有効ならそれを保持、無ければ canonical URL)。
+    OSError は呼び出し側で SystemExit にする。
+    """
+    out: dict = {}
+    schema_existing = existing.get("$schema") if isinstance(existing, dict) else None
+    out["$schema"] = schema_existing if isinstance(schema_existing, str) and schema_existing else PROJECT_CONFIG_SCHEMA_URL
+    if isinstance(existing, dict):
+        for k, v in existing.items():
+            if k == "$schema":
+                continue
+            out[k] = v
+    out.update(updates)
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
 def _project_set_port(args):
     project_path = _require_cwd_project()
     port = args.port_value
@@ -733,26 +775,16 @@ def _project_set_port(args):
         raise SystemExit(_red(f"port は 1..65535 の範囲で指定してください: {port}"))
     field = "runtimePort" if getattr(args, "runtime", False) else "port"
     cfg_path = _project_config_path(project_path)
-    data: dict = {}
-    if cfg_path.is_file():
-        try:
-            existing_raw = cfg_path.read_text(encoding="utf-8")
-        except OSError as e:
-            raise SystemExit(_red(f"read error: {cfg_path}: {e}"))
-        try:
-            existing = json.loads(existing_raw)
-            if isinstance(existing, dict):
-                data = existing
-        except json.JSONDecodeError:
-            print(_yellow(f"warning: {cfg_path} の JSON パースに失敗。上書きします。"))
-    data[field] = port
-    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    existing = _read_project_config(cfg_path)
+    schema_was_missing = "$schema" not in existing
     try:
-        cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        _write_project_config(cfg_path, existing, {field: port})
     except OSError as e:
         raise SystemExit(_red(f"write error: {cfg_path}: {e}"))
     print(f"{_green('wrote')}  {cfg_path}")
     print(f"  {field} = {port}")
+    if schema_was_missing:
+        print(_dim("  $schema reference を追加 (IDE autocomplete 用)"))
     if field == "port":
         print(_dim("  Unity Editor 再起動 (もしくは DomainReload) で反映されます"))
     else:
@@ -766,6 +798,8 @@ def _project_unset_port(args):
         print(_dim(f"  (no {cfg_path.name} — 何もしません)"))
         return
     field = "runtimePort" if getattr(args, "runtime", False) else "port"
+    # unset は破壊的操作なので _read_project_config の lenient ({} fallback) は使わず、
+    # JSON パース失敗を致命エラーとして可視化する (lenient だと「フィールドは元々無い」と誤認させる)。
     try:
         raw = cfg_path.read_text(encoding="utf-8")
     except OSError as e:
@@ -773,22 +807,180 @@ def _project_unset_port(args):
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise SystemExit(_red(f"parse error: {e}"))
-    if not isinstance(data, dict) or field not in data:
+        raise SystemExit(_red(
+            f"parse error: {cfg_path}: {e}\n"
+            "  → ファイルを手動修正するか削除してから再実行してください。"
+        ))
+    if not isinstance(data, dict):
+        raise SystemExit(_red(
+            f"{cfg_path}: 想定形式 (JSON object) ではありません。手動修正してください。"
+        ))
+    if field not in data:
         print(_dim(f"  {field} は元々設定されていません"))
         return
     data.pop(field, None)
+    # $schema 以外にユーザー値が残っていなければファイルごと削除する。
+    has_user_data = any(k != "$schema" for k in data.keys())
     try:
-        if not data:
-            # 全フィールド消えたらファイルごと削除 (空ファイルを残さない)
+        if not has_user_data:
             cfg_path.unlink()
-            print(f"{_green('removed')}  {cfg_path} (全フィールド消えたためファイルごと削除)")
+            print(f"{_green('removed')}  {cfg_path} (port/runtimePort が無くなったためファイルごと削除)")
         else:
-            cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            _write_project_config(cfg_path, data, {})
             print(f"{_green('updated')}  {cfg_path}")
             print(f"  {field} を削除")
     except OSError as e:
         raise SystemExit(_red(f"write error: {cfg_path}: {e}"))
+
+
+def cmd_init(args):
+    """新規プロジェクトの onboarding を 1 コマンドで:
+       cwd→Unity プロジェクト検出 / config 状態 / token 確認 / Skills 確認 / live probe を順に表示。
+       --port / --runtime-port を渡すとその場で ProjectSettings/LiminalPalette.json に書き込む。
+    """
+    print(_bold("Liminal Palette init"))
+
+    # 1) Unity プロジェクト検出 (これが無いと他は意味が無い)
+    project_path = _detect_project_from_cwd()
+    if not project_path:
+        raise SystemExit(_red(
+            f"cwd ({Path.cwd()}) 配下に Unity プロジェクトが見つかりません。"
+            " ProjectSettings/ProjectVersion.txt がある場所で実行してください。"
+        ))
+    print(f"\n{_bold('Project')}")
+    print(f"  detected : {_green(project_path)}")
+
+    # 2) Project config (--port / --runtime-port があれば書き込む。無くても $schema 整合だけは合わせる)
+    cfg_path = _project_config_path(project_path)
+    print(f"\n{_bold('Project config')}")
+    print(f"  file     : {cfg_path}")
+    existing = _read_project_config(cfg_path)
+
+    updates: dict = {}
+    if args.port is not None:
+        if not (1 <= args.port <= 65535):
+            raise SystemExit(_red(f"--port は 1..65535: {args.port}"))
+        updates["port"] = args.port
+    if args.runtime_port is not None:
+        if not (1 <= args.runtime_port <= 65535):
+            raise SystemExit(_red(f"--runtime-port は 1..65535: {args.runtime_port}"))
+        updates["runtimePort"] = args.runtime_port
+
+    schema_was_missing = isinstance(existing, dict) and "$schema" not in existing
+    file_existed = cfg_path.is_file()
+
+    # フラグ無しの init は read-only に保つ (副作用ゼロを保証)。$schema が無くても自動注入はせず、
+    # 必要ならヒントだけ出して set-port / init --port での明示的書き込みに任せる。
+    if updates:
+        try:
+            written = _write_project_config(cfg_path, existing, updates)
+        except OSError as e:
+            raise SystemExit(_red(f"write error: {cfg_path}: {e}"))
+        for k, v in updates.items():
+            print(f"  {_green('set')}      {k} = {v}")
+        if schema_was_missing:
+            print(_dim("  $schema reference を追加 (IDE autocomplete 用)"))
+        existing = written  # 以降の表示で最新状態を使う
+    else:
+        if file_existed:
+            ed = existing.get("port")
+            rt = existing.get("runtimePort")
+            print(f"  port     : {_cyan(str(ed)) if isinstance(ed, int) else _dim('(unset)')}")
+            print(f"  runtimePort: {_cyan(str(rt)) if isinstance(rt, int) else _dim('(unset, falls back to port)')}")
+            if schema_was_missing:
+                hint_port = ed if isinstance(ed, int) else 7613
+                print(_yellow(
+                    f"  $schema reference 無し → IDE 補完を有効にするには "
+                    f"`liminal init --port {hint_port}` で再書き込みしてください"
+                ))
+        else:
+            print(_dim("  (no config file — fixed port が要らないなら省略可。設定するなら --port / --runtime-port)"))
+
+    # 3) Token (Editor を 1 度起動するまでは生成されない)
+    print(f"\n{_bold('Token')}")
+    if DEFAULT_TOKEN_PATH.is_file():
+        try:
+            t = DEFAULT_TOKEN_PATH.read_text(encoding="utf-8").strip()
+        except OSError as e:
+            print(f"  {_red('error')}    {DEFAULT_TOKEN_PATH}: {e}")
+            t = ""
+        if t:
+            print(f"  {_green('exists')}   {DEFAULT_TOKEN_PATH}  ({len(t)} chars)")
+        else:
+            print(f"  {_yellow('empty')}    {DEFAULT_TOKEN_PATH} (Unity Editor を起動すると自動再生成)")
+    else:
+        print(f"  {_yellow('missing')}  {DEFAULT_TOKEN_PATH}")
+        print(_dim("    Unity Editor を起動すると自動生成されます"))
+
+    # 4) CLI on PATH (パッケージ内の script の絶対パスを表示して symlink ヒント)
+    print(f"\n{_bold('CLI')}")
+    try:
+        script = Path(__file__).resolve()
+    except NameError:
+        script = Path(sys.argv[0]).resolve()
+    print(f"  source   : {script}")
+    print(_dim("  PATH に通すには:"))
+    print(_dim(f"    ln -sf '{script}' ~/.local/bin/liminal"))
+
+    # 5) AI Skills (.claude/skills/liminal-* と legacy lp-* 両方検出)
+    print(f"\n{_bold('AI Skills')}")
+    skills_dst = Path(project_path) / ".claude" / "skills"
+    if skills_dst.is_dir():
+        try:
+            entries = list(skills_dst.iterdir())
+        except OSError:
+            entries = []
+        installed = sorted(p.name for p in entries
+                           if p.is_dir() and p.name.startswith("liminal-"))
+        legacy = sorted(p.name for p in entries
+                        if p.is_dir() and p.name.startswith("lp-"))
+        if installed:
+            print(f"  {_green('installed')}  {len(installed)} skill(s) in {skills_dst}")
+            for n in installed:
+                print(_dim(f"    {n}"))
+        else:
+            print(f"  {_yellow('missing')}    no liminal-* skills in {skills_dst}")
+        if legacy:
+            print(_yellow(f"  legacy lp-* skill(s) found ({len(legacy)})。"
+                          " Editor の Tools > LiminalPalette > Uninstall AI Skills で掃除できます"))
+    else:
+        print(f"  {_dim('not yet installed')}  ({skills_dst} は未作成)")
+    print(_dim("  Unity Editor で Tools > LiminalPalette > Install AI Skills... を実行するとコピーされます"))
+
+    # 6) Live probe (このプロジェクト宛にサーバが立っているか)
+    # _build_candidate_ports に full cache を渡すと他プロジェクト分の port も probe してしまうので、
+    # ここでは preferred + 当該プロジェクトの cached port + DEFAULT_PORTS だけを候補にする。
+    print(f"\n{_bold('Live check')}")
+    found = None
+    cache = _load_cache()
+    preferred = _read_preferred_ports(project_path)
+    probe_ports: list[int] = []
+    for seed in (preferred.get("editor"), preferred.get("runtime")):
+        if isinstance(seed, int):
+            for p in range(seed, seed + 6):
+                if 1 <= p <= 65535 and p not in probe_ports:
+                    probe_ports.append(p)
+    for p in _find_cached_ports(cache, project_path, project_path, None):
+        if p not in probe_ports:
+            probe_ports.append(p)
+    for p in DEFAULT_PORTS:
+        if p not in probe_ports:
+            probe_ports.append(p)
+    for p in probe_ports:
+        info = _probe_port(p)
+        if info and _matches_project(info, project_path):
+            found = (p, info)
+            break
+    if found:
+        port, info = found
+        mode = info.get("mode") or "?"
+        cnt = info.get("commandCount", "?")
+        print(f"  {_green('●')} reachable on http://127.0.0.1:{port}  [{mode}]  cmds={cnt}")
+    else:
+        print(_dim("  no live server (Unity Editor が起動していない、または別ポートに移動)"))
+
+    print()
+    print(_green("init complete"))
 
 
 def cmd_commands(args, base_url, token):
@@ -1189,6 +1381,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     sub.add_parser("health", help="サーバーの生存確認 (認証不要)")
+    sp_init = sub.add_parser("init", help="プロジェクト onboarding: cwd / config / token / Skills / live probe を 1 コマンドで確認 + 任意で port を書き込み (認証不要)")
+    sp_init.add_argument("--port", type=int, help="Editor の固定ポートを ProjectSettings/LiminalPalette.json に書き込む")
+    sp_init.add_argument("--runtime-port", type=int, dest="runtime_port",
+                         help="Play Mode の固定ポートを ProjectSettings/LiminalPalette.json に書き込む")
     sp_doc = sub.add_parser("doctor", help="環境診断: token / プロジェクト解決 / 生存ポート一覧 (認証不要)")
     sp_doc.add_argument("--prune-stale", action="store_true",
                         help="probe しても応答が無かった cache エントリを ports.json から削除する")
@@ -1231,12 +1427,15 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    # doctor / project はサーバー無しでもローカルファイルだけで動くので discovery / 認証を通さない。
+    # doctor / project / init はサーバー無しでもローカルファイルだけで動くので discovery / 認証を通さない。
     if args.command == "doctor":
         cmd_doctor(args)
         return
     if args.command == "project":
         cmd_project(args)
+        return
+    if args.command == "init":
+        cmd_init(args)
         return
 
     token = _read_token(args.token)

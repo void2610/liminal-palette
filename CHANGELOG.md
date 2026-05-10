@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- `liminal run` がシナリオパスの glob (例: `liminal run 'Battle/*'`) に対応。`/api/v1/scenarios` を引いて `fnmatch` で一致するシナリオを順次実行し、最後にサマリ (`N scenarios, X passed, Y failed`) を表示する。1 つでも失敗すれば exit code 2。
+- `liminal run --report PATH` で JUnit XML レポートを書き出し可能に。CI システム (GitHub Actions の test reporter / Jenkins JUnit Plugin 等) でそのまま読める形式。`<testcase>` ごとに失敗時は `<failure message="...">` + 失敗ステップの詳細を含む。`--json` と併用すると aggregate 形式 (`{scenarios:[...], total, passed, failed}`) も同時に得られる。
 - AI Agent 用の Claude Code Skills を 8 個同梱 (`AISkills~/liminal-*/SKILL.md`): liminal-overview / liminal-find-port / liminal-list-commands / liminal-execute / liminal-get-state / liminal-get-logs / liminal-list-scenarios / liminal-run-scenario。
 - Editor メニュー `Tools > LiminalPalette > Install AI Skills... / Uninstall AI Skills` を追加 (`Editor/AISkillsInstaller.cs`)。利用側プロジェクトの `.claude/skills/` への配布 / 削除に対応 (旧 `lp-*` skill ディレクトリも legacy として一掃)。
 - `/api/v1/health` レスポンスに `projectName` / `projectPath` / `mode` を追加。`mode` は `"editor"` か `"runtime"` で、同一プロジェクト内で Editor IpcServer と Play Mode / Player の Runtime IpcServer を区別する。

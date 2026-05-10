@@ -51,6 +51,12 @@ liminal state Player/HP
 # シナリオ
 liminal scenarios
 liminal run Battle/Repro/StairDescendingBack
+
+# glob で複数シナリオを順次実行 (シェルが展開しないようクォート)
+liminal run 'Battle/**'
+
+# JUnit XML レポート (CI 向け)
+liminal run 'Battle/**' --report reports/liminal.xml
 ```
 
 ## グローバルオプション
@@ -129,7 +135,46 @@ liminal --mode runtime state   # Play Mode 側を叩く
 |---|---|
 | 0 | 成功 |
 | 1 | HTTP / ネットワークエラー、トークン未設定 等の使用エラー |
-| 2 | コマンド実行は届いたが `success: false` (`exec` / `run`) |
+| 2 | コマンド実行は届いたが `success: false` (`exec` / `run`)。glob `run` の場合は **1 つでも失敗すれば 2** |
+
+## シナリオ glob と JUnit レポート
+
+`liminal run 'Battle/*'` のように `*` / `?` / `[...]` を含むパスを渡すと、`/api/v1/scenarios` を引いて `fnmatch` で一致するシナリオを集め、順次実行する。`*` は path 内の `/` も跨ぐ (`Battle/*` が `Battle/Repro/X` にもヒットする)。シェルが展開しないようクォート必須。
+
+```bash
+liminal run 'Combat/*'
+#   ✓ Combat/EnemyDies          (12.5 ms)
+#   ✓ Combat/EnemyTakesDamage   (12.5 ms)
+#   ✗ Combat/PlayerHeals        (34.7 ms)  failedAtStep=1
+#       expected '70' but got '65'
+#
+# FAIL  3 scenarios, 2 passed, 1 failed  (59.7 ms total)
+```
+
+`--report PATH` で JUnit 互換 XML を書き出す (CI システム向け)。
+
+```bash
+liminal run 'Battle/**' --report reports/liminal.xml
+```
+
+```xml
+<testsuites name="liminal" tests="3" failures="1" time="0.060">
+  <testsuite name="liminal" tests="3" failures="1" time="0.060">
+    <testcase name="Combat/EnemyDies" time="0.013"/>
+    <testcase name="Combat/PlayerHeals" time="0.035">
+      <failure message="failedAtStep=1 — AssertEquals — expected '70' but got '65'">
+        step[1] AssertEquals
+          actualValue: 65
+          expectedValue: 70
+          error: expected '70' but got '65'
+      </failure>
+    </testcase>
+    ...
+  </testsuite>
+</testsuites>
+```
+
+`--json` と組み合わせると aggregate 形式で stdout にも出る (`{scenarios: [...], total, passed, failed}`)。
 
 ## `--json` の例
 

@@ -1,13 +1,13 @@
 ---
 name: liminal-run-scenario
-description: 'Run a named or ad-hoc multi-step scenario via `liminal run`. Bundles command / wait_seconds / wait_frames / assert_equals / assert_not_equals steps into a single request with fail-fast semantics. Use for integration tests, spawn-wait-assert chains, or to bundle multiple liminal-execute calls and save rate-limit budget.'
-when_to_use: 'Trigger phrases: "シナリオ実行", "シナリオ走らせて", "統合テスト", "spawn して assert", "run scenario", "execute named scenario", "ad-hoc steps", "bundle multiple commands".'
+description: 'Run a named, glob-expanded, or ad-hoc multi-step scenario via `liminal run`. Bundles command / wait_seconds / wait_frames / assert_equals / assert_not_equals steps into a single request with fail-fast semantics. Glob (`liminal run "Battle/*"`) sweeps multiple scenarios sequentially, and `--report PATH` writes JUnit XML for CI. Use for integration tests, spawn-wait-assert chains, smoke regression sweeps, or to bundle multiple liminal-execute calls and save rate-limit budget.'
+when_to_use: 'Trigger phrases: "シナリオ実行", "シナリオ走らせて", "統合テスト", "spawn して assert", "run scenario", "execute named scenario", "ad-hoc steps", "bundle multiple commands", "全シナリオ実行", "glob で実行", "JUnit", "CI で回す".'
 allowed-tools: Bash(liminal *), Bash(jq *), Bash(cat *), Read
 ---
 
 # liminal-run-scenario
 
-LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行 / 待機 / 状態 assert) を 1 リクエストで順次実行する。**named** (事前宣言済み `[LiminalScenario]` を path 指定) と **ad-hoc** (CLI 側でステップ列を組み立てて `--steps` で渡す) の 2 経路。
+LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行 / 待機 / 状態 assert) を 1 リクエストで順次実行する。**named** (事前宣言済み `[LiminalScenario]` を path 指定)、**glob** (`Battle/*` 等で複数シナリオを順次)、**ad-hoc** (CLI 側でステップ列を組み立てて `--steps` で渡す) の 3 経路。
 
 シナリオは **fail-fast** (最初の失敗で打ち切り) + **1 並列 (排他)** で実行される。詳細な内部仕様は [references/step-types.md](references/step-types.md)。
 
@@ -19,6 +19,13 @@ LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行
 # named: 事前宣言済みシナリオを path で叩く
 liminal run <Scenario/Path>
 
+# glob: 複数シナリオを順次 (シェル展開を防ぐためクォート必須)
+liminal run 'Battle/*'
+liminal run 'Combat/Repro/**'
+
+# JUnit XML レポート (CI 向け)
+liminal run 'Battle/*' --report reports/liminal.xml
+
 # ad-hoc: stdin から JSON ステップ列を流す
 liminal run --steps -
 
@@ -26,7 +33,22 @@ liminal run --steps -
 liminal run --steps path/to/steps.json
 ```
 
-`<path>` と `--steps` は **排他**。ad-hoc では JSON は配列直書き (`[{...}, ...]`) でも `{"steps":[...]}` でも受ける。
+`<path>` と `--steps` は **排他**。ad-hoc では JSON は配列直書き (`[{...}, ...]`) でも `{"steps":[...]}` でも受ける。glob (`*` / `?` / `[...]` を含む path) を渡すと `/api/v1/scenarios` を引いて `fnmatch` で一致するものを集め、順番に named 実行する。
+
+### glob + JUnit の出力例
+
+```bash
+liminal run 'Combat/*' --report reports/liminal.xml
+#   ✓ Combat/EnemyDies          (12.5 ms)
+#   ✓ Combat/EnemyTakesDamage   (12.5 ms)
+#   ✗ Combat/PlayerHeals        (34.7 ms)  failedAtStep=1
+#       expected '70' but got '65'
+#
+# FAIL  3 scenarios, 2 passed, 1 failed  (59.7 ms total)
+#   JUnit report: reports/liminal.xml
+```
+
+`--json` と組み合わせると `{scenarios: [...], total, passed, failed}` を stdout に出す。**1 つでも失敗すると exit 2**、すべて成功なら exit 0。
 
 ---
 

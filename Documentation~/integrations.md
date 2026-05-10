@@ -24,7 +24,7 @@ R3 は `ReactiveProperty<T>` / `Observable<T>` を、VContainer は `IObjectReso
 
 ## VContainer: 1 行で接続
 
-利用側 `LifetimeScope` の `Configure` に **`RegisterEntryPoint<LiminalPaletteEntryPoint>()` を 1 行**書くだけで、コンテナ内で登録された全型がインスタンスメソッド `[ConsoleCommand]` から解決可能になる。
+利用側 `LifetimeScope` の `Configure` に **`RegisterEntryPoint<LiminalPaletteEntryPoint>()` を 1 行**書くだけで、コンテナ内で登録された全型がインスタンスメソッド `[LiminalCommand]` から解決可能になる。
 
 ```csharp
 using VContainer;
@@ -46,11 +46,11 @@ public class GameLifetimeScope : LifetimeScope
 }
 ```
 
-`LiminalPaletteEntryPoint` は `IInitializable` で、VContainer の Initialize 段階で `LiminalPalette.SetInstanceResolver(new VContainerInstanceResolver(container))` を呼んで自身を resolver として登録する。これでインスタンスメソッド `[ConsoleCommand]` と `[ConsoleObservableField]` の両方が VContainer 経由で動く。
+`LiminalPaletteEntryPoint` は `IInitializable` で、VContainer の Initialize 段階で `LiminalPalette.SetInstanceResolver(new VContainerInstanceResolver(container))` を呼んで自身を resolver として登録する。これでインスタンスメソッド `[LiminalCommand]` と `[LiminalObservableField]` の両方が VContainer 経由で動く。
 
 ### 解決の挙動
 
-`builder.RegisterComponentInHierarchy<Player>()` で登録された `Player` は、`[ConsoleCommand]` のインスタンスメソッドが叩かれるたびに `IObjectResolver.Resolve(typeof(Player))` で取得される。VContainer は通常シングルトンを返すため、毎回同じインスタンスが使われる。
+`builder.RegisterComponentInHierarchy<Player>()` で登録された `Player` は、`[LiminalCommand]` のインスタンスメソッドが叩かれるたびに `IObjectResolver.Resolve(typeof(Player))` で取得される。VContainer は通常シングルトンを返すため、毎回同じインスタンスが使われる。
 
 未登録の型に対しては `VContainerException` が投げられるが、`VContainerInstanceResolver` がそれを catch して null を返し、`CommandExecutor` 側で「Instance not resolved」エラーに変換する (利用者向けの明確なエラーメッセージ付き)。
 
@@ -58,7 +58,7 @@ public class GameLifetimeScope : LifetimeScope
 
 ## R3: ReactiveProperty を直接公開
 
-`[ConsoleObservableField]` 属性を `ReactiveProperty<T>` または `Observable<T>` のプロパティ / フィールドに付与する。UI が R3 push 駆動で値変更を即時反映する。
+`[LiminalObservableField]` 属性を `ReactiveProperty<T>` または `Observable<T>` のプロパティ / フィールドに付与する。UI が R3 push 駆動で値変更を即時反映する。
 
 ```csharp
 using R3;
@@ -69,17 +69,17 @@ public class Player : MonoBehaviour
 {
     public ReactiveProperty<int> Hp { get; } = new(100);
 
-    [ConsoleObservableField("Player/Health")]
+    [LiminalObservableField("Player/Health")]
     public ReactiveProperty<int> HpField => Hp;
 
-    [ConsoleCommand("Player/Health/Set")]
+    [LiminalCommand("Player/Health/Set")]
     public void SetHealth(int value) => Hp.Value = value;
 }
 ```
 
 UI 上の挙動:
 1. ユーザーが `Player/Health/Set` をパレットで選択
-2. UI が同 prefix `Player/Health` を持つ `[ConsoleObservableField]` を検索 → `HpField` (= `Hp`) を発見
+2. UI が同 prefix `Player/Health` を持つ `[LiminalObservableField]` を検索 → `HpField` (= `Hp`) を発見
 3. `Hp.Subscribe(v => label.text = $"Current: {v}")` で R3 購読
 4. `Hp.Value = X` するたびに UI のラベルが自動更新 (polling 不要、フレーム毎の負荷ゼロ)
 5. ユーザーが別コマンドを選択すると旧購読が `IDisposable.Dispose()` で解除される
@@ -93,19 +93,19 @@ public class Player : MonoBehaviour
     public ReactiveProperty<int> Mp { get; } = new(50);
     public ReactiveProperty<Vector3> Position { get; } = new(Vector3.zero);
 
-    [ConsoleObservableField("Player/Health")]
+    [LiminalObservableField("Player/Health")]
     public ReactiveProperty<int> HpField => Hp;
 
-    [ConsoleObservableField("Player/Mana")]
+    [LiminalObservableField("Player/Mana")]
     public ReactiveProperty<int> MpField => Mp;
 
-    [ConsoleObservableField("Player/Position")]
+    [LiminalObservableField("Player/Position")]
     public ReactiveProperty<Vector3> PosField => Position;
 
-    [ConsoleCommand("Player/Health/Set")]
+    [LiminalCommand("Player/Health/Set")]
     public void SetHealth(int value) => Hp.Value = value;
 
-    [ConsoleCommand("Player/Mana/Set")]
+    [LiminalCommand("Player/Mana/Set")]
     public void SetMana(int value) => Mp.Value = value;
 }
 ```
@@ -161,7 +161,7 @@ UI の Status 行にも同じメッセージが出る。
 
 ## 関連ドキュメント
 
-- [commands.md](commands.md) — `[ConsoleCommand]` / `[ConsoleObservableField]` の詳細仕様
+- [commands.md](commands.md) — `[LiminalCommand]` / `[LiminalObservableField]` の詳細仕様
 - [ui.md](ui.md) — Current values セクションの UI 挙動
 - [ipc.md](ipc.md) — `GET /api/v1/state` API
 - [asmdef.md](asmdef.md) — `Integration.VContainer` asmdef 構成

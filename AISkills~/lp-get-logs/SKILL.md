@@ -9,7 +9,7 @@ allowed-tools: Bash(lp *), Bash(jq *)
 
 LiminalPalette の `InvocationStore` に記録された **コマンド実行履歴**を新しい順で取得する。UI 経由 / HTTP 経由 / シナリオ内すべてが同じ Store に記録される。
 
-⚠️ Unity の `Debug.Log*` 全体ではない (本スキルは LP の `[ConsoleCommand]` 実行履歴限定)。Unity Console を見たい場合は `uloop-get-logs` などの別経路を使う。
+⚠️ Unity の `Debug.Log*` 全体ではない (本スキルは LP の `[LiminalCommand]` 実行履歴限定)。Unity Console を見たい場合は `uloop-get-logs` などの別経路を使う。
 
 ---
 
@@ -188,7 +188,7 @@ lp --port 7611 logs --limit 10 --json | jq -r '.invocations[] | "[R] " + .path'
 
 | skill | 取得対象 |
 |---|---|
-| `lp-get-logs` (本スキル) | LP の `[ConsoleCommand]` 実行履歴 (UI/HTTP/scenario 統合) |
+| `lp-get-logs` (本スキル) | LP の `[LiminalCommand]` 実行履歴 (UI/HTTP/scenario 統合) |
 | `uloop-get-logs` | Unity Editor の Console Window のログ (`Debug.Log*` 全体) |
 
 両方使い分け可能。コマンド実行に伴う `Debug.Log*` は `lp logs` の `result.logs[]` にも入るので、ピンポイントで欲しいなら LP 側で十分。

@@ -5,7 +5,7 @@ LiminalPalette を利用側で拡張するための 4 つのフックポイン�
 1. **`ITypeConverter`** — 任意の型を引数として受け付ける
 2. **`IParameterEditor`** — 任意の型に専用 UI を提供する
 3. **`ICommandHistory`** — 履歴の永続化先を差し替える (PlayerPrefs 以外に DB 等)
-4. **`IInstanceResolver`** — インスタンスメソッド `[ConsoleCommand]` のインスタンス解決経路 (DI コンテナ統合用)
+4. **`IInstanceResolver`** — インスタンスメソッド `[LiminalCommand]` のインスタンス解決経路 (DI コンテナ統合用)
 
 `ITypeConverter` / `IParameterEditor` は **後勝ち登録** (新しく登録したものが既存より優先される) のルール。`IInstanceResolver` は単一インスタンス差替え。
 
@@ -95,10 +95,10 @@ public static class MyBootstrap
 }
 ```
 
-これだけで `[ConsoleCommand]` メソッドが `Quaternion` 引数を取れるようになる:
+これだけで `[LiminalCommand]` メソッドが `Quaternion` 引数を取れるようになる:
 
 ```csharp
-[ConsoleCommand("Player/Rotate")]
+[LiminalCommand("Player/Rotate")]
 public static void Rotate(Quaternion rotation) { /* ... */ }
 ```
 
@@ -287,7 +287,7 @@ var controller = new PaletteController(
 
 ## `IInstanceResolver`: インスタンスメソッド解決経路
 
-インスタンスメソッド `[ConsoleCommand]` 実行時に、メソッドが属する型のインスタンスをどこから取ってくるかを差し替えるフックポイント。
+インスタンスメソッド `[LiminalCommand]` 実行時に、メソッドが属する型のインスタンスをどこから取ってくるかを差し替えるフックポイント。
 
 ### インタフェース
 
@@ -341,7 +341,7 @@ static void RegisterResolver()
 
 ## 動的コマンド登録
 
-`[ConsoleCommand]` 属性に依らないコマンドの登録経路:
+`[LiminalCommand]` 属性に依らないコマンドの登録経路:
 
 ```csharp
 public static class DynamicRegistration
@@ -401,6 +401,6 @@ public static class DynamicRegistration
 
 ## 関連ドキュメント
 
-- [commands.md](commands.md) — `[ConsoleCommand]` の引数型一覧
+- [commands.md](commands.md) — `[LiminalCommand]` の引数型一覧
 - [ui.md](ui.md) — `IParameterEditor` の UI が表示される文脈
 - [asmdef.md](asmdef.md) — どの asmdef がどの拡張ポイントを公開しているか

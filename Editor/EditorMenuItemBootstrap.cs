@@ -10,12 +10,12 @@ namespace Void2610.LiminalPalette.Editor
     /// <summary>
     /// Editor 起動時に Unity の全 [MenuItem] 属性を TypeCache 経由で収集し、
     /// `Menu/<元の menu path>` の形でパレットに自動登録する。
-    /// 個別に [ConsoleCommand] を書かなくても、`Window/General/Hierarchy` などのエディタメニューが
+    /// 個別に [LiminalCommand] を書かなくても、`Window/General/Hierarchy` などのエディタメニューが
     /// すべてパレットからファジー検索で開けるようになる。
     /// </summary>
     internal static class EditorMenuItemBootstrap
     {
-        // パレットに登録する際のパスプレフィックス。手書き [ConsoleCommand] と衝突しないように分ける。
+        // パレットに登録する際のパスプレフィックス。手書き [LiminalCommand] と衝突しないように分ける。
         private const string PathPrefix = "Menu/";
 
         // 除外するメニューパスの prefix。CONTEXT/ はコンポーネントの右クリック専用で、

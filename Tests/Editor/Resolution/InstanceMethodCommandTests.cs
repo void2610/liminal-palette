@@ -8,12 +8,12 @@ namespace Void2610.LiminalPalette.Tests.Resolution
     /// <summary>
     /// Phase 5a インスタンスメソッド対応テスト。
     /// IInstanceResolver 経由でインスタンスを解決し、メソッドが正しく呼ばれることを確認。
-    /// 既存の static [ConsoleCommand] が回帰しないことも併せて検証。
+    /// 既存の static [LiminalCommand] が回帰しないことも併せて検証。
     /// </summary>
     public sealed class InstanceMethodCommandTests
     {
         // テスト用のインスタンスメソッドを持つコマンド対象クラス。
-        // [ConsoleCommand] を直接付けると AttributeScanner で自動登録されるが、
+        // [LiminalCommand] を直接付けると AttributeScanner で自動登録されるが、
         // テスト独立性のため動的登録にする (Path 衝突回避 + テスト後の cleanup 楽)。
         private sealed class Counter
         {

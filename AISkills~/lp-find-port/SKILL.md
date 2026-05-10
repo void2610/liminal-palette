@@ -42,7 +42,7 @@ lp --port 7610 health   # → Editor
 lp --port 7611 health   # → Play Mode
 ```
 
-`commandCount` を比較すると判別できる (Editor 側に Editor 限定 `[ConsoleCommand]` が含まれるため通常 Editor の方が多い):
+`commandCount` を比較すると判別できる (Editor 側に Editor 限定 `[LiminalCommand]` が含まれるため通常 Editor の方が多い):
 
 ```bash
 for p in 7610 7611 7612 7613 7614 7615; do
@@ -72,7 +72,7 @@ lp --base-url http://127.0.0.1:7611 state                       # Play Mode
 |---|---|
 | `status` | 常に `"ok"`。返ること自体が「生きている」サイン |
 | `version` | LP パッケージのバージョン |
-| `commandCount` | 登録済み `[ConsoleCommand]` の数。Editor / Runtime の判別ヒント |
+| `commandCount` | 登録済み `[LiminalCommand]` の数。Editor / Runtime の判別ヒント |
 
 ---
 

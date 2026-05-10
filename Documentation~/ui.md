@@ -54,7 +54,7 @@ public class PaletteRuntimeSettings : ScriptableObject
 
 ### Scenario タブ (コマンドチェインの実行)
 
-- `[ConsoleScenario]` で宣言した全シナリオを表示
+- `[LiminalScenario]` で宣言した全シナリオを表示
 - 各行: Path / Description / ステップ数 (副作用付き生成で計測不能なら "?")
 - **Run Scenario** で全ステップを順次実行
 - 実行結果は下部 `ScenarioResultView` で各ステップごとの ✓ / ✗ + 所要時間 + 失敗詳細
@@ -108,7 +108,7 @@ public class PaletteRuntimeSettings : ScriptableObject
 
 ## Current values セクション
 
-コマンドを選択すると引数欄の **直前** に、関連する `[ConsoleObservableField]` の現在値が表示される。
+コマンドを選択すると引数欄の **直前** に、関連する `[LiminalObservableField]` の現在値が表示される。
 
 ```
 ┌──────────────────────────────────────┐
@@ -144,7 +144,7 @@ builder.RegisterEntryPoint<LiminalPaletteEntryPoint>();
 
 セクションは非表示になる (`display: None`)。引数欄が直接トップに出る。
 
-詳細は [commands.md](commands.md) の `[ConsoleObservableField]` 章と [integrations.md](integrations.md)。
+詳細は [commands.md](commands.md) の `[LiminalObservableField]` 章と [integrations.md](integrations.md)。
 
 ---
 
@@ -252,7 +252,7 @@ UI のホスト先は 2 つある:
 
 ## 関連ドキュメント
 
-- [commands.md](commands.md) — `[ConsoleCommand]` の書き方
+- [commands.md](commands.md) — `[LiminalCommand]` の書き方
 - [extensibility.md](extensibility.md) — `IParameterEditor` で型ごとの UI を拡張
 - [security.md](security.md) — Production ビルドで Runtime UI を無効化する方法
 - [troubleshooting.md](troubleshooting.md) — UI が出ない / フォーカスが取られる等

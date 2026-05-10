@@ -1,6 +1,6 @@
 # Commands
 
-`[ConsoleCommand]` 属性とコマンドメソッドのすべて。
+`[LiminalCommand]` 属性とコマンドメソッドのすべて。
 
 ## 最小例
 
@@ -10,17 +10,17 @@ using UnityEngine;
 
 public static class MyCommands
 {
-    [ConsoleCommand("Player/Health/Set")]
+    [LiminalCommand("Player/Health/Set")]
     public static void SetHealth(int value) => Debug.Log($"HP = {value}");
 }
 ```
 
 これで `Player/Health/Set` という名前で Editor / Runtime / HTTP の 3 経路から実行できる。
 
-## `[ConsoleCommand]` の全パラメータ
+## `[LiminalCommand]` の全パラメータ
 
 ```csharp
-[ConsoleCommand(
+[LiminalCommand(
     path:        "Category/Subcategory/Action",   // ← 必須・第 1 引数
     Description: "ヒトに見せる説明",                  // 任意
     Aliases:     new[] { "Cat/Sub/A" }            // 任意・別名
@@ -51,7 +51,7 @@ public static class MyCommands
 ```csharp
 public static class TimeCommands
 {
-    [ConsoleCommand("Editor/Time/Reset")]
+    [LiminalCommand("Editor/Time/Reset")]
     public static void Reset() => Time.timeScale = 1f;
 }
 ```
@@ -65,7 +65,7 @@ public class Player : MonoBehaviour
 {
     public ReactiveProperty<int> Hp { get; } = new(100);
 
-    [ConsoleCommand("Player/Health/Set")]
+    [LiminalCommand("Player/Health/Set")]
     public void SetHealth(int value) => Hp.Value = value;
 }
 ```
@@ -104,7 +104,7 @@ unsigned / 狭い範囲の整数 (`byte` / `sbyte` / `short` / `ushort` / `uint`
 [Flags]
 public enum DamageType { None = 0, Fire = 1, Ice = 2, Poison = 4 }
 
-[ConsoleCommand("Player/ApplyDamage")]
+[LiminalCommand("Player/ApplyDamage")]
 public static void ApplyDamage(int amount, DamageType types) { /* ... */ }
 ```
 
@@ -130,7 +130,7 @@ public static void ApplyDamage(int amount, DamageType types) { /* ... */ }
 ## デフォルト値
 
 ```csharp
-[ConsoleCommand("Test/Greet")]
+[LiminalCommand("Test/Greet")]
 public static string Greet(string name, int times = 3, bool excited = false)
 {
     var s = string.Join(" ", Enumerable.Repeat($"Hello {name}", times));
@@ -155,7 +155,7 @@ UI 上では `times` と `excited` は省略可能 (デフォルト値が初期�
 ## async コマンド
 
 ```csharp
-[ConsoleCommand("Net/Fetch")]
+[LiminalCommand("Net/Fetch")]
 public static async Task<string> FetchAsync(string url, CancellationToken ct = default)
 {
     using var client = new HttpClient();
@@ -167,10 +167,10 @@ public static async Task<string> FetchAsync(string url, CancellationToken ct = d
 
 ## 例外処理
 
-`[ConsoleCommand]` メソッド内で例外が出ても、利用側の try-catch は不要。`CommandExecutor` が `CommandResult.Fail(message, exception)` に変換する:
+`[LiminalCommand]` メソッド内で例外が出ても、利用側の try-catch は不要。`CommandExecutor` が `CommandResult.Fail(message, exception)` に変換する:
 
 ```csharp
-[ConsoleCommand("Test/Throws")]
+[LiminalCommand("Test/Throws")]
 public static void Throws() => throw new InvalidOperationException("boom");
 ```
 
@@ -189,7 +189,7 @@ UI / HTTP の戻り:
 実行中の `Debug.Log` / `Debug.LogWarning` / `Debug.LogError` は `LogCapture` で取り込まれ、`CommandResult.Logs` に蓄積される:
 
 ```csharp
-[ConsoleCommand("Test/Log")]
+[LiminalCommand("Test/Log")]
 public static void Log(string msg) => Debug.Log(msg);
 ```
 
@@ -226,22 +226,22 @@ public static class DynamicRegistration
 
 > セキュリティ: HTTP API 経由でのコマンド注入は **意図的に未対応**。任意コード実行に近づくため。
 
-## `[ConsoleParam]` (補助情報 + 数値範囲)
+## `[LiminalParam]` (補助情報 + 数値範囲)
 
 引数に説明 / 候補リスト / 数値範囲を付与できる:
 
 ```csharp
-[ConsoleCommand("Audio/Play")]
+[LiminalCommand("Audio/Play")]
 public static void Play(
-    [ConsoleParam(Description = "再生する効果音のキー", Choices = new[] { "click", "open", "close" })]
+    [LiminalParam(Description = "再生する効果音のキー", Choices = new[] { "click", "open", "close" })]
     string clipKey)
 {
     /* ... */
 }
 
-[ConsoleCommand("Player/Health/Damage")]
+[LiminalCommand("Player/Health/Damage")]
 public string Damage(
-    [ConsoleParam(Description = "ダメージ量", Min = 1, Max = 9999)] int amount)
+    [LiminalParam(Description = "ダメージ量", Min = 1, Max = 9999)] int amount)
 {
     /* ... */
 }
@@ -264,7 +264,7 @@ public string Damage(
 - **デフォルト値経由は検証されない** (`HasDefault` で省略された場合)。デフォルト値の妥当性は定義者の責任
 - Sentinel: `float.NaN` を「未指定」として扱う。`float.NaN` 自体を境界値にすることはできない (実用上の制約はない想定)
 
-## `[ConsoleObservableField]` (現在値の表示)
+## `[LiminalObservableField]` (現在値の表示)
 
 クラスの **読み取り専用状態** を LiminalPalette UI と HTTP API に公開する属性。`ReactiveProperty<T>` または `Observable<T>` を直接受ける。
 
@@ -273,10 +273,10 @@ public class Player : MonoBehaviour
 {
     public ReactiveProperty<int> Hp { get; } = new(100);
 
-    [ConsoleObservableField("Player/Health")]
+    [LiminalObservableField("Player/Health")]
     public ReactiveProperty<int> HpField => Hp;
 
-    [ConsoleCommand("Player/Health/Set")]
+    [LiminalCommand("Player/Health/Set")]
     public void SetHealth(int value) => Hp.Value = value;
 }
 ```
@@ -285,7 +285,7 @@ public class Player : MonoBehaviour
 
 ユーザーが `Player/Health/Set` をパレットで選択 → 引数欄上部に "Current values" セクションが出て、`Player/Health: 75` のラベルが **R3 push 駆動で自動更新** される。値変更があるたびにラベルが書き換わる (polling ゼロ)。
 
-prefix マッチで関連付け: 選択コマンドの Path から最後の `/` 以前の部分を prefix として取り、`[ConsoleObservableField]` の Path が同 prefix で始まるものを表示する。例:
+prefix マッチで関連付け: 選択コマンドの Path から最後の `/` 以前の部分を prefix として取り、`[LiminalObservableField]` の Path が同 prefix で始まるものを表示する。例:
 
 | 選択コマンド | 表示される ObservableField (一致 prefix `Player/Health`) |
 |---|---|

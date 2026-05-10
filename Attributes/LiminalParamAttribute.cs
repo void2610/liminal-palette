@@ -7,7 +7,7 @@ namespace Void2610.LiminalPalette
     /// 数値型の範囲制約を補強する属性。
     /// </summary>
     [AttributeUsage(AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
-    public sealed class ConsoleParamAttribute : Attribute
+    public sealed class LiminalParamAttribute : Attribute
     {
         /// <summary>
         /// パラメータの説明文。

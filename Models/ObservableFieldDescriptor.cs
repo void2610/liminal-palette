@@ -3,7 +3,7 @@ using System;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
-    /// [ConsoleObservableField] が付与されたプロパティ / フィールドの不変メタデータ。
+    /// [LiminalObservableField] が付与されたプロパティ / フィールドの不変メタデータ。
     /// AttributeScanner が生成して ObservableFieldRegistry に登録する。
     /// </summary>
     public sealed class ObservableFieldDescriptor

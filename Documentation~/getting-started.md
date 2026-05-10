@@ -62,22 +62,22 @@ public class Player : MonoBehaviour
 {
     public ReactiveProperty<int> Hp { get; } = new(100);
 
-    // [ConsoleObservableField] で現在値が UI に表示される (R3 push 駆動で自動更新)
-    [ConsoleObservableField("Player/Health")]
+    // [LiminalObservableField] で現在値が UI に表示される (R3 push 駆動で自動更新)
+    [LiminalObservableField("Player/Health")]
     public ReactiveProperty<int> HpField => Hp;
 
-    // インスタンスメソッドを [ConsoleCommand] でパレットから叩ける (VContainer 経由解決)
-    [ConsoleCommand("Player/Health/Set", Description = "プレイヤーの HP を設定する")]
+    // インスタンスメソッドを [LiminalCommand] でパレットから叩ける (VContainer 経由解決)
+    [LiminalCommand("Player/Health/Set", Description = "プレイヤーの HP を設定する")]
     public void SetHealth(int value) => Hp.Value = value;
 
-    [ConsoleCommand("Player/Health/Damage", Description = "ダメージを受ける")]
+    [LiminalCommand("Player/Health/Damage", Description = "ダメージを受ける")]
     public void Damage(int amount) => Hp.Value = Mathf.Max(0, Hp.Value - amount);
 }
 
 // 静的メソッドも従来通り使える (インスタンス不要)
 public static class TimeCommands
 {
-    [ConsoleCommand("Editor/Time/SlowMotion", Description = "Time.timeScale = 0.25")]
+    [LiminalCommand("Editor/Time/SlowMotion", Description = "Time.timeScale = 0.25")]
     public static void SlowMotion() => Time.timeScale = 0.25f;
 }
 ```
@@ -85,7 +85,7 @@ public static class TimeCommands
 ポイント:
 - メソッドは `public static` または `public` インスタンス
 - インスタンスメソッドは VContainer に登録された型のみ実行可能
-- `[ConsoleObservableField]` で `ReactiveProperty<T>` を直接公開して現在値を UI に表示
+- `[LiminalObservableField]` で `ReactiveProperty<T>` を直接公開して現在値を UI に表示
 - 戻り値の型は何でも OK (`void` / プリミティブ / `Task<T>` / `Vector3` 等)
 - 引数のデフォルト値も尊重される
 
@@ -167,11 +167,11 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 - Play Mode で `Cmd/Ctrl+K` を押すと半透明 overlay でパレットが開く
 - `curl http://127.0.0.1:7610/api/v1/health` が `200 ok` を返す
 
-ここまで動けば導入完了。次は [commands.md](commands.md) で `[ConsoleCommand]` の全機能を学ぶ。
+ここまで動けば導入完了。次は [commands.md](commands.md) で `[LiminalCommand]` の全機能を学ぶ。
 
 ## Hello Scenario (5 分)
 
-複数コマンドをまとめて 1 クリックで再生したい / CI から統合テストとして叩きたいなら **Scenario** を使う。`[ConsoleScenario]` を付けたメソッドが `IEnumerable<ScenarioStep>` を返すだけ:
+複数コマンドをまとめて 1 クリックで再生したい / CI から統合テストとして叩きたいなら **Scenario** を使う。`[LiminalScenario]` を付けたメソッドが `IEnumerable<ScenarioStep>` を返すだけ:
 
 ```csharp
 using System.Collections.Generic;
@@ -179,7 +179,7 @@ using Void2610.LiminalPalette;
 
 public static class HelloScenarios
 {
-    [ConsoleScenario("Hello/Smoke", Description = "echo + add の連続実行")]
+    [LiminalScenario("Hello/Smoke", Description = "echo + add の連続実行")]
     public static IEnumerable<ScenarioStep> Smoke()
     {
         yield return ScenarioStep.Run("Hello/Echo", new() { ["message"] = "hi" });
@@ -190,13 +190,13 @@ public static class HelloScenarios
 
 Cmd+K → **Scenario タブ** に `Hello/Smoke` が並ぶ。Run Scenario で 2 ステップが順次走り、各ステップの ✓ + 所要時間が表示される。
 
-`[ConsoleObservableField]` で公開した値を Assert ステップで検証すれば統合テストにできる。詳細は [scenarios.md](scenarios.md) を参照。
+`[LiminalObservableField]` で公開した値を Assert ステップで検証すれば統合テストにできる。詳細は [scenarios.md](scenarios.md) を参照。
 
 
 ## トラブル時
 
 - **`Cmd+K` で開かない**: Editor / Game ウィンドウどちらにフォーカスがあるか確認。Project ウィンドウなど他にフォーカスがあると Editor の Shortcut が効かないことがある
-- **コマンドがリストに出ない**: `[ConsoleCommand]` を付けたメソッドが `public static` か確認
+- **コマンドがリストに出ない**: `[LiminalCommand]` を付けたメソッドが `public static` か確認
 - **引数欄が表示されない**: パラメータの型が UI でサポートされているか確認 (詳細は [commands.md](commands.md) の「サポート型」)
 - **HTTP API が動かない**: Editor を開いているか確認。トークンファイル `~/.liminal-palette/token` の存在も確認
 - **その他**: [troubleshooting.md](troubleshooting.md) を参照

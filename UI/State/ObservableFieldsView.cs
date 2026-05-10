@@ -5,7 +5,7 @@ using UnityEngine.UIElements;
 namespace Void2610.LiminalPalette.UI
 {
     /// <summary>
-    /// 選択コマンドの Path prefix と一致する [ConsoleObservableField] を「Current values」セクションに表示する VisualElement。
+    /// 選択コマンドの Path prefix と一致する [LiminalObservableField] を「Current values」セクションに表示する VisualElement。
     /// Show(prefix) で関連 Field を購読し、値変更時にラベルを push 駆動で更新する (polling 不要)。
     /// 別 prefix への切替時 / Detach 時に全購読を Dispose してリークを防ぐ。
     ///

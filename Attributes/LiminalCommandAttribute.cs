@@ -7,7 +7,7 @@ namespace Void2610.LiminalPalette
     /// Phase 1 では static メソッドのみ対象。
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-    public sealed class ConsoleCommandAttribute : Attribute
+    public sealed class LiminalCommandAttribute : Attribute
     {
         /// <summary>
         /// コマンドのパス。"/" 区切りで階層を表現する (例: "Player/Health/Set")。
@@ -25,7 +25,7 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public string[] Aliases { get; set; } = Array.Empty<string>();
 
-        public ConsoleCommandAttribute(string path)
+        public LiminalCommandAttribute(string path)
         {
             Path = path;
         }

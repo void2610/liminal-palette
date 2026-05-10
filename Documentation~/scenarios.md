@@ -1,6 +1,6 @@
 # Scenarios
 
-`[ConsoleScenario]` 属性で「コマンドを順次実行するシナリオ」を C# で宣言する仕組み。
+`[LiminalScenario]` 属性で「コマンドを順次実行するシナリオ」を C# で宣言する仕組み。
 ボタン 1 つで「敵スポーン → アイテム所持 → 特定ステージへワープ」のような連続操作を再現できるほか、HTTP API (`/api/v1/scenarios/run`) 経由で CI から走らせて統合テストとしても使える。
 
 ---
@@ -13,7 +13,7 @@ using Void2610.LiminalPalette;
 
 public static class CombatScenarios
 {
-    [ConsoleScenario("Combat/EnemyTakesDamage", Description = "敵にダメージを与えて HP が減ることを検証")]
+    [LiminalScenario("Combat/EnemyTakesDamage", Description = "敵にダメージを与えて HP が減ることを検証")]
     public static IEnumerable<ScenarioStep> EnemyTakesDamage()
     {
         yield return ScenarioStep.Run("Enemy/Spawn", new() { ["type"] = "Goblin" });
@@ -35,10 +35,10 @@ public static class CombatScenarios
 
 | ステップ | ファクトリ | 説明 |
 |---|---|---|
-| Command | `ScenarioStep.Run(path, args, description)` | `[ConsoleCommand]` を呼ぶ。引数は `IReadOnlyDictionary<string, object>` (型解決済み)。失敗で fail-fast |
+| Command | `ScenarioStep.Run(path, args, description)` | `[LiminalCommand]` を呼ぶ。引数は `IReadOnlyDictionary<string, object>` (型解決済み)。失敗で fail-fast |
 | WaitSeconds | `ScenarioStep.WaitSeconds(seconds, description)` | 実時間で待機 (`Task.Delay`) |
 | WaitFrames | `ScenarioStep.WaitFrames(frames, description)` | フレーム数で待機。Edit Mode は `EditorApplication.update` tick、Play Mode / Player ビルドは `Time.frameCount` |
-| AssertEquals | `ScenarioStep.AssertEquals(observableFieldPath, expected, description)` | `[ConsoleObservableField]` の現在値が `expected` と一致 |
+| AssertEquals | `ScenarioStep.AssertEquals(observableFieldPath, expected, description)` | `[LiminalObservableField]` の現在値が `expected` と一致 |
 | AssertNotEquals | `ScenarioStep.AssertNotEquals(observableFieldPath, unexpected, description)` | 上記の否定 |
 
 `description` は省略可。指定するとシナリオ結果の各ステップ行に表示されて読み手にとって意図が分かりやすくなる。
@@ -50,10 +50,10 @@ public static class CombatScenarios
 
 ---
 
-## `[ConsoleScenario]` の全パラメータ
+## `[LiminalScenario]` の全パラメータ
 
 ```csharp
-[ConsoleScenario(
+[LiminalScenario(
     path:        "Category/Subcategory/Action",
     Description: "ヒトに見せる説明"
 )]
@@ -84,7 +84,7 @@ public static class CombatScenarios
 ```csharp
 public static class CombatScenarios
 {
-    [ConsoleScenario("Combat/Smoke")]
+    [LiminalScenario("Combat/Smoke")]
     public static IEnumerable<ScenarioStep> Smoke()
     {
         yield return ScenarioStep.Run("Player/Health/FullHeal");
@@ -101,7 +101,7 @@ public sealed class CombatScenarios
 
     public CombatScenarios(EnemySpawner spawner) { _spawner = spawner; }
 
-    [ConsoleScenario("Combat/EnemyTakesDamage")]
+    [LiminalScenario("Combat/EnemyTakesDamage")]
     public IEnumerable<ScenarioStep> EnemyTakesDamage()
     {
         yield return ScenarioStep.Run("Enemy/Spawn", new() { ["type"] = _spawner.DefaultType });
@@ -314,9 +314,9 @@ echo "exit=$?"
 
 「ステップ列」を一元化することで HTTP ad-hoc 経路と C# 宣言の表現を揃えている。
 
-### Assert の対象は `[ConsoleObservableField]` のみ
+### Assert の対象は `[LiminalObservableField]` のみ
 
-`[ConsoleObservableField]` で公開された Path をベースに値を引く。直前 Command の戻り値に対する Assert (例: `AssertReturn`) は意図的に入れていない: 暗黙の "前ステップ" 状態が発生して fail-fast の単純さが崩れるため。「Command 経由で副作用を起こし、ObservableField に出てきた値を検証」というスタイルに統一している。
+`[LiminalObservableField]` で公開された Path をベースに値を引く。直前 Command の戻り値に対する Assert (例: `AssertReturn`) は意図的に入れていない: 暗黙の "前ステップ" 状態が発生して fail-fast の単純さが崩れるため。「Command 経由で副作用を起こし、ObservableField に出てきた値を検証」というスタイルに統一している。
 
 ---
 
@@ -324,7 +324,7 @@ echo "exit=$?"
 
 ### Q. シナリオ Run で 「ObservableField not found」になる
 
-**A**: Assert 対象の Path が `[ConsoleObservableField]` で登録されていない。
+**A**: Assert 対象の Path が `[LiminalObservableField]` で登録されていない。
 
 確認:
 ```csharp
@@ -332,7 +332,7 @@ foreach (var f in ObservableFieldRegistry.Default.All)
     Debug.Log(f.Path);
 ```
 
-`Path` の typo / `[ConsoleObservableField]` の付け忘れ / `public` でない / VContainer 未登録のいずれか。詳細は [commands.md](commands.md) の `[ConsoleObservableField]` 章を参照。
+`Path` の typo / `[LiminalObservableField]` の付け忘れ / `public` でない / VContainer 未登録のいずれか。詳細は [commands.md](commands.md) の `[LiminalObservableField]` 章を参照。
 
 ### Q. シナリオ Run で 「Instance not resolved」になる
 
@@ -345,7 +345,7 @@ builder.RegisterEntryPoint<LiminalPaletteEntryPoint>();
 
 ### Q. ステップ実行直後の Assert が失敗する (タイミング問題)
 
-**A**: `[ConsoleCommand]` 内で `ReactiveProperty<T>.Value = X` した直後に Assert すると、R3 の Subscribe コールバックが完了する前に `ReadCurrent` が呼ばれることはない。`ReactiveProperty<T>.Value = ...` は同期的に内部値を更新するため、AssertEquals は新しい値で評価される。
+**A**: `[LiminalCommand]` 内で `ReactiveProperty<T>.Value = X` した直後に Assert すると、R3 の Subscribe コールバックが完了する前に `ReadCurrent` が呼ばれることはない。`ReactiveProperty<T>.Value = ...` は同期的に内部値を更新するため、AssertEquals は新しい値で評価される。
 
 ただし「副作用が `Update` で反映されるタイプの状態」(物理 / アニメーション / 物理エンジン経由の Rigidbody 等) を Assert する場合は `WaitFrames(1)` を間に挟む必要がある:
 
@@ -369,7 +369,7 @@ UI 側は Run ボタンが disable されるので発生しにくいが、HTTP �
 
 ## 関連ドキュメント
 
-- [commands.md](commands.md) — `[ConsoleCommand]` の引数バインドと async 戻り値の扱い
+- [commands.md](commands.md) — `[LiminalCommand]` の引数バインドと async 戻り値の扱い
 - [integrations.md](integrations.md) — VContainer 統合の流儀
 - [ipc.md](ipc.md) — HTTP API の認証 / レートリミット / body サイズ
 - [ui.md](ui.md) — Scenario タブを含む 4 タブ構成

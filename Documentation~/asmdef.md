@@ -60,9 +60,9 @@ LiminalPalette は **9 つの asmdef** で構成される。Production ビルド
 
 ### 1. `Void2610.LiminalPalette` (Core)
 
-`Bootstrap.cs` / `LiminalPalette.cs` ファサード / Registry (Command / ObservableField / Scenario) / Executor (Command / Scenario / `IFrameWaiter` + `RuntimeFrameWaiter`) / Models / Conversion / Attributes (`ConsoleCommand` / `ConsoleObservableField` / `ConsoleScenario` / `ConsoleParam`) / Resolution。
+`Bootstrap.cs` / `LiminalPalette.cs` ファサード / Registry (Command / ObservableField / Scenario) / Executor (Command / Scenario / `IFrameWaiter` + `RuntimeFrameWaiter`) / Models / Conversion / Attributes (`LiminalCommand` / `LiminalObservableField` / `LiminalScenario` / `LiminalParam`) / Resolution。
 
-**依存**: R3.Unity (Phase 5a で必須化)。`ReactiveProperty<T>` / `Observable<T>` を `[ConsoleObservableField]` に直接使うため。
+**依存**: R3.Unity (Phase 5a で必須化)。`ReactiveProperty<T>` / `Observable<T>` を `[LiminalObservableField]` に直接使うため。
 
 `autoReferenced: true` なので利用側は `using Void2610.LiminalPalette;` だけで使える。
 
@@ -136,7 +136,7 @@ UnityEditor 非依存。`HttpListener` (System.Net) を使うが Player でも E
 
 `VContainerInstanceResolver` + `LiminalPaletteEntryPoint`。
 
-VContainer の `IObjectResolver` を `IInstanceResolver` にアダプトする層。利用側は `LifetimeScope.Configure` で `builder.RegisterEntryPoint<LiminalPaletteEntryPoint>()` を呼ぶだけで、コンテナ全体がインスタンスメソッド `[ConsoleCommand]` と `[ConsoleObservableField]` の解決経路として機能する。
+VContainer の `IObjectResolver` を `IInstanceResolver` にアダプトする層。利用側は `LifetimeScope.Configure` で `builder.RegisterEntryPoint<LiminalPaletteEntryPoint>()` を呼ぶだけで、コンテナ全体がインスタンスメソッド `[LiminalCommand]` と `[LiminalObservableField]` の解決経路として機能する。
 
 `autoReferenced: true`、VContainer references 必須。VContainer 未導入プロジェクトでは asmdef がコンパイル不能になる (Phase 5a で必須化、利用側コード量最小化のため意図的)。
 
@@ -244,7 +244,7 @@ Tests asmdef は `UNITY_INCLUDE_TESTS` を要求するため、Test Runner が�
 ]
 ```
 
-`[ConsoleCommand]` の付与と `LiminalPalette.ExecuteAsync` 呼び出しのみ。UI / IPC は使わない。
+`[LiminalCommand]` の付与と `LiminalPalette.ExecuteAsync` 呼び出しのみ。UI / IPC は使わない。
 
 ### Editor / Runtime UI も使う (一般的)
 

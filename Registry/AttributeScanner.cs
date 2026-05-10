@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
-    /// 全 Assembly をスキャンし、[ConsoleCommand] を付与した static メソッドを CommandDescriptor に変換する。
+    /// 全 Assembly をスキャンし、[LiminalCommand] を付与した static メソッドを CommandDescriptor に変換する。
     /// 起動時に Bootstrap から 1 回だけ呼ばれる想定。
     /// </summary>
     internal static class AttributeScanner
@@ -86,10 +86,10 @@ namespace Void2610.LiminalPalette
                     for (var mi = 0; mi < methods.Length; mi++)
                     {
                         var method = methods[mi];
-                        ConsoleCommandAttribute attr;
+                        LiminalCommandAttribute attr;
                         try
                         {
-                            attr = method.GetCustomAttribute<ConsoleCommandAttribute>();
+                            attr = method.GetCustomAttribute<LiminalCommandAttribute>();
                         }
                         catch
                         {
@@ -116,7 +116,7 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public static bool TryBuildDescriptor(
             MethodInfo method,
-            ConsoleCommandAttribute attr,
+            LiminalCommandAttribute attr,
             out CommandDescriptor descriptor,
             out string error)
         {
@@ -145,7 +145,7 @@ namespace Void2610.LiminalPalette
                     return false;
                 }
 
-                var paramAttr = pi.GetCustomAttribute<ConsoleParamAttribute>();
+                var paramAttr = pi.GetCustomAttribute<LiminalParamAttribute>();
                 var description = paramAttr != null ? paramAttr.Description : "";
                 var choices = paramAttr != null ? paramAttr.Choices : Array.Empty<string>();
                 // Min/Max は float.NaN を「未指定」の Sentinel に使う (属性側のデフォルトと揃える)。

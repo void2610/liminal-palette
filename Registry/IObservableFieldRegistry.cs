@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
-    /// [ConsoleObservableField] で公開された状態フィールドのレジストリ。
+    /// [LiminalObservableField] で公開された状態フィールドのレジストリ。
     /// CommandRegistry と同じく プロセス共有の static シングルトン (ObservableFieldRegistry.Default)。
     /// </summary>
     public interface IObservableFieldRegistry

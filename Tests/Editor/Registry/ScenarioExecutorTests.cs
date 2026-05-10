@@ -52,7 +52,7 @@ namespace Void2610.LiminalPalette.Tests
         // ObservableField のテストは ObservableFieldRegistry.Default を直接使う方がシンプル。
         private sealed class FakeContainer
         {
-            [ConsoleObservableField("ScenarioTest/Hp")]
+            [LiminalObservableField("ScenarioTest/Hp")]
             public ReactiveProperty<int> Hp { get; } = new ReactiveProperty<int>(100);
         }
 

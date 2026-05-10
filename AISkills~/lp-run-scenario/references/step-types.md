@@ -21,7 +21,7 @@
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `path` | string | ✅ | `[ConsoleCommand]` の path。`lp-list-commands` で発見 |
+| `path` | string | ✅ | `[LiminalCommand]` の path。`lp-list-commands` で発見 |
 | `args` | object | ✅ | 引数。**全 value を string で送る**。引数 0 個でも `{}` を必ず付ける |
 
 ### 受理形式
@@ -168,7 +168,7 @@ LP の `EditorFrameWaiter` クラスが Edit Mode 用、Play Mode は `WaitForEn
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `path` | string | ✅ | `[ConsoleObservableField]` の path。`lp-get-state` で確認できる |
+| `path` | string | ✅ | `[LiminalObservableField]` の path。`lp-get-state` で確認できる |
 | `expected` | string \| number \| bool \| null | ✅ | 期待値 |
 
 ### 挙動
@@ -303,7 +303,7 @@ named シナリオは `IEnumerable<ScenarioStep>` を返す yield return メソ�
 
 | やりたいこと | step type | 例 |
 |---|---|---|
-| `[ConsoleCommand]` を呼ぶ | `command` | spawn, set, damage |
+| `[LiminalCommand]` を呼ぶ | `command` | spawn, set, damage |
 | 実時間で待つ | `wait_seconds` | network, Task.Delay |
 | フレームで待つ | `wait_frames` | 物理 / Rigidbody / Update |
 | 状態が期待値と一致 | `assert_equals` | HP=100, position=(0,0,0) |

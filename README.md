@@ -2,7 +2,7 @@
 
 VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグコンソール / コマンド実行ライブラリ。
 
-`[ConsoleCommand]` を付けた C# メソッドを **Editor / Runtime / HTTP API の 3 経路から統一的に実行できる**。AI Agent (Claude Code 等) や CLI / Discord bot から `curl` 一発でゲーム操作を自動化したいケースに特化している。
+`[LiminalCommand]` を付けた C# メソッドを **Editor / Runtime / HTTP API の 3 経路から統一的に実行できる**。AI Agent (Claude Code 等) や CLI / Discord bot から `curl` 一発でゲーム操作を自動化したいケースに特化している。
 
 ---
 
@@ -42,10 +42,10 @@ public class Player : MonoBehaviour
 {
     public ReactiveProperty<int> Hp { get; } = new(100);
 
-    [ConsoleObservableField("Player/Health")]
+    [LiminalObservableField("Player/Health")]
     public ReactiveProperty<int> HpField => Hp;          // 現在値が UI に常時表示される
 
-    [ConsoleCommand("Player/Health/Set", Description = "プレイヤーの HP を設定する")]
+    [LiminalCommand("Player/Health/Set", Description = "プレイヤーの HP を設定する")]
     public void SetHealth(int value) => Hp.Value = value;  // インスタンスメソッドでも OK
 }
 ```
@@ -108,7 +108,7 @@ skill ファイル本体は package 内の `AISkills~/` に同梱されており
 |---|---|
 | [index](Documentation~/index.md) | ドキュメントのハブ + 全体構成図 |
 | [getting-started](Documentation~/getting-started.md) | インストール / Hello World / 最初の動作確認 |
-| [commands](Documentation~/commands.md) | `[ConsoleCommand]` の全機能、引数の型、async、動的登録 |
+| [commands](Documentation~/commands.md) | `[LiminalCommand]` の全機能、引数の型、async、動的登録 |
 | [ui](Documentation~/ui.md) | Editor Window / Runtime UI / ショートカット / 入力ブロッカー |
 | [ipc](Documentation~/ipc.md) | HTTP API リファレンス + curl 例 + AI Agent 連携 |
 | [extensibility](Documentation~/extensibility.md) | `ITypeConverter` / `IParameterEditor` / `ICommandHistory` で利用側拡張 |
@@ -151,6 +151,7 @@ R3 と VContainer は Phase 5a 以降必須なので、利用側 manifest で別
 ```
 
 > 相対パスは利用側プロジェクトの `Packages/` フォルダから見て解決される。
+
 
 ---
 

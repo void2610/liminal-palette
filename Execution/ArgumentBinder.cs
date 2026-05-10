@@ -181,7 +181,7 @@ namespace Void2610.LiminalPalette
             return true;
         }
 
-        // ConsoleParamAttribute.Min/Max を ParameterDescriptor 経由で受け取り、数値型の範囲外なら error を返す。
+        // LiminalParamAttribute.Min/Max を ParameterDescriptor 経由で受け取り、数値型の範囲外なら error を返す。
         // float.NaN は「未指定」の Sentinel (属性側と同じ規約)。
         // 非数値型 (string / enum / Vector / Color など) は Min/Max を持っていても黙って通す
         // (定義側の利用ミスを ArgumentBinder で握る筋ではないため; UI ヒントとして残しておく方針)。

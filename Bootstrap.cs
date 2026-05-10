@@ -68,11 +68,11 @@ namespace Void2610.LiminalPalette
                     CommandRegistry.Default.Register(commands[i]);
                 }
 
-                // Phase 5a: [ConsoleObservableField] のスキャン。
+                // Phase 5a: [LiminalObservableField] のスキャン。
                 // ReactiveProperty<T> / Observable<T> を発見して ObservableFieldRegistry.Default に投入。
                 ObservableFieldScanner.ScanAll(filtered);
 
-                // Phase 5b: [ConsoleScenario] のスキャン。
+                // Phase 5b: [LiminalScenario] のスキャン。
                 // IEnumerable<ScenarioStep> を返すメソッドを発見して ScenarioRegistry.Default に投入。
                 ScenarioScanner.ScanAll(filtered);
             }

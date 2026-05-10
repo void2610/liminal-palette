@@ -190,7 +190,7 @@ curl -H "Authorization: Bearer $LP_TOKEN" ...
 
 ### `GET /api/v1/state` (認証必須)
 
-`[ConsoleObservableField]` で公開された読み取り専用状態のスナップショット。`?path=` 指定で単一フィールド、未指定で全件。
+`[LiminalObservableField]` で公開された読み取り専用状態のスナップショット。`?path=` 指定で単一フィールド、未指定で全件。
 
 **Request (単一)**:
 ```
@@ -234,7 +234,7 @@ GET /api/v1/state
 
 ### `GET /api/v1/scenarios` (認証必須)
 
-`[ConsoleScenario]` で登録された全シナリオの一覧。
+`[LiminalScenario]` で登録された全シナリオの一覧。
 
 **Response 200**:
 ```json
@@ -325,7 +325,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
      "http://127.0.0.1:7610/api/v1/state" | jq '.fields[] | select(.value != null)'
 ```
 
-詳細は [commands.md](commands.md) の `[ConsoleObservableField]` 章。
+詳細は [commands.md](commands.md) の `[LiminalObservableField]` 章。
 
 ---
 

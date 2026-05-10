@@ -13,8 +13,8 @@
 ### Added
 - 初回リリース。`apocalyptic-apartment-hunting` リポジトリの `Assets/Plugins/LiminalPalette/` から UPM パッケージとして切り出し。
 - Phase 1〜5b 相当の機能を同梱:
-  - Core: `[ConsoleCommand]` / Registry / Executor / TypeConverter
+  - Core: `[LiminalCommand]` / Registry / Executor / TypeConverter
   - UI Toolkit ベースの Editor Window + Runtime overlay
   - HTTP API (`/api/v1/{health, commands, execute, logs, scenarios}`)
   - インスタンスメソッドコマンド対応 (R3 / VContainer 必須化)
-  - Scenarios (`[ConsoleScenario]` / Scenario タブ / 2 endpoint)
+  - Scenarios (`[LiminalScenario]` / Scenario タブ / 2 endpoint)

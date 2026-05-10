@@ -227,4 +227,4 @@ ad-hoc が:
 - リポジトリで共有したい
 - CI で固定テストとして回したい
 
-これらのいずれかなら、C# 側に `[ConsoleScenario]` で宣言して named 化する。詳細: [named.md](named.md)。
+これらのいずれかなら、C# 側に `[LiminalScenario]` で宣言して named 化する。詳細: [named.md](named.md)。

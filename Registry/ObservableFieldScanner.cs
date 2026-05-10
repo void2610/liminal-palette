@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
-    /// [ConsoleObservableField] が付いたプロパティ / フィールドを全 Assembly からスキャンして
+    /// [LiminalObservableField] が付いたプロパティ / フィールドを全 Assembly からスキャンして
     /// ObservableFieldRegistry.Default に登録する。
     /// Bootstrap の起動経路から呼ばれる。
     ///
@@ -60,7 +60,7 @@ namespace Void2610.LiminalPalette
 
         private static void ScanType(Type type)
         {
-            // public のみを対象とする (troubleshooting.md / docs の仕様: [ConsoleObservableField] は public 必須)。
+            // public のみを対象とする (troubleshooting.md / docs の仕様: [LiminalObservableField] は public 必須)。
             // 公開 API として使われる前提のため、意図しない private/internal メンバーの公開を避ける。
             const BindingFlags flags = BindingFlags.Public |
                                        BindingFlags.Instance | BindingFlags.Static |
@@ -72,8 +72,8 @@ namespace Void2610.LiminalPalette
             for (var pi = 0; pi < props.Length; pi++)
             {
                 var p = props[pi];
-                ConsoleObservableFieldAttribute attr;
-                try { attr = p.GetCustomAttribute<ConsoleObservableFieldAttribute>(); }
+                LiminalObservableFieldAttribute attr;
+                try { attr = p.GetCustomAttribute<LiminalObservableFieldAttribute>(); }
                 catch { continue; }
                 if (attr == null) continue;
                 if (!TryBuildFromProperty(type, p, attr, out var desc, out var err))
@@ -91,8 +91,8 @@ namespace Void2610.LiminalPalette
             for (var fi = 0; fi < fields.Length; fi++)
             {
                 var f = fields[fi];
-                ConsoleObservableFieldAttribute attr;
-                try { attr = f.GetCustomAttribute<ConsoleObservableFieldAttribute>(); }
+                LiminalObservableFieldAttribute attr;
+                try { attr = f.GetCustomAttribute<LiminalObservableFieldAttribute>(); }
                 catch { continue; }
                 if (attr == null) continue;
                 if (!TryBuildFromField(type, f, attr, out var desc, out var err))
@@ -105,7 +105,7 @@ namespace Void2610.LiminalPalette
         }
 
         private static bool TryBuildFromProperty(Type declaringType, PropertyInfo prop,
-            ConsoleObservableFieldAttribute attr, out ObservableFieldDescriptor descriptor, out string error)
+            LiminalObservableFieldAttribute attr, out ObservableFieldDescriptor descriptor, out string error)
         {
             return TryBuildCommon(
                 declaringType, prop.PropertyType, attr,
@@ -116,7 +116,7 @@ namespace Void2610.LiminalPalette
         }
 
         private static bool TryBuildFromField(Type declaringType, FieldInfo field,
-            ConsoleObservableFieldAttribute attr, out ObservableFieldDescriptor descriptor, out string error)
+            LiminalObservableFieldAttribute attr, out ObservableFieldDescriptor descriptor, out string error)
         {
             return TryBuildCommon(
                 declaringType, field.FieldType, attr,
@@ -129,7 +129,7 @@ namespace Void2610.LiminalPalette
         // 戻り値型が ReactiveProperty<T> / Observable<T> なら descriptor を組み立てる。
         // それ以外は false を返してスキップさせる。
         private static bool TryBuildCommon(Type declaringType, Type memberType,
-            ConsoleObservableFieldAttribute attr, Func<object, object> getMember, string memberName,
+            LiminalObservableFieldAttribute attr, Func<object, object> getMember, string memberName,
             out ObservableFieldDescriptor outDescriptor, out string outError)
         {
             outDescriptor = null;

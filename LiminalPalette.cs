@@ -67,7 +67,7 @@ namespace Void2610.LiminalPalette
         public static IInstanceResolver InstanceResolver => _instanceResolver;
 
         /// <summary>
-        /// インスタンスメソッドの [ConsoleCommand] 解決に使う IInstanceResolver を差し替える。
+        /// インスタンスメソッドの [LiminalCommand] 解決に使う IInstanceResolver を差し替える。
         /// VContainer 統合経由では builder.RegisterEntryPoint&lt;LiminalPaletteEntryPoint&gt;() が呼ばれた時点で自動で設定される。
         /// </summary>
         public static void SetInstanceResolver(IInstanceResolver resolver)

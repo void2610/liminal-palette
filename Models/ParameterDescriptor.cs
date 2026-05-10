@@ -24,19 +24,19 @@ namespace Void2610.LiminalPalette
         /// <summary>デフォルト値。HasDefault が false の場合は null。</summary>
         public object DefaultValue { get; }
 
-        /// <summary>UI / CLI 表示用の説明 (ConsoleParamAttribute から)。</summary>
+        /// <summary>UI / CLI 表示用の説明 (LiminalParamAttribute から)。</summary>
         public string Description { get; }
 
-        /// <summary>UI ドロップダウン候補 (ConsoleParamAttribute から)。空配列で「候補なし」。</summary>
+        /// <summary>UI ドロップダウン候補 (LiminalParamAttribute から)。空配列で「候補なし」。</summary>
         public IReadOnlyList<string> Choices { get; }
 
         /// <summary>
-        /// 下限値 (含む)。float.NaN を「未指定」の Sentinel として扱う (ConsoleParamAttribute と同じ規約)。
+        /// 下限値 (含む)。float.NaN を「未指定」の Sentinel として扱う (LiminalParamAttribute と同じ規約)。
         /// </summary>
         public float Min { get; }
 
         /// <summary>
-        /// 上限値 (含む)。float.NaN を「未指定」の Sentinel として扱う (ConsoleParamAttribute と同じ規約)。
+        /// 上限値 (含む)。float.NaN を「未指定」の Sentinel として扱う (LiminalParamAttribute と同じ規約)。
         /// </summary>
         public float Max { get; }
 

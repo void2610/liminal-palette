@@ -181,21 +181,11 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:7610/api/v1/commands
 | リスク | 影響 | 緩和策 |
 |---|---|---|
 | トークンが他プロセスから読み取られる | 同マシン内の任意プロセスから操作可能 | `chmod 600` (Unix) + ユーザー権限分離 |
-| トークンファイルがバックアップで流出 | 過去のトークンが復元される可能性 | 定期的に削除して再生成 (将来検討: ローテーション機能) |
+| トークンファイルがバックアップで流出 | 過去のトークンが復元される可能性 | 定期的に削除して再生成 |
 | HTTP リクエストがプロキシ / VPN ソフトに見える | 平文通信 | 開発機内通信なので許容。LAN 越しは Tailscale / SSH トンネル前提 |
 | `[LiminalCommand]` で危険な操作が登録されている | curl 経由で破壊操作実行可能 | Production ビルドでは asmdef defineConstraints + `ProductionGuard` の二層で HTTP 機構自体が起動しない (= ビルド単位で防ぐ)。さらに個別メソッドを除外したいなら `#if DEVELOPMENT_BUILD` で囲むか別 asmdef に分離 |
 | LogCapture で取り込んだログにトークン / 機密情報が含まれる | `result.logs[]` に残る | コマンド側で機密情報を `Debug.Log` しない (利用側責任) |
 | 同マシンで悪意あるブラウザタブが localhost にリクエスト送信 (DNS rebinding 等) | XSS で `/api/v1/execute` が叩かれる可能性 | Bearer トークンファイルはブラウザから直接読めない (file://読み込み不可)。ただし他経由でトークン漏洩した場合のリスクは残る |
-
----
-
-## Phase 4 で扱わなかった項目 (将来検討)
-
-- **HTTPS / TLS** — localhost 限定なら平文で十分。LAN 越し対応するときに追加
-- **トークンのローテーション** — 現状は手動削除での再生成のみ
-- **OAuth / OIDC** — 単独開発機 + 単一ユーザー想定なので過剰
-- **動的コマンド登録 API (`POST /api/v1/commands`)** — 任意コード実行リスクのため意図的に未対応
-- **CSRF 対策** — Bearer 認証 + localhost only で実質的に保護されている。SameSite cookie 等の追加は不要
 
 ---
 

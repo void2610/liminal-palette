@@ -504,13 +504,6 @@ lp logs --limit 10 --json | jq '.invocations[].path'
 
 詳細は [Tools~/lp/README.md](../Tools~/lp/README.md)。
 
-## 拡張ポイント (将来検討)
-
-- WebSocket / SSE によるストリーミング (長時間 async コマンドのプログレス通知)
-- HTTPS / TLS (LAN 経由のリモート用)
-- 動的コマンド登録 API (`POST /api/v1/commands`、任意コード実行リスクのため要慎重)
-- キャンセルトークンの cancel エンドポイント
-
 ---
 
 ## 関連ドキュメント

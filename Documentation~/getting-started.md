@@ -34,9 +34,9 @@ LiminalPalette を最短で動かす手順。所要 5 分。
 cp -r /path/to/source/Assets/Plugins/LiminalPalette /path/to/target/Assets/Plugins/
 ```
 
-### 方法 C: UPM 経由 (将来対応予定)
+### 方法 C: UPM 経由
 
-UPM パッケージ化と `Packages/com.void2610.liminal-palette/` 構造への移行が完了したら git URL で導入可能になる:
+git URL で導入可能:
 
 ```json
 // Packages/manifest.json
@@ -46,8 +46,6 @@ UPM パッケージ化と `Packages/com.void2610.liminal-palette/` 構造への�
   }
 }
 ```
-
-OpenUPM 登録は Phase 5 完了後に予定。
 
 ## Hello World
 
@@ -163,11 +161,11 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ## 動作確認チェックリスト
 
-- [ ] Editor で `Cmd/Ctrl+K` を押すとパレットが開く
-- [ ] 検索ボックスに `Hello` を入力すると `Hello/Echo` と `Hello/Add` が候補に出る
-- [ ] `Hello/Echo` を選択して引数を入力 → Run Command で Unity Console にログが出る
-- [ ] Play Mode で `Cmd/Ctrl+K` を押すと半透明 overlay でパレットが開く
-- [ ] `curl http://127.0.0.1:7610/api/v1/health` が `200 ok` を返す
+- Editor で `Cmd/Ctrl+K` を押すとパレットが開く
+- 検索ボックスに `Hello` を入力すると `Hello/Echo` と `Hello/Add` が候補に出る
+- `Hello/Echo` を選択して引数を入力 → Run Command で Unity Console にログが出る
+- Play Mode で `Cmd/Ctrl+K` を押すと半透明 overlay でパレットが開く
+- `curl http://127.0.0.1:7610/api/v1/health` が `200 ok` を返す
 
 ここまで動けば導入完了。次は [commands.md](commands.md) で `[LiminalCommand]` の全機能を学ぶ。
 

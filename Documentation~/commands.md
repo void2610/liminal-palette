@@ -150,7 +150,7 @@ UI 上では `times` と `excited` は省略可能 (デフォルト値が初期�
 | `Task<T>` | await して T を `Value` に格納 |
 | `ValueTask` / `ValueTask<T>` | 同上 (unwrap される) |
 
-`UniTask` は **未対応** (将来の拡張で検討)。
+`UniTask` は **未対応**。
 
 ## async コマンド
 
@@ -195,7 +195,7 @@ public static void Log(string msg) => Debug.Log(msg);
 
 UI の Log タブでメッセージが見える。HTTP API では `result.logs[]` 配列で返ってくる。
 
-> 並列実行 (同じプロセスで複数コマンドが同時に走る) の場合、`LogCapture` は **混線する可能性がある** (既知の制約)。コマンド単位のログスコープ分離は将来検討。
+> 並列実行 (同じプロセスで複数コマンドが同時に走る) の場合、`LogCapture` は **混線する可能性がある** (既知の制約)。
 
 ## 動的登録
 

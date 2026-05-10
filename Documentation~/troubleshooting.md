@@ -377,6 +377,4 @@ UI / Editor / Player.InputSystem / Player.Ipc は `autoReferenced: false` また
 
 ## サポート
 
-不明点があれば本リポジトリ `Docs/debug-console/phase{1..4}-implementation-notes.md` を確認。設計判断の経緯がフェーズごとに残っている。
-
-それでも解決しない場合は GitHub Issue を立てる (Phase 5 で公式リポジトリに切り出した際にテンプレを追加予定)。
+解決しない場合は GitHub Issue を立てる。

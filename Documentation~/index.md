@@ -91,13 +91,3 @@ var sr = await LiminalPalette.RunScenarioAsync("Combat/EnemyTakesDamage");
 詳細は [security.md](security.md) と [asmdef.md](asmdef.md) を参照。
 
 ---
-
-## 実装の経緯 (社内向け)
-
-各フェーズの判断記録は本リポジトリ `Docs/debug-console/` に残っている:
-
-- `unity-debug-console-overview-plan.md` — 全体アーキテクチャ
-- `unity-debug-console-phase{1..4}-plan.md` — 各フェーズの設計判断
-- `phase{1..4}-implementation-notes.md` — 実装結果と既知の制約
-
-新しく入った人はまず `getting-started.md` → `commands.md` → 必要に応じて Phase ごとの notes を読む順がおすすめ。

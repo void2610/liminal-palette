@@ -152,27 +152,6 @@ R3 と VContainer は Phase 5a 以降必須なので、利用側 manifest で別
 
 > 相対パスは利用側プロジェクトの `Packages/` フォルダから見て解決される。
 
-### C. OpenUPM
-
-OpenUPM 登録は将来的に予定。
-
----
-
-## ステータス
-
-| Phase | スコープ | 状態 |
-|---|---|---|
-| Phase 1 | Core (Registry / Executor / `[ConsoleCommand]` / TypeConverter) | ✅ |
-| Phase 2 | UI Toolkit ベースの Editor Window + 検索 / タブ / 引数入力 / 履歴 | ✅ |
-| Phase 3 | Runtime 対応 (UIDocument / DontDestroyOnLoad / 入力 / 半透明 overlay) | ✅ |
-| Phase 4 | HTTP API (4 endpoints / Bearer 認証 / rate limit / Production 除外) | ✅ |
-| Phase 5a | インスタンスメソッド対応 + 状態表示 (R3/VContainer 必須化) | ✅ |
-| Phase 5b | Scenarios (`[ConsoleScenario]` / `Scenario` タブ / `/api/v1/scenarios` 系 2 endpoint) | ✅ |
-| Phase 6 | UPM パッケージ化 / 配布整備 | ✅ (本リポジトリ) |
-| Phase 7 | OpenUPM 登録 / SemVer 安定化 | 計画中 |
-
-EditMode テスト 299 件緑、Editor + Play Mode + IPC のラウンドトリップ動作確認済み。
-
 ---
 
 ## ライセンス

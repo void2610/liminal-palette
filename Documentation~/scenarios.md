@@ -318,17 +318,6 @@ echo "exit=$?"
 
 `[ConsoleObservableField]` で公開された Path をベースに値を引く。直前 Command の戻り値に対する Assert (例: `AssertReturn`) は意図的に入れていない: 暗黙の "前ステップ" 状態が発生して fail-fast の単純さが崩れるため。「Command 経由で副作用を起こし、ObservableField に出てきた値を検証」というスタイルに統一している。
 
-### scope 外の機能 (将来)
-
-- 変数受け渡し (前ステップの戻り値を次に渡す)
-- 条件分岐 (if/else) / ループ
-- JSON/YAML ファイルからの定義 (HTTP ad-hoc 経路がカバー)
-- UI ビルダー (シナリオを GUI で組む)
-- 並列実行 (常に逐次)
-- 失敗継続モード (常に fail-fast)
-
-必要になったら後追いで入れる方針。
-
 ---
 
 ## トラブルシューティング (Scenario 関連)

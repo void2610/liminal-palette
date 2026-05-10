@@ -209,7 +209,7 @@ public enum Permission { None = 0, Read = 1, Write = 2, Execute = 4 }
 |---|---|---|
 | `"@<entityID>"` | `Resources.EntityIdToObject` で解決 | UI ピッカーで取得した ID 前提 (CLI から組み立てるのは現実的でない) |
 | `"GameObject:<name>"` | シーン上の GameObject 名前検索 | **Runtime 限定**。`GameObject.Find(name)` ベース |
-| `"<name>"` (フォールバック) | (未対応) | Phase 2 で UI ピッカー経由に切り替え予定。現状はエラー |
+| `"<name>"` (フォールバック) | (未対応) | 現状はエラー |
 
 ### Runtime 名前検索の例
 

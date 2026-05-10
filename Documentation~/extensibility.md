@@ -281,7 +281,7 @@ var controller = new PaletteController(
     new SqliteCommandHistory("/path/to/history.db"));
 ```
 
-ただし `LiminalPaletteWindow` / `LiminalPaletteRuntime` は内部で固定の History 実装を使うため、ホスト側のコードを上書きする必要がある (現状は public API なし)。将来検討事項として、history factory のフックを公開する案がある。
+ただし `LiminalPaletteWindow` / `LiminalPaletteRuntime` は内部で固定の History 実装を使うため、ホスト側のコードを上書きする必要がある (現状は public API なし)。
 
 ---
 

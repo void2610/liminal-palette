@@ -945,17 +945,19 @@ def cmd_scenarios(args, base_url, token):
 
 
 def cmd_run(args, base_url, token):
-    # ad-hoc (--steps) を最優先で処理 (glob と併用しない)
+    # ad-hoc (--steps) を最優先で処理。path との併用はドキュメント上排他なのでエラーで弾く。
     if args.steps is not None:
+        if args.path:
+            raise SystemExit(_red("path と --steps は同時に指定できません (どちらか一方)"))
         body = _build_adhoc_body(args.steps)
-        results = [_run_scenario(base_url, token, body, args.path or "(ad-hoc)")]
+        results = [_run_scenario(base_url, token, body, "(ad-hoc)")]
         _finalize_run(args, results, single=True)
         return
 
     if not args.path:
         raise SystemExit(_red("path か --steps を指定"))
 
-    # path に glob メタ文字 (*/?) が含まれていれば一覧取得 → フィルタ → 順次実行。
+    # path に glob メタ文字 (*, ?, [...]) が含まれていれば一覧取得 → フィルタ → 順次実行。
     if any(c in args.path for c in ("*", "?", "[")):
         targets = _expand_scenario_glob(base_url, token, args.path)
         if not targets:
@@ -1025,7 +1027,10 @@ def _finalize_run(args, results: list[tuple[str, dict]], *, single: bool) -> Non
             _emit_json(results[0][1])
         else:
             payload = {
-                "scenarios": [{"path": label, **resp} for label, resp in results],
+                # label が glob 展開で確定したパスなので、resp に同名キーがあっても上書きされないよう
+                # resp を先に展開して "path" を最後に書く (server 応答は ad-hoc 実行時に "path" が
+                # null になるなど一致しない場合がある)。
+                "scenarios": [{**resp, "path": label} for label, resp in results],
                 "total": len(results),
                 "passed": sum(1 for _, r in results if r.get("success")),
                 "failed": sum(1 for _, r in results if not r.get("success")),
@@ -1141,7 +1146,7 @@ def _write_junit_report(path: str, results: list[tuple[str, dict]]) -> None:
             kind = step.get("kind", "?")
             err = step.get("error") or ""
             actual = step.get("actualValue")
-            expected = step.get("expectedValue")
+            expected = step.get("expected")
             msg_parts.append(kind)
             if err:
                 msg_parts.append(err)
@@ -1149,7 +1154,7 @@ def _write_junit_report(path: str, results: list[tuple[str, dict]]) -> None:
             if actual is not None:
                 details.append(f"  actualValue: {actual}")
             if expected is not None:
-                details.append(f"  expectedValue: {expected}")
+                details.append(f"  expected: {expected}")
             if err:
                 details.append(f"  error: {err}")
         elif resp.get("error"):

@@ -165,7 +165,7 @@ liminal run 'Battle/**' --report reports/liminal.xml
       <failure message="failedAtStep=1 — AssertEquals — expected '70' but got '65'">
         step[1] AssertEquals
           actualValue: 65
-          expectedValue: 70
+          expected: 70
           error: expected '70' but got '65'
       </failure>
     </testcase>

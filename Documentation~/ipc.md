@@ -68,9 +68,15 @@ curl -H "Authorization: Bearer $LP_TOKEN" ...
 {
   "status": "ok",
   "version": "0.4.0",
+  "projectName": "MyGame",
+  "projectPath": "/Users/me/dev/MyGame",
   "commandCount": 356
 }
 ```
+
+`projectName` は `Application.productName`、`projectPath` は `Application.dataPath` の親ディレクトリ。
+同一マシンで複数 Unity プロジェクトが同時起動しているとき、CLI 側がポートとプロジェクトを
+紐付けるための識別子として使う。値が取れない場合は空文字列。
 
 ### `GET /api/v1/commands` (認証必須)
 
@@ -353,7 +359,7 @@ H="Authorization: Bearer $TOKEN"
 
 # Health
 curl -s $BASE/api/v1/health
-# → {"status":"ok","version":"0.4.0","commandCount":356}
+# → {"status":"ok","version":"0.4.0","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
 
 # コマンド一覧 (Player/ 配下だけ)
 curl -s -H "$H" $BASE/api/v1/commands | jq '.commands[] | select(.path | startswith("Player/"))'

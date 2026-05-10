@@ -29,9 +29,10 @@ lp health   # → ok ... が出れば設定 OK
 | 自動化される項目 | 出所 |
 |---|---|
 | トークン | `~/.liminal-palette/token` (Editor 初回起動時に自動生成) または `$LP_TOKEN` |
-| ベース URL | `7610〜7615` を `/health` で順スキャンして最初に応答した方 |
+| ベース URL | `~/.liminal-palette/ports.json` のキャッシュ → 失敗時 `7610〜7615` を short timeout で probe |
+| ターゲットプロジェクト | `--project` / `$LP_PROJECT` / cwd の `ProjectSettings/ProjectVersion.txt` 検出 (`/health` の `projectName`+`projectPath` で照合) |
 
-明示したい場合は `--token`, `--port`, `--base-url` で個別に上書きできる。
+明示したい場合は `--token`, `--port`, `--base-url`, `--project` で個別に上書きできる。複数 Unity プロジェクトが同時起動しているときは `lp doctor` で全体像を確認すると速い。
 
 ---
 
@@ -39,7 +40,7 @@ lp health   # → ok ... が出れば設定 OK
 
 | やりたいこと | 使うスキル | `lp` サブコマンド |
 |---|---|---|
-| LP が起動しているか確認 | `/lp-find-port` | `lp health` |
+| LP が起動しているか確認 | `/lp-find-port` | `lp health` / `lp doctor` |
 | 利用できるコマンドを発見 | `/lp-list-commands` | `lp commands [--filter Player/]` |
 | コマンドを実行する | `/lp-execute` | `lp exec <path> key=value...` |
 | 現在のゲーム状態を読む | `/lp-get-state` | `lp state [<path>]` |

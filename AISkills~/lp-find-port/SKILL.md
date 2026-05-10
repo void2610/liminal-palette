@@ -1,17 +1,19 @@
 ---
 name: lp-find-port
-description: 'Verify that the LiminalPalette HTTP server is up via `lp health`. The CLI auto-discovers the port (scans 7610..7615), so explicit detection is only needed when distinguishing Editor (7610) vs Play Mode (7611) — use `lp --port N health` to target each. Use when LP appears down, after Editor restart, or when both Editor + Play Mode are running.'
-when_to_use: 'Trigger phrases: "LP のヘルスチェック", "LP が動いているか確認", "ポートが分からない", "connection refused", "Play Mode と Editor 両方確認", "what port is LP on", "scan LP ports".'
+description: 'Verify that the LiminalPalette HTTP server is up via `lp health` / `lp doctor`. The CLI caches the discovered port per Unity project at `~/.liminal-palette/ports.json` and falls back to scanning 7610..7615. Multi-project disambiguation uses `--project` / `$LP_PROJECT` / cwd auto-detect against `/health` `projectName`+`projectPath`. Use when LP appears down, after Editor restart, when both Editor + Play Mode are running, or when multiple Unity projects are open at once.'
+when_to_use: 'Trigger phrases: "LP のヘルスチェック", "LP が動いているか確認", "ポートが分からない", "connection refused", "Play Mode と Editor 両方確認", "what port is LP on", "scan LP ports", "複数プロジェクト", "lp doctor".'
 allowed-tools: Bash(lp *), Bash(jq *), Bash(lsof *), Bash(echo *)
 ---
 
 # lp-find-port
 
-LP の HTTP サーバが今どこで動いているかを `lp health` で確認する。
+LP の HTTP サーバが今どこで動いているかを `lp health` / `lp doctor` で確認する。
 
-`lp` は通常呼び出し時に **`7610〜7615` を自動スキャン**して最初に応答したポートを使うので、単に「LP に届くか」を見たいなら `lp health` を 1 発叩けば終わり (`/health` は認証不要)。
+`lp` は **直近成功ポートを `~/.liminal-palette/ports.json` にキャッシュ**しており、次回呼び出しはそこから試す。キャッシュが効かない場合のみ `7610〜7615` を short timeout (0.4s) で probe する。単に「LP に届くか」を見たいなら `lp health` を 1 発叩けば終わり (`/health` は認証不要)。
 
-明示的にポートを切り分ける必要があるのは **Editor + Play Mode が両方走っている** ケースだけ。
+明示的に切り分けが必要なのは次のケース:
+- **Editor + Play Mode が両方走っている** (同じプロジェクト内、別ポート)
+- **複数 Unity プロジェクトが同時起動している** (別プロジェクト、別ポート)
 
 ---
 
@@ -26,10 +28,28 @@ lp health
 ```
 ok  http://127.0.0.1:7610
   version       : 0.4.0
+  projectName   : MyGame
+  projectPath   : /Users/me/dev/MyGame
   commandCount  : 395
 ```
 
 応答した URL がそのまま使われる。これで OK なら他のスキルもそのまま叩いて良い。
+
+## 環境まるごと診断 (`lp doctor`)
+
+token / cwd 検出 / キャッシュ / 生存ポート / 解決結果を一発で出す。LP の挙動が怪しいときの最初の一手:
+
+```bash
+lp doctor
+```
+
+出力には次が並ぶ:
+
+- Token: 存在 / `$LP_TOKEN` 経由か / 未取得か
+- Project detection: cwd / cwd→Unity プロジェクト / `--project` / `$LP_PROJECT` / 解決後ターゲット
+- Port cache: `~/.liminal-palette/ports.json` の中身 (プロジェクトごとのポート)
+- Live probe: `7610〜7615` を全部叩いた結果 (生存ポート × `projectName`/`projectPath`/`commandCount`)
+- Resolution: 最終的にどのポートが選ばれるか / 曖昧なら警告
 
 ---
 
@@ -41,6 +61,24 @@ ok  http://127.0.0.1:7610
 lp --port 7610 health   # → Editor
 lp --port 7611 health   # → Play Mode
 ```
+
+## 複数 Unity プロジェクト同時起動
+
+別々のプロジェクト Editor が 2 つ以上立っている場合、`lp` は cwd を辿って `ProjectSettings/ProjectVersion.txt` を見つけるとそのプロジェクトをターゲット扱いする。明示的に切り替えるなら:
+
+```bash
+# プロジェクト名で指定 (Application.productName と一致)
+lp --project MyGame state
+
+# プロジェクトパスで指定 (絶対パス推奨)
+lp --project /Users/me/dev/Other state
+
+# 環境変数で固定 (シェルセッション単位)
+export LP_PROJECT=MyGame
+lp state
+```
+
+ターゲット未指定で複数生存している場合、`lp` は曖昧として停止し生存中のポート + プロジェクト一覧を出すので、それを見て `--project` を付け直す。
 
 `commandCount` を比較すると判別できる (Editor 側に Editor 限定 `[LiminalCommand]` が含まれるため通常 Editor の方が多い):
 
@@ -65,13 +103,15 @@ lp --base-url http://127.0.0.1:7611 state                       # Play Mode
 `--json` 無しなら整形済み、`--json` 付きなら以下が返る:
 
 ```json
-{"status":"ok","version":"0.4.0","commandCount":356}
+{"status":"ok","version":"0.4.0","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
 ```
 
 | フィールド | 用途 |
 |---|---|
 | `status` | 常に `"ok"`。返ること自体が「生きている」サイン |
 | `version` | LP パッケージのバージョン |
+| `projectName` | `Application.productName`。複数プロジェクト同時起動時の照合キー |
+| `projectPath` | `Application.dataPath` の親ディレクトリ。同マシン内で唯一 |
 | `commandCount` | 登録済み `[LiminalCommand]` の数。Editor / Runtime の判別ヒント |
 
 ---

@@ -945,36 +945,121 @@ def cmd_scenarios(args, base_url, token):
 
 
 def cmd_run(args, base_url, token):
+    # ad-hoc (--steps) を最優先で処理。path との併用はドキュメント上排他なのでエラーで弾く。
     if args.steps is not None:
-        # ad-hoc: --steps - は stdin、--steps FILE はファイル読み込み。
-        if args.steps == "-":
-            raw = sys.stdin.read()
-        else:
-            raw = Path(args.steps).read_text(encoding="utf-8")
-        try:
-            steps_obj = json.loads(raw)
-        except json.JSONDecodeError as e:
-            raise SystemExit(_red(f"--steps の JSON パースに失敗: {e}"))
-        # 配列直書きと {"steps":[...]} のどちらでも受ける。
-        if isinstance(steps_obj, list):
-            body = {"steps": steps_obj}
-        elif isinstance(steps_obj, dict) and "steps" in steps_obj:
-            body = {"steps": steps_obj["steps"]}
-        else:
-            raise SystemExit(_red("--steps は配列 or {steps:[...]} を渡す"))
-    elif args.path:
-        body = {"path": args.path}
-    else:
+        if args.path:
+            raise SystemExit(_red("path と --steps は同時に指定できません (どちらか一方)"))
+        body = _build_adhoc_body(args.steps)
+        results = [_run_scenario(base_url, token, body, "(ad-hoc)")]
+        _finalize_run(args, results, single=True)
+        return
+
+    if not args.path:
         raise SystemExit(_red("path か --steps を指定"))
+
+    # path に glob メタ文字 (*, ?, [...]) が含まれていれば一覧取得 → フィルタ → 順次実行。
+    if any(c in args.path for c in ("*", "?", "[")):
+        targets = _expand_scenario_glob(base_url, token, args.path)
+        if not targets:
+            raise SystemExit(_red(f"glob '{args.path}' に一致するシナリオがありません"))
+        results = [_run_scenario(base_url, token, {"path": p}, p) for p in targets]
+        _finalize_run(args, results, single=False)
+        return
+
+    # 通常の単一シナリオ実行
+    results = [_run_scenario(base_url, token, {"path": args.path}, args.path)]
+    _finalize_run(args, results, single=True)
+
+
+def _build_adhoc_body(steps_arg: str) -> dict:
+    """--steps の値 ('-' なら stdin、それ以外はファイルパス) を request body にする。"""
+    if steps_arg == "-":
+        raw = sys.stdin.read()
+    else:
+        try:
+            raw = Path(steps_arg).read_text(encoding="utf-8")
+        except OSError as e:
+            raise SystemExit(_red(f"--steps の読み込みに失敗: {e}"))
+    try:
+        steps_obj = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise SystemExit(_red(f"--steps の JSON パースに失敗: {e}"))
+    # 配列直書きと {"steps":[...]} のどちらでも受ける。
+    if isinstance(steps_obj, list):
+        return {"steps": steps_obj}
+    if isinstance(steps_obj, dict) and "steps" in steps_obj:
+        return {"steps": steps_obj["steps"]}
+    raise SystemExit(_red("--steps は配列 or {steps:[...]} を渡す"))
+
+
+def _run_scenario(base_url: str, token: str | None, body: dict, label: str) -> tuple[str, dict]:
+    """1 シナリオ実行して (label, response) を返す。"""
     status, resp = _request("POST", f"{base_url}/api/v1/scenarios/run", token, body)
     _check_status(status, resp)
+    if not isinstance(resp, dict):
+        # 通常 dict が返るが、サーバ実装が壊れた場合の保険。
+        resp = {"success": False, "error": str(resp)}
+    return (label, resp)
+
+
+def _expand_scenario_glob(base_url: str, token: str | None, pattern: str) -> list[str]:
+    """/api/v1/scenarios を引いて fnmatch で path をフィルタ。
+    `*` は path 内の `/` も跨ぐ (Battle/* が Battle/Repro/X にもヒット)。"""
+    import fnmatch
+    status, body = _request("GET", f"{base_url}/api/v1/scenarios", token)
+    _check_status(status, body)
+    scenarios = body.get("scenarios", []) if isinstance(body, dict) else []
+    matched: list[str] = []
+    for s in scenarios:
+        if not isinstance(s, dict):
+            continue
+        path = s.get("path", "")
+        if path and fnmatch.fnmatchcase(path, pattern):
+            matched.append(path)
+    matched.sort()
+    return matched
+
+
+def _finalize_run(args, results: list[tuple[str, dict]], *, single: bool) -> None:
+    """run 系コマンドの後処理 (出力 / レポート / exit code)。"""
     if args.json:
-        _emit_json(resp)
-        sys.exit(0 if resp.get("success") else 2)
+        if single:
+            _emit_json(results[0][1])
+        else:
+            payload = {
+                # label が glob 展開で確定したパスなので、resp に同名キーがあっても上書きされないよう
+                # resp を先に展開して "path" を最後に書く (server 応答は ad-hoc 実行時に "path" が
+                # null になるなど一致しない場合がある)。
+                "scenarios": [{**resp, "path": label} for label, resp in results],
+                "total": len(results),
+                "passed": sum(1 for _, r in results if r.get("success")),
+                "failed": sum(1 for _, r in results if not r.get("success")),
+            }
+            _emit_json(payload)
+    else:
+        if single:
+            _emit_single_run_text(*results[0])
+        else:
+            _emit_glob_run_text(results)
+
+    if args.report:
+        try:
+            _write_junit_report(args.report, results)
+        except OSError as e:
+            raise SystemExit(_red(f"JUnit report write error: {args.report}: {e}"))
+        if not args.json:
+            print(_dim(f"  JUnit report: {args.report}"))
+
+    any_failed = any(not r.get("success") for _, r in results)
+    sys.exit(2 if any_failed else 0)
+
+
+def _emit_single_run_text(label: str, resp: dict) -> None:
+    """単一シナリオの詳細表示 (既存挙動を保持)。"""
     ok = resp.get("success", False)
     head = _green("PASS") if ok else _red("FAIL")
     dur = resp.get("durationMs")
-    print(f"{head}  {args.path}  ({dur} ms)")
+    print(f"{head}  {label}  ({dur} ms)")
     if not ok:
         idx = resp.get("failedAtStep", -1)
         print(f"  failedAtStep: {idx}")
@@ -994,7 +1079,95 @@ def cmd_run(args, base_url, token):
             if err:
                 extra += f"  {_red(err)}"
         print(f"  {marker} [{i}] {kind:<16} {extra} {_dim(f'({s_dur}ms)')}")
-    sys.exit(0 if ok else 2)
+
+
+def _emit_glob_run_text(results: list[tuple[str, dict]]) -> None:
+    """glob ヒット時の集計表示。1 行 per scenario + サマリ。"""
+    width = min(max((len(label) for label, _ in results), default=0), 60)
+    passed = failed = 0
+    total_ms = 0.0
+    for label, resp in results:
+        ok = resp.get("success", False)
+        dur = resp.get("durationMs", 0) or 0
+        total_ms += dur
+        marker = _green("✓") if ok else _red("✗")
+        line = f"  {marker} {label.ljust(width)}  {_dim(f'({dur} ms)')}"
+        if ok:
+            passed += 1
+            print(line)
+        else:
+            failed += 1
+            idx = resp.get("failedAtStep", -1)
+            print(f"{line}  failedAtStep={idx}")
+            steps = resp.get("steps") or []
+            if isinstance(idx, int) and 0 <= idx < len(steps):
+                step = steps[idx]
+                kind = step.get("kind", "?")
+                err = step.get("error") or ""
+                actual = step.get("actualValue")
+                msg = err or f"{kind} actual={actual}"
+                print(f"      {_red(msg)}")
+    print()
+    head = _green("PASS") if failed == 0 else _red("FAIL")
+    print(f"{head}  {passed + failed} scenarios, {passed} passed, {failed} failed  ({total_ms:.1f} ms total)")
+
+
+def _xml_escape(s: str) -> str:
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+              .replace("\"", "&quot;"))
+
+
+def _write_junit_report(path: str, results: list[tuple[str, dict]]) -> None:
+    """JUnit XML を path に書く。tests=N、failures=F、time は秒。"""
+    failures = sum(1 for _, r in results if not r.get("success"))
+    total_time = sum((r.get("durationMs", 0) or 0) for _, r in results) / 1000.0
+    lines: list[str] = ['<?xml version="1.0" encoding="UTF-8"?>']
+    lines.append(
+        f'<testsuites name="liminal" tests="{len(results)}" '
+        f'failures="{failures}" time="{total_time:.3f}">'
+    )
+    lines.append(
+        f'  <testsuite name="liminal" tests="{len(results)}" '
+        f'failures="{failures}" time="{total_time:.3f}">'
+    )
+    for label, resp in results:
+        dur_s = (resp.get("durationMs", 0) or 0) / 1000.0
+        ok = resp.get("success", False)
+        name_attr = _xml_escape(label)
+        if ok:
+            lines.append(f'    <testcase name="{name_attr}" time="{dur_s:.3f}"/>')
+            continue
+        idx = resp.get("failedAtStep", -1)
+        steps = resp.get("steps") or []
+        msg_parts = [f"failedAtStep={idx}"]
+        details: list[str] = []
+        if isinstance(idx, int) and 0 <= idx < len(steps):
+            step = steps[idx]
+            kind = step.get("kind", "?")
+            err = step.get("error") or ""
+            actual = step.get("actualValue")
+            expected = step.get("expected")
+            msg_parts.append(kind)
+            if err:
+                msg_parts.append(err)
+            details.append(f"step[{idx}] {kind}")
+            if actual is not None:
+                details.append(f"  actualValue: {actual}")
+            if expected is not None:
+                details.append(f"  expected: {expected}")
+            if err:
+                details.append(f"  error: {err}")
+        elif resp.get("error"):
+            details.append(str(resp.get("error")))
+        message = _xml_escape(" — ".join(msg_parts))
+        body_text = _xml_escape("\n".join(details))
+        lines.append(f'    <testcase name="{name_attr}" time="{dur_s:.3f}">')
+        lines.append(f'      <failure message="{message}">{body_text}</failure>')
+        lines.append('    </testcase>')
+    lines.append('  </testsuite>')
+    lines.append('</testsuites>')
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 # -- argparse -------------------------------------------------------------
@@ -1046,9 +1219,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("scenarios", help="登録シナリオの一覧")
 
-    sp = sub.add_parser("run", help="シナリオ実行 (named or ad-hoc)")
-    sp.add_argument("path", nargs="?", help="シナリオパス (例: Combat/EnemyTakesDamage)。--steps を使う場合は省略")
+    sp = sub.add_parser("run", help="シナリオ実行 (named / glob / ad-hoc)")
+    sp.add_argument("path", nargs="?", help="シナリオパス (例: Combat/EnemyTakesDamage)。glob (例: 'Battle/*') で複数実行も可。--steps 使用時は省略")
     sp.add_argument("--steps", metavar="FILE_OR_DASH", help="ad-hoc: '-' で stdin、それ以外はファイルから JSON を読む")
+    sp.add_argument("--report", metavar="PATH", help="JUnit XML レポートを PATH に書き出す (CI で testsuite として読める)")
 
     return p
 

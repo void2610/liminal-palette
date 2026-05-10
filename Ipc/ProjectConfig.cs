@@ -11,7 +11,10 @@ namespace Void2610.LiminalPalette.Ipc
     /// このファイルの port を最優先候補として probe する。
     ///
     /// ファイルフォーマット (例):
-    ///   { "port": 7613 }
+    ///   {
+    ///     "port": 7613,           // Editor が使うポート (Play Mode 未設定なら fallback としても使われる)
+    ///     "runtimePort": 7700     // Play Mode / Player ビルド用 (省略可)
+    ///   }
     ///
     /// ファイルが存在しない / port が 0 以下 / 65535 超 / パースエラーの場合は null を返し、
     /// 呼び出し側は IpcSettings.DefaultPort にフォールバックする。
@@ -24,6 +27,7 @@ namespace Void2610.LiminalPalette.Ipc
         private class Dto
         {
             public int port;
+            public int runtimePort;
         }
 
         /// <summary>
@@ -33,14 +37,28 @@ namespace Void2610.LiminalPalette.Ipc
         /// </summary>
         public static string ConfigFilePath => GetConfigFilePathAt(GetProjectRoot());
 
-        /// <summary>プロジェクト設定で指定された preferred port を返す。未設定なら null。</summary>
+        /// <summary>
+        /// Editor が使う preferred port を返す。未設定なら null。
+        /// Play Mode / Runtime 用は <see cref="GetPreferredRuntimePort"/>。
+        /// </summary>
         public static int? GetPreferredPort() => GetPreferredPortAt(GetProjectRoot());
 
         /// <summary>
-        /// テスト / 任意プロジェクトディレクトリから preferred port を読む。
-        /// production code では <see cref="GetPreferredPort"/> を使う。
+        /// Play Mode / Runtime (Player ビルド) が使う preferred port を返す。
+        /// runtimePort 未設定なら null。呼び出し側は port (Editor 共通) → DefaultPort の順に
+        /// フォールバックする。
         /// </summary>
+        public static int? GetPreferredRuntimePort() => GetPreferredRuntimePortAt(GetProjectRoot());
+
+        /// <summary>テスト / 任意プロジェクトディレクトリから Editor 用 preferred port を読む。</summary>
         internal static int? GetPreferredPortAt(string projectRoot)
+            => ReadPort(projectRoot, dto => dto.port);
+
+        /// <summary>テスト / 任意プロジェクトディレクトリから Runtime 用 preferred port を読む。</summary>
+        internal static int? GetPreferredRuntimePortAt(string projectRoot)
+            => ReadPort(projectRoot, dto => dto.runtimePort);
+
+        private static int? ReadPort(string projectRoot, Func<Dto, int> select)
         {
             try
             {
@@ -49,8 +67,10 @@ namespace Void2610.LiminalPalette.Ipc
                 var json = File.ReadAllText(path);
                 if (string.IsNullOrWhiteSpace(json)) return null;
                 var dto = JsonUtility.FromJson<Dto>(json);
-                if (dto == null || dto.port <= 0 || dto.port > 65535) return null;
-                return dto.port;
+                if (dto == null) return null;
+                var port = select(dto);
+                if (port <= 0 || port > 65535) return null;
+                return port;
             }
             catch (Exception ex)
             {

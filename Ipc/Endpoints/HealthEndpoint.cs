@@ -9,12 +9,24 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 {
     /// <summary>
     /// GET /api/v1/health: 認証不要の生存確認。
-    /// 戻り値: {"status":"ok","version":"0.4.0","projectName":"...","projectPath":"...","commandCount":N}
+    /// 戻り値: {"status":"ok","version":"0.4.0","mode":"editor|runtime","projectName":"...","projectPath":"...","commandCount":N}
     /// projectName / projectPath は同一マシンで複数 Unity プロジェクトが
     /// 同時起動しているときに lp CLI 側がポートとプロジェクトを紐付けるために使う。
+    /// mode は同一プロジェクト内で Editor / Runtime (Play Mode) listener を区別するためのフラグ。
     /// </summary>
     public sealed class HealthEndpoint : IIpcEndpoint
     {
+        private readonly string _mode;
+
+        /// <summary>
+        /// <paramref name="mode"/> は "editor" または "runtime" を渡す。
+        /// EditorIpcBootstrap → "editor"、RuntimeIpcBootstrap → "runtime"。
+        /// </summary>
+        public HealthEndpoint(string mode)
+        {
+            _mode = string.IsNullOrEmpty(mode) ? "unknown" : mode;
+        }
+
         // 認証は不要。クライアントから token 無しでも到達できる。
         public bool RequiresAuth => false;
 
@@ -24,6 +36,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
             w.BeginObject();
             w.WriteString("status", "ok");
             w.WriteString("version", "0.4.0");
+            w.WriteString("mode", _mode);
             w.WriteString("projectName", Application.productName ?? "");
             w.WriteString("projectPath", GetProjectPath());
             w.WriteNumber("commandCount", LiminalPalette.Registry.All.Count);

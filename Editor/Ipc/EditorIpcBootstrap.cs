@@ -53,7 +53,7 @@ namespace Void2610.LiminalPalette.Editor.Ipc
 
             var token = TokenStore.LoadOrCreate();
             var router = new IpcRouter(new TokenAuthenticator(token));
-            router.Register("GET", "/api/v1/health", new HealthEndpoint());
+            router.Register("GET", "/api/v1/health", new HealthEndpoint("editor"));
             router.Register("GET", "/api/v1/commands", new ListCommandsEndpoint());
             router.Register("POST", "/api/v1/execute", new ExecuteCommandEndpoint());
             router.Register("GET", "/api/v1/logs", new ListLogsEndpoint());

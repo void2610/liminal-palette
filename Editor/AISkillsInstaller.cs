@@ -37,20 +37,27 @@ namespace Void2610.LiminalPalette.Editor
             }
 
             var dstRoot = Path.Combine(GetProjectRoot(), ClaudeSkillsRel);
-            // 既存の lp-* スキル (前バージョンのインストール残骸) と衝突する場合は事前に通知する。
+            // 既存スキル (現行 liminal-* および旧 lp-* 残骸) と衝突する場合は事前に通知する。
             var existing = Directory.Exists(dstRoot)
-                ? Directory.GetDirectories(dstRoot, "lp-*")
+                ? CollectInstalledSkills(dstRoot)
                 : System.Array.Empty<string>();
 
             var prompt = $"Install {skillDirs.Length} skill(s) into:\n  {dstRoot}";
             if (existing.Length > 0)
-                prompt += $"\n\n{existing.Length} existing lp-* skill(s) will be OVERWRITTEN.";
+                prompt += $"\n\n{existing.Length} existing skill(s) (liminal-*/lp-*) will be OVERWRITTEN or removed.";
 
             if (!EditorUtility.DisplayDialog("LiminalPalette - Install AI Skills",
                     prompt, "Install", "Cancel"))
                 return;
 
             Directory.CreateDirectory(dstRoot);
+            // 旧 lp-* (legacy) はリネーム前のディレクトリ名なので、新規インストールでは取り残されてしまう。
+            // 重複を避けるため、Install 時に明示的に削除して新しい liminal-* に置き換える。
+            foreach (var legacy in Directory.GetDirectories(dstRoot, "lp-*"))
+            {
+                try { Directory.Delete(legacy, recursive: true); }
+                catch { /* swallow: legacy cleanup なので失敗してもよい */ }
+            }
             var copied = 0;
             foreach (var skillDir in skillDirs)
             {
@@ -80,25 +87,39 @@ namespace Void2610.LiminalPalette.Editor
                 return;
             }
 
-            var lpSkills = Directory.GetDirectories(dstRoot, "lp-*");
-            if (lpSkills.Length == 0)
+            // 現行の liminal-* と旧 lp-* を両方クリーンアップする (リネーム前にインストールしたユーザー向け)。
+            var skills = CollectInstalledSkills(dstRoot);
+            if (skills.Length == 0)
             {
                 EditorUtility.DisplayDialog("LiminalPalette",
-                    "No lp-* skills are currently installed.", "OK");
+                    "No liminal-* / lp-* skills are currently installed.", "OK");
                 return;
             }
 
             if (!EditorUtility.DisplayDialog("LiminalPalette - Uninstall AI Skills",
-                    $"Remove {lpSkills.Length} lp-* skill(s) from:\n{dstRoot}",
+                    $"Remove {skills.Length} skill(s) (liminal-*/lp-*) from:\n{dstRoot}",
                     "Remove", "Cancel"))
                 return;
 
-            foreach (var dir in lpSkills)
+            foreach (var dir in skills)
                 Directory.Delete(dir, recursive: true);
 
-            Debug.Log($"[LiminalPalette] Uninstalled {lpSkills.Length} AI skill(s) from {dstRoot}");
+            Debug.Log($"[LiminalPalette] Uninstalled {skills.Length} AI skill(s) from {dstRoot}");
             EditorUtility.DisplayDialog("LiminalPalette",
-                $"Removed {lpSkills.Length} lp-* skill(s).", "OK");
+                $"Removed {skills.Length} skill(s).", "OK");
+        }
+
+        /// <summary>
+        /// インストール済みのスキルディレクトリ (現行 liminal-* と legacy lp-*) を集める。
+        /// </summary>
+        private static string[] CollectInstalledSkills(string dstRoot)
+        {
+            var current = Directory.GetDirectories(dstRoot, "liminal-*");
+            var legacy = Directory.GetDirectories(dstRoot, "lp-*");
+            var combined = new string[current.Length + legacy.Length];
+            current.CopyTo(combined, 0);
+            legacy.CopyTo(combined, current.Length);
+            return combined;
         }
 
         /// <summary>

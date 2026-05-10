@@ -5,14 +5,17 @@
 ## [Unreleased]
 
 ### Added
-- AI Agent 用の Claude Code Skills を 8 個同梱 (`AISkills~/lp-*/SKILL.md`): lp-overview / lp-find-port / lp-list-commands / lp-execute / lp-get-state / lp-get-logs / lp-list-scenarios / lp-run-scenario。
-- Editor メニュー `Tools > LiminalPalette > Install AI Skills... / Uninstall AI Skills` を追加 (`Editor/AISkillsInstaller.cs`)。利用側プロジェクトの `.claude/skills/` への配布 / 削除に対応。
-- `/api/v1/health` レスポンスに `projectName` / `projectPath` を追加。同一マシンで複数 Unity プロジェクトが同時起動しているときに CLI 側がポートとプロジェクトを紐付けるための識別子。
-- プロジェクト固定ポート設定 `<project>/ProjectSettings/LiminalPalette.json` (`{"port": <N>}`) を追加。`Void2610.LiminalPalette.Ipc.ProjectConfig` が読み取り、Editor / Play Mode の bootstrap が `IpcSettings.DefaultPort` の代わりに採用する。複数 Unity プロジェクトを衝突なく同時起動できる。
-- `lp` CLI: 上記 preferred port を cwd / `--project` から読み、最優先候補として probe する。さらに `~/.liminal-palette/ports.json` への結果キャッシュを併用して通常 1 リクエストで discovery を終わらせる。
-- `lp` CLI: 複数 Unity プロジェクト同時起動時のターゲット指定として `--project` フラグ・`$LP_PROJECT` 環境変数・cwd からの Unity プロジェクト自動検出 (`ProjectSettings/ProjectVersion.txt`) を追加。
-- `lp doctor`: トークン / cwd 検出 / preferred port / キャッシュ / 生存ポート / 解決結果 を一覧表示する診断コマンド。
-- `lp project show` / `lp project set-port <N>`: cwd 配下のプロジェクト固定ポート設定を表示 / 編集するコマンド。
+- AI Agent 用の Claude Code Skills を 8 個同梱 (`AISkills~/liminal-*/SKILL.md`): liminal-overview / liminal-find-port / liminal-list-commands / liminal-execute / liminal-get-state / liminal-get-logs / liminal-list-scenarios / liminal-run-scenario。
+- Editor メニュー `Tools > LiminalPalette > Install AI Skills... / Uninstall AI Skills` を追加 (`Editor/AISkillsInstaller.cs`)。利用側プロジェクトの `.claude/skills/` への配布 / 削除に対応 (旧 `lp-*` skill ディレクトリも legacy として一掃)。
+- `/api/v1/health` レスポンスに `projectName` / `projectPath` / `mode` を追加。`mode` は `"editor"` か `"runtime"` で、同一プロジェクト内で Editor IpcServer と Play Mode / Player の Runtime IpcServer を区別する。
+- プロジェクト固定ポート設定 `<project>/ProjectSettings/LiminalPalette.json` を追加。`port` は Editor 用、`runtimePort` は Play Mode / Runtime 用 (省略時は `port` にフォールバック)。`Void2610.LiminalPalette.Ipc.ProjectConfig.GetPreferredPort()` / `GetPreferredRuntimePort()` から読む。複数 Unity プロジェクト + 同プロジェクト内 Editor/Play Mode を衝突なく同時起動できる。
+- `liminal` CLI: 上記 preferred port を cwd / `--project` から読み、最優先候補として probe する。さらに `~/.liminal-palette/ports.json` (v2) に mode 別ポートをキャッシュして次回起動を高速化。
+- `liminal` CLI: 複数 listener 同時起動時のターゲット指定として `--mode editor|runtime` フラグ、`--project` フラグ、`$LP_PROJECT` 環境変数、cwd からの Unity プロジェクト自動検出 (`ProjectSettings/ProjectVersion.txt`) を追加。
+- `liminal doctor`: トークン / cwd 検出 / preferred port / キャッシュ / 生存ポート / 解決結果 を一覧表示する診断コマンド。`--prune-stale` で probe しても応答が無かった cache エントリを削除。
+- `liminal project show` / `liminal project set-port [--runtime] <N>` / `liminal project unset-port [--runtime]`: cwd 配下のプロジェクト固定ポート設定を表示 / 編集するコマンド。`show` はライブ probe で listener の現在位置も表示する。
+
+### Changed
+- CLI コマンド名を `lp` から `liminal` に変更 (`lp` は macOS の line printer ユーティリティと衝突するため)。`Tools~/lp/` → `Tools~/liminal/`、AI Skill 名も `lp-*` → `liminal-*` にリネーム。AISkillsInstaller の Uninstall は legacy `lp-*` ディレクトリも自動的に掃除する。
 
 ## [0.1.0] - 2026-05-06
 

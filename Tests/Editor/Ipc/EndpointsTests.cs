@@ -33,7 +33,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         [Test]
         public async Task Health_ReturnsOkAndCommandCount()
         {
-            var ep = new HealthEndpoint();
+            var ep = new HealthEndpoint("editor");
             var res = await ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
             Assert.AreEqual(200, res.StatusCode);
             StringAssert.Contains("\"status\":\"ok\"", res.Body);
@@ -44,7 +44,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         public async Task Health_ReturnsProjectIdentity()
         {
             // 複数 Unity プロジェクト同時起動時に lp CLI が紐付け判定に使う 2 フィールド。
-            var ep = new HealthEndpoint();
+            var ep = new HealthEndpoint("editor");
             var res = await ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
             Assert.AreEqual(200, res.StatusCode);
             StringAssert.Contains("\"projectName\":", res.Body);
@@ -52,9 +52,22 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         }
 
         [Test]
+        public async Task Health_IncludesModeFromConstructor()
+        {
+            // 同一プロジェクト内で Editor / Runtime を区別するために mode を返す。
+            var editor = new HealthEndpoint("editor");
+            var editorRes = await editor.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
+            StringAssert.Contains("\"mode\":\"editor\"", editorRes.Body);
+
+            var runtime = new HealthEndpoint("runtime");
+            var runtimeRes = await runtime.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
+            StringAssert.Contains("\"mode\":\"runtime\"", runtimeRes.Body);
+        }
+
+        [Test]
         public void Health_DoesNotRequireAuth()
         {
-            Assert.IsFalse(new HealthEndpoint().RequiresAuth);
+            Assert.IsFalse(new HealthEndpoint("editor").RequiresAuth);
         }
 
         // ---------- ListCommandsEndpoint ----------

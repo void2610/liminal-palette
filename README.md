@@ -92,7 +92,7 @@ Claude Code から HTTP API を叩くための **Agent Skills** を package に�
 Tools > LiminalPalette > Install AI Skills...
 ```
 
-を選ぶと、プロジェクトルートの `.claude/skills/` に 8 個の `lp-*` skill (lp-overview / lp-find-port / lp-list-commands / lp-execute / lp-get-state / lp-get-logs / lp-list-scenarios / lp-run-scenario) がコピーされる。Claude Code を再起動すれば skill が認識され、「LP のコマンド一覧」「Player/Health/Set を 50 で実行」のような指示で curl 操作が自動選択される。
+を選ぶと、プロジェクトルートの `.claude/skills/` に 8 個の `liminal-*` skill (liminal-overview / liminal-find-port / liminal-list-commands / liminal-execute / liminal-get-state / liminal-get-logs / liminal-list-scenarios / liminal-run-scenario) がコピーされる。Claude Code を再起動すれば skill が認識され、「LP のコマンド一覧」「Player/Health/Set を 50 で実行」のような指示で curl 操作が自動選択される。
 
 アンインストール: `Tools > LiminalPalette > Uninstall AI Skills`。
 

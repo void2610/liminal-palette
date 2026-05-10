@@ -84,5 +84,48 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             Assert.IsNull(ProjectConfig.GetPreferredPortAt(null));
             Assert.IsNull(ProjectConfig.GetPreferredPortAt(""));
         }
+
+        // ---------- runtimePort (Play Mode 専用ポート) ----------
+
+        [Test]
+        public void GetPreferredRuntimePortAt_NoFile_ReturnsNull()
+        {
+            Assert.IsNull(ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+        }
+
+        [Test]
+        public void GetPreferredRuntimePortAt_ValidPort_ReturnsPort()
+        {
+            File.WriteAllText(ConfigPath, "{\"runtimePort\":7700}");
+            Assert.AreEqual(7700, ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+        }
+
+        [Test]
+        public void GetPreferredRuntimePortAt_OnlyEditorPortSet_ReturnsNull()
+        {
+            // port (Editor) のみ書かれていて runtimePort 未設定なら、Runtime 側は null。
+            // 呼び出し側で port にフォールバックする責務。
+            File.WriteAllText(ConfigPath, "{\"port\":7613}");
+            Assert.AreEqual(7613, ProjectConfig.GetPreferredPortAt(_tempRoot));
+            Assert.IsNull(ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+        }
+
+        [Test]
+        public void GetPreferredRuntimePortAt_BothSet_ReturnsEachIndependently()
+        {
+            File.WriteAllText(ConfigPath, "{\"port\":7613,\"runtimePort\":7700}");
+            Assert.AreEqual(7613, ProjectConfig.GetPreferredPortAt(_tempRoot));
+            Assert.AreEqual(7700, ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+        }
+
+        [Test]
+        public void GetPreferredRuntimePortAt_OutOfRange_ReturnsNull()
+        {
+            File.WriteAllText(ConfigPath, "{\"runtimePort\":-1}");
+            Assert.IsNull(ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+
+            File.WriteAllText(ConfigPath, "{\"runtimePort\":70000}");
+            Assert.IsNull(ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+        }
     }
 }

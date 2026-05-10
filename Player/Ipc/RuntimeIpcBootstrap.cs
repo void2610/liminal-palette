@@ -92,7 +92,7 @@ namespace Void2610.LiminalPalette.Player.Ipc
         {
             var token = TokenStore.LoadOrCreate();
             var router = new IpcRouter(new TokenAuthenticator(token));
-            router.Register("GET", "/api/v1/health", new HealthEndpoint());
+            router.Register("GET", "/api/v1/health", new HealthEndpoint("runtime"));
             router.Register("GET", "/api/v1/commands", new ListCommandsEndpoint());
             router.Register("POST", "/api/v1/execute", new ExecuteCommandEndpoint());
             router.Register("GET", "/api/v1/logs", new ListLogsEndpoint());
@@ -101,8 +101,11 @@ namespace Void2610.LiminalPalette.Player.Ipc
             router.Register("POST", "/api/v1/scenarios/run", new RunScenarioEndpoint());
 
             // Play Mode 中は <project>/ProjectSettings/LiminalPalette.json が読めるので preferred port を採用。
-            // Player ビルドでは ProjectSettings/ が同梱されないので null になり、DefaultPort にフォールバック。
-            var preferred = ProjectConfig.GetPreferredPort() ?? IpcSettings.DefaultPort;
+            // フォールバック順: runtimePort (Play Mode 専用) → port (Editor 共通) → DefaultPort。
+            // Player ビルドでは ProjectSettings/ が同梱されないので両方 null になり DefaultPort になる。
+            var preferred = ProjectConfig.GetPreferredRuntimePort()
+                ?? ProjectConfig.GetPreferredPort()
+                ?? IpcSettings.DefaultPort;
             _server = new HttpServer(router, preferred);
             _server.Start();
 

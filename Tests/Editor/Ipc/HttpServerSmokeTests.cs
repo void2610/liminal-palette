@@ -30,7 +30,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             MainThreadDispatcher.ClearForTest();
 
             var router = new IpcRouter(new TokenAuthenticator("smoke-token"));
-            router.Register("GET", "/api/v1/health", new HealthEndpoint());
+            router.Register("GET", "/api/v1/health", new HealthEndpoint("editor"));
             router.Register("GET", "/api/v1/commands", new ListCommandsEndpoint());
             router.Register("POST", "/api/v1/execute", new ExecuteCommandEndpoint());
             router.Register("GET", "/api/v1/logs", new ListLogsEndpoint());
@@ -129,7 +129,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         {
             // 同じポートを取ろうとする 2 個目の HttpServer を立てて、隣接ポートにずれることを確認。
             var router = new IpcRouter();
-            router.Register("GET", "/api/v1/health", new HealthEndpoint());
+            router.Register("GET", "/api/v1/health", new HealthEndpoint("editor"));
             using var second = new HttpServer(router, TestPort);
             second.Start();
             Assert.AreNotEqual(TestPort, second.Port, "占有ポートとは違うポートにバインドされるはず");

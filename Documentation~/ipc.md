@@ -68,24 +68,42 @@ curl -H "Authorization: Bearer $LP_TOKEN" ...
 {
   "status": "ok",
   "version": "0.4.0",
+  "mode": "editor",
   "projectName": "MyGame",
   "projectPath": "/Users/me/dev/MyGame",
   "commandCount": 356
 }
 ```
 
-`projectName` は `Application.productName`、`projectPath` は `Application.dataPath` の親ディレクトリ。
-同一マシンで複数 Unity プロジェクトが同時起動しているとき、CLI 側がポートとプロジェクトを
-紐付けるための識別子として使う。値が取れない場合は空文字列。
+| フィールド | 説明 |
+|---|---|
+| `mode` | `"editor"` または `"runtime"`。Editor IpcServer か、Play Mode / Player ビルドの Runtime IpcServer かを区別する |
+| `projectName` | `Application.productName` |
+| `projectPath` | `Application.dataPath` の親ディレクトリ。同一マシン内で唯一 |
+
+`mode` / `projectName` / `projectPath` は同一マシンで複数 Unity プロジェクトが同時起動しているとき、
+CLI 側が「どのプロジェクトの、Editor 側と Runtime 側のどちらの listener か」を判別するための識別子。値が取れない場合は空文字列。
 
 ### ポート固定 (プロジェクトごと)
 
-`<project>/ProjectSettings/LiminalPalette.json` に `{"port": <N>}` を置くと、Unity サーバはそのポート
-にバインドする (取れなければ既存どおり port+1, port+2, ... と隣接にリトライ)。複数プロジェクト同時
-起動時に各プロジェクトに別ポートを割り当てるための仕組み。
+`<project>/ProjectSettings/LiminalPalette.json` に固定ポートを宣言できる:
 
-ファイルは `lp project set-port <N>` で生成 / 更新できる。読み込みは `Void2610.LiminalPalette.Ipc.ProjectConfig`。
-未設定なら `IpcSettings.DefaultPort` (7610) にフォールバック。
+```json
+{
+  "port": 7613,
+  "runtimePort": 7700
+}
+```
+
+| フィールド | 用途 |
+|---|---|
+| `port` | Editor IpcServer の bind port。`runtimePort` 未設定時は Runtime のフォールバックとしても使われる |
+| `runtimePort` | Play Mode / Runtime IpcServer 専用。Editor と Runtime を別ポートに固定したい場合に使う (省略可) |
+
+両方未設定なら `IpcSettings.DefaultPort` (7610)。占有時は port+1, port+2, ... と隣接ポートに最大 5 回リトライする。
+
+ファイルは `liminal project set-port <N>` (Editor) / `liminal project set-port --runtime <N>` (Runtime) で生成 / 更新できる。
+読み込みは `Void2610.LiminalPalette.Ipc.ProjectConfig.GetPreferredPort()` (Editor) / `GetPreferredRuntimePort()` (Runtime)。
 
 ### `GET /api/v1/commands` (認証必須)
 
@@ -507,17 +525,17 @@ static void TweakIpcLimits()
 
 ## 専用 CLI
 
-`Tools~/lp/lp` に Python 3 標準ライブラリ製のシングルファイル CLI を同梱。
-`chmod +x` するか PATH に symlink すれば `lp health` / `lp exec` / `lp logs` 等が使える。
+`Tools~/liminal/liminal` に Python 3 標準ライブラリ製のシングルファイル CLI を同梱。
+`chmod +x` するか PATH に symlink すれば `liminal health` / `liminal exec` / `liminal logs` 等が使える。
 
 ```bash
-ln -s "$(pwd)/Tools~/lp/lp" ~/.local/bin/lp
-lp health
-lp exec Player/HP/Heal amount=10
-lp logs --limit 10 --json | jq '.invocations[].path'
+ln -s "$(pwd)/Tools~/liminal/liminal" ~/.local/bin/liminal
+liminal health
+liminal exec Player/HP/Heal amount=10
+liminal logs --limit 10 --json | jq '.invocations[].path'
 ```
 
-詳細は [Tools~/lp/README.md](../Tools~/lp/README.md)。
+詳細は [Tools~/liminal/README.md](../Tools~/liminal/README.md)。
 
 ---
 

@@ -394,24 +394,39 @@ def cmd_health(args, base_url, _token):
 
 def cmd_doctor(args):
     """環境診断: token / cwd / cache / 生存ポート / 解決結果 を一覧表示。"""
-    # 1) Token
+    # 1) Token — _read_token と同じ判定 (strip 後に空なら「未取得」扱い) で表示する。
     print(_bold("Token:"))
-    env_token = os.environ.get("LP_TOKEN")
-    if env_token:
-        print(f"  {_green('found')}  via $LP_TOKEN ({len(env_token)} chars)")
-    elif DEFAULT_TOKEN_PATH.is_file():
-        try:
-            t = DEFAULT_TOKEN_PATH.read_text(encoding="utf-8").strip()
-            print(f"  {_green('found')}  {DEFAULT_TOKEN_PATH}  ({len(t)} chars)")
-        except OSError as e:
-            print(f"  {_red('error')}  {DEFAULT_TOKEN_PATH}: {e}")
-    else:
-        print(f"  {_red('NOT FOUND')}  expected at {DEFAULT_TOKEN_PATH}")
-        print(_dim(f"    Unity Editor を一度起動するか、{DEFAULT_TOKEN_PATH} を作ってください"))
+    env_token_raw = os.environ.get("LP_TOKEN")
+    env_token_stripped = env_token_raw.strip() if env_token_raw else ""
+    token_displayed = False
+    if env_token_stripped:
+        print(f"  {_green('found')}  via $LP_TOKEN ({len(env_token_stripped)} chars)")
+        token_displayed = True
+    elif env_token_raw:
+        # 設定はされているが strip すると空 → _read_token は "" を返し auth に失敗する。
+        print(f"  {_yellow('empty')}  $LP_TOKEN は空白のみ。実質未設定として扱われます")
+        token_displayed = True
+    if not token_displayed:
+        if DEFAULT_TOKEN_PATH.is_file():
+            try:
+                t = DEFAULT_TOKEN_PATH.read_text(encoding="utf-8").strip()
+                if t:
+                    print(f"  {_green('found')}  {DEFAULT_TOKEN_PATH}  ({len(t)} chars)")
+                else:
+                    print(f"  {_yellow('empty')}  {DEFAULT_TOKEN_PATH} は空。Unity Editor を起動して再生成してください")
+            except OSError as e:
+                print(f"  {_red('error')}  {DEFAULT_TOKEN_PATH}: {e}")
+        else:
+            print(f"  {_red('NOT FOUND')}  expected at {DEFAULT_TOKEN_PATH}")
+            print(_dim(f"    Unity Editor を一度起動するか、{DEFAULT_TOKEN_PATH} を作ってください"))
 
-    # 2) cwd / project detection
+    # 2) cwd / project detection (cwd が削除済み等で取れないこともあるので握る)
     print(_bold("\nProject detection:"))
-    print(f"  cwd            : {Path.cwd()}")
+    try:
+        cwd_disp = str(Path.cwd())
+    except OSError as e:
+        cwd_disp = _red(f"(unavailable: {e})")
+    print(f"  cwd            : {cwd_disp}")
     detected = _detect_project_from_cwd()
     if detected:
         print(f"  cwd→project    : {_green(detected)}")
@@ -432,18 +447,27 @@ def cmd_doctor(args):
         else:
             print(f"  preferred port : {_dim('(no ' + str(cfg_path) + ' — falling back to defaults)')}")
 
-    # 3) Cache
+    # 3) Cache (手で編集された壊れた entry でも doctor 自体は落ちないようにする)
     cache = _load_cache()
     projects = cache.get("projects", {})
     print(_bold("\nPort cache:"))
     print(f"  {DEFAULT_CACHE_PATH}")
-    if not projects:
+    if not isinstance(projects, dict) or not projects:
         print(_dim("  (empty)"))
     else:
-        name_w = max((len(e.get("projectName", "") or "?") for e in projects.values()), default=8)
+        rows = []
         for path, entry in projects.items():
-            name = entry.get("projectName", "") or "?"
-            print(f"    port {entry.get('port'):>5}  {name.ljust(name_w)}  {_dim(path)}")
+            if not isinstance(entry, dict):
+                rows.append((str(path), "?", "?"))
+                continue
+            port = entry.get("port")
+            port_disp = str(port) if isinstance(port, int) else "?"
+            name = entry.get("projectName")
+            name_disp = name if isinstance(name, str) and name else "?"
+            rows.append((str(path), port_disp, name_disp))
+        name_w = max((len(name) for _, _, name in rows), default=8)
+        for path, port_disp, name in rows:
+            print(f"    port {port_disp:>5}  {name.ljust(name_w)}  {_dim(path)}")
 
     # 4) Live probe (preferred があれば隣接 5 個もスキャンして、preferred 衝突で +N にずれた場合も拾う)
     probe_ports = _build_candidate_ports(None, preferred)

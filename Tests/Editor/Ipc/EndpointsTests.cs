@@ -46,6 +46,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             // 複数 Unity プロジェクト同時起動時に lp CLI が紐付け判定に使う 2 フィールド。
             var ep = new HealthEndpoint();
             var res = await ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
+            Assert.AreEqual(200, res.StatusCode);
             StringAssert.Contains("\"projectName\":", res.Body);
             StringAssert.Contains("\"projectPath\":", res.Body);
         }

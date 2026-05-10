@@ -1,6 +1,6 @@
 # lp-get-logs — jq クエリレシピ集
 
-`/api/v1/logs?limit=N` の結果に対する jq パターン。`<curl ...> | jq '<expr>'` の `<expr>` 部分を示す。
+`lp logs --limit N --json` の結果に対する jq パターン。`lp logs --limit N --json | jq '<expr>'` の `<expr>` 部分を示す。
 
 ## 基本フィルタ
 
@@ -163,7 +163,7 @@
 (.invocations[] | "| `\(.path)` | \(if .result.success then "✓" else "✗" end) | \(.result.durationMs)ms | \(.timestamp) |")
 ```
 
-(curl 結果を `jq -r` で出力すると Markdown が直接得られる)
+(`lp logs --json` の結果を `jq -r` で出力すると Markdown が直接得られる)
 
 ### 失敗だけ Markdown
 
@@ -220,8 +220,7 @@
 ### 「最後の N 件を JSON dump して別ツールで解析」
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/logs?limit=200" \
-  > /tmp/lp-logs-snapshot.json
+lp logs --limit 200 --json > /tmp/lp-logs-snapshot.json
 
 jq '.invocations | length' /tmp/lp-logs-snapshot.json
 ```

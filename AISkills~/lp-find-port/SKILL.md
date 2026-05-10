@@ -1,82 +1,71 @@
 ---
 name: lp-find-port
-description: 'Discover which port the LiminalPalette HTTP server is listening on. Scans 7610..7615 via /api/v1/health (no auth required), exports $LP_PORT and $LP_BASE, and detects Editor (7610) vs Play Mode (7611) when both are running. Use when LP_BASE is unset, after Editor restart, or when curl returns connection refused.'
+description: 'Verify that the LiminalPalette HTTP server is up via `lp health`. The CLI auto-discovers the port (scans 7610..7615), so explicit detection is only needed when distinguishing Editor (7610) vs Play Mode (7611) — use `lp --port N health` to target each. Use when LP appears down, after Editor restart, or when both Editor + Play Mode are running.'
 when_to_use: 'Trigger phrases: "LP のヘルスチェック", "LP が動いているか確認", "ポートが分からない", "connection refused", "Play Mode と Editor 両方確認", "what port is LP on", "scan LP ports".'
-allowed-tools: Bash(curl *), Bash(jq *), Bash(lsof *), Bash(echo *)
+allowed-tools: Bash(lp *), Bash(jq *), Bash(lsof *), Bash(echo *)
 ---
 
 # lp-find-port
 
-LiminalPalette の HTTP サーバが今どのポートで稼働しているかを `/health` スキャンで発見する。`/health` は認証不要なので token が無くても叩ける。
+LP の HTTP サーバが今どこで動いているかを `lp health` で確認する。
+
+`lp` は通常呼び出し時に **`7610〜7615` を自動スキャン**して最初に応答したポートを使うので、単に「LP に届くか」を見たいなら `lp health` を 1 発叩けば終わり (`/health` は認証不要)。
+
+明示的にポートを切り分ける必要があるのは **Editor + Play Mode が両方走っている** ケースだけ。
 
 ---
 
-## 標準フロー (1 ポートだけ取る)
+## 1 ポートだけ確認 (通常)
 
 ```bash
-unset LP_PORT
-for port in 7610 7611 7612 7613 7614 7615; do
-  if curl -s -m 1 "http://127.0.0.1:$port/api/v1/health" > /dev/null 2>&1; then
-    export LP_PORT=$port
-    export LP_BASE="http://127.0.0.1:$LP_PORT"
-    break
-  fi
-done
-[ -n "$LP_PORT" ] && echo "Found LP at port $LP_PORT" || echo "ERROR: LP not running"
-```
-
-最初に応答したポートを取って終了。Editor 単体運用ならこれで十分。
-
----
-
-## 両稼働の検出 (Editor + Play Mode)
-
-Editor (7610) と Play Mode (7611) が同時に走っている場合、両方の `/health` が応答する。両方の port + commandCount を取得して使い分けたい時:
-
-```bash
-echo '['
-sep=''
-for p in 7610 7611 7612 7613 7614 7615; do
-  resp=$(curl -s -m 1 "http://127.0.0.1:$p/api/v1/health" 2>/dev/null)
-  if [ -n "$resp" ]; then
-    printf '%s' "$sep"
-    echo "$resp" | jq --arg p "$p" '. + {port: ($p|tonumber)}'
-    sep=','
-  fi
-done
-echo ']'
+lp health
 ```
 
 出力例:
 
-```json
-[
-  {"status":"ok","version":"0.4.0","commandCount":420,"port":7610},
-  {"status":"ok","version":"0.4.0","commandCount":312,"port":7611}
-]
+```
+ok  http://127.0.0.1:7610
+  version       : 0.4.0
+  commandCount  : 395
 ```
 
-`commandCount` が大きいほうが Editor 側 (Editor 限定 `[ConsoleCommand]` を含むため)。スクリプト化したフルバージョンは [examples/multi-instance.sh](examples/multi-instance.sh) を参照。
+応答した URL がそのまま使われる。これで OK なら他のスキルもそのまま叩いて良い。
 
-### 両 base URL を環境変数に持つ
+---
+
+## Editor + Play Mode 両稼働の検出
+
+両方走っている場合、Editor が 7610、Play Mode が 7611 にずれる。明示的にどちらか指定するには `--port` を使う:
 
 ```bash
-export LP_BASE_EDITOR="http://127.0.0.1:7610"
-export LP_BASE_RUNTIME="http://127.0.0.1:7611"
+lp --port 7610 health   # → Editor
+lp --port 7611 health   # → Play Mode
 ```
 
-`lp-execute` 等で `$LP_BASE_EDITOR` / `$LP_BASE_RUNTIME` を明示的に切り替える。
+`commandCount` を比較すると判別できる (Editor 側に Editor 限定 `[ConsoleCommand]` が含まれるため通常 Editor の方が多い):
+
+```bash
+for p in 7610 7611 7612 7613 7614 7615; do
+  out=$(lp --port "$p" --json health 2>/dev/null) || continue
+  echo "$out" | jq --arg p "$p" '. + {port: ($p|tonumber)}'
+done | jq -s .
+```
+
+両方並行で叩く運用なら、毎回 `--port` を渡すか `--base-url` で固定する:
+
+```bash
+lp --base-url http://127.0.0.1:7610 commands --filter Editor/   # Editor
+lp --base-url http://127.0.0.1:7611 state                       # Play Mode
+```
 
 ---
 
 ## Output (`/health` レスポンス)
 
+`--json` 無しなら整形済み、`--json` 付きなら以下が返る:
+
 ```json
-{
-  "status": "ok",
-  "version": "0.4.0",
-  "commandCount": 356
-}
+{"status":"ok","version":"0.4.0","commandCount":356}
 ```
 
 | フィールド | 用途 |
@@ -89,12 +78,14 @@ export LP_BASE_RUNTIME="http://127.0.0.1:7611"
 
 ## 全ポートで応答が無い場合
 
+`lp health` が `Liminal Palette サーバーが見つかりません` を返すケース:
+
 | 原因 | 対処 |
 |---|---|
 | Unity Editor 未起動 | Editor を起動 |
 | Production ビルドの実行ファイルを叩いている | LP は Production 除外。Development build を使う |
 | `IpcSettings.Enabled = false` で明示的に切られている | 利用側 C# 設定を確認 |
-| 7616 以降にずれている (異常) | Editor Console の `IpcServer started on port: <N>` ログを確認 |
+| 7616 以降にずれている (異常) | Editor Console の `IpcServer started on port: <N>` ログを確認 → `lp --port N health` |
 | 別プロセスがポートを占有 | `lsof -i :7610` 等で確認 |
 
 詳細: `/lp-overview` の [references/troubleshooting.md](../lp-overview/references/troubleshooting.md)
@@ -117,26 +108,19 @@ lsof -i :7610 | tail -1 | awk '{print $2}' | xargs -r kill -9
 
 通常は **同じポートに戻る**。他プロセスが 7610 を占有していなければ 7610 に再バインド。
 
-Play Mode の Runtime listener は Play Mode 終了時に消え、開始時に新規で立つ。Play Mode を出入りするたびに `lp-find-port` で確認するのが確実。
+Play Mode の Runtime listener は Play Mode 終了時に消え、開始時に新規で立つ。Play Mode を出入りするたびに `lp health` で確認するのが確実。
 
 ### Domain Reload 直後
 
-C# 編集 → Reload の数百 ms 間は応答しないことがある。`-m 1` (1 秒タイムアウト) では弾かれる場合があるので、`-m 3` 程度に上げる手も:
-
-```bash
-for p in 7610 7611 7612 7613 7614 7615; do
-  curl -s -m 3 "http://127.0.0.1:$p/api/v1/health" >/dev/null && export LP_PORT=$p && break
-done
-```
+C# 編集 → Reload の数百 ms 間は応答しないことがある。`lp` のタイムアウトは 10 秒なので通常は十分待つが、Reload 直後にスキャンが走ると connection refused で 1 ポート空振りすることがある。1 秒置いて再試行で復帰する。
 
 ### IPv6
 
-LP は IPv4 (`127.0.0.1`) のみにバインド。`localhost` が IPv6 解決される環境 (`::1` 優先) で問題になる場合は **明示的に `127.0.0.1`** を指定する。本スキルの全例は `127.0.0.1` 直書き。
+LP は IPv4 (`127.0.0.1`) のみにバインド。`lp` も内部で `127.0.0.1` を直書きしているので環境依存はない。
 
 ---
 
 ## See also
 
-- `/lp-overview` — token + port のフル setup
+- `/lp-overview` — `lp` のセットアップ全体像
 - references: `../lp-overview/references/ports.md` — ポート割り当ての全表
-- examples: [multi-instance.sh](examples/multi-instance.sh) — Editor + Runtime 両検出を 1 ファイルにまとめた完全版

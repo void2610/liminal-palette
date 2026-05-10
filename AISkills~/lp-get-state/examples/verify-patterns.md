@@ -1,22 +1,19 @@
 # lp-get-state — 検証パターン集
 
-`/state` を `lp-execute` と組み合わせて状態の変化を検証する bash パターン。**多くは `lp-run-scenario` の `assert_equals` で代替可能だが、bash でやるケースの参考**。
+`lp state` を `lp exec` と組み合わせて状態の変化を検証するシェルパターン。**多くは `lp run --steps -` の `assert_equals` で代替可能だが、シェルでやるケースの参考**。
 
 ## 1. 単純な before / after
 
 ```bash
 # 取り出しヘルパ
 get_state() {
-  curl -s -H "Authorization: Bearer $LP_TOKEN" \
-    "$LP_BASE/api/v1/state?path=$1" | jq -r '.value'
+  lp state "$1" --json | jq -r '.value'
 }
 
 before=$(get_state "Player/Health")
 echo "before HP=$before"
 
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Player/Health/Damage","args":{"amount":"30"}}' >/dev/null
+lp exec Player/Health/Damage amount=30 >/dev/null
 
 after=$(get_state "Player/Health")
 echo "after HP=$after"
@@ -26,24 +23,20 @@ echo "diff=$((before - after))"
 ## 2. 数値の閾値判定
 
 ```bash
-hp=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-       "$LP_BASE/api/v1/state?path=Player/Health" | jq -r '.value')
+hp=$(lp state Player/Health --json | jq -r '.value')
 
-if [ "$hp" -lt 30 ] 2>/dev/null; then
+if (( hp < 30 )); then
   echo "Critical: HP=$hp"
-  curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-    -X POST "$LP_BASE/api/v1/execute" \
-    -d '{"path":"Player/Health/Heal","args":{"amount":"50"}}'
+  lp exec Player/Health/Heal amount=50
 fi
 ```
 
 ## 3. float の閾値判定
 
 ```bash
-speed=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-          "$LP_BASE/api/v1/state?path=Player/Speed" | jq -r '.value')
+speed=$(lp state Player/Speed --json | jq -r '.value')
 
-# bash の `[` は float を扱えない。awk か bc を使う
+# bash の `(( ))` は float を扱えない。awk か bc を使う
 if awk -v v="$speed" 'BEGIN { exit !(v > 5.0) }'; then
   echo "Speed too high: $speed"
 fi
@@ -52,8 +45,7 @@ fi
 ## 4. Vector3 の値をパース
 
 ```bash
-pos=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-        "$LP_BASE/api/v1/state?path=Player/Position" | jq -r '.value')
+pos=$(lp state Player/Position --json | jq -r '.value')
 # pos="(1.50, 2.00, 3.00)"
 
 # カッコと空白を剥がして配列に
@@ -69,8 +61,7 @@ fi
 ## 5. Color の比較 (HEX)
 
 ```bash
-color=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-          "$LP_BASE/api/v1/state?path=UI/Background/Color" | jq -r '.value')
+color=$(lp state UI/Background/Color --json | jq -r '.value')
 # color="#FF8800FF"
 
 # 大小無視で比較
@@ -82,8 +73,7 @@ fi
 ## 6. Enum の名前比較
 
 ```bash
-state=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-          "$LP_BASE/api/v1/state?path=Game/State" | jq -r '.value')
+state=$(lp state Game/State --json | jq -r '.value')
 # state="Playing"
 
 case "$state" in
@@ -100,8 +90,7 @@ esac
 # 最大 30 秒、Player/Position の x が 10 を超えるまで待つ
 end=$(($(date +%s) + 30))
 while [ "$(date +%s)" -lt "$end" ]; do
-  pos=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-          "$LP_BASE/api/v1/state?path=Player/Position" | jq -r '.value')
+  pos=$(lp state Player/Position --json | jq -r '.value')
   read -r x _ _ <<<"$(echo "$pos" | sed -E 's/[()]//g; s/,/ /g')"
 
   if awk -v v="$x" 'BEGIN { exit !(v > 10) }'; then
@@ -118,7 +107,7 @@ done
 ## 8. 複数フィールドの一括チェック
 
 ```bash
-RESP=$(curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/state")
+RESP=$(lp state --json)
 
 # Player/* が全部 != null
 all_resolved=$(echo "$RESP" | jq '
@@ -130,7 +119,7 @@ if [ "$all_resolved" = "true" ]; then
   echo "Player の全フィールドが解決済み"
 else
   echo "未解決のフィールドあり:"
-  echo "$RESP" | jq '.fields[] | select(.path | startswith("Player/")) | select(.value == null) | .path'
+  echo "$RESP" | jq -r '.fields[] | select(.path | startswith("Player/")) | select(.value == null) | .path'
 fi
 ```
 
@@ -145,8 +134,7 @@ declare -A EXPECTED=(
 
 failures=0
 for path in "${!EXPECTED[@]}"; do
-  actual=$(curl -s -H "Authorization: Bearer $LP_TOKEN" \
-             "$LP_BASE/api/v1/state?path=$path" | jq -r '.value')
+  actual=$(lp state "$path" --json | jq -r '.value')
   expected="${EXPECTED[$path]}"
   if [ "$actual" != "$expected" ]; then
     echo "FAIL: $path expected=$expected actual=$actual"
@@ -162,25 +150,25 @@ done
 上記 9 は scenarios で 1 リクエストに:
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/scenarios/run" \
-  -d '{"steps":[
-    {"type":"assert_equals","path":"Player/Health","expected":"100"},
-    {"type":"assert_equals","path":"Player/Mana","expected":"50"},
-    {"type":"assert_equals","path":"Game/Stage","expected":"1"}
-  ]}' \
+cat <<'EOF' | lp run --steps - --json \
   | jq '{success, failedAtStep, failed: [.steps[] | select(.success == false)]}'
+[
+  {"type":"assert_equals","path":"Player/Health","expected":"100"},
+  {"type":"assert_equals","path":"Player/Mana","expected":"50"},
+  {"type":"assert_equals","path":"Game/Stage","expected":"1"}
+]
+EOF
 ```
 
 詳細: `/lp-run-scenario`。
 
 ---
 
-## bash での値比較の落とし穴まとめ
+## シェルでの値比較の落とし穴まとめ
 
 | 型 | 比較方法 | 例 |
 |---|---|---|
-| `Int32` / `Int64` | `[ "$a" -eq "$b" ]` | `[ "$hp" -lt 30 ]` |
+| `Int32` / `Int64` | `(( a < b ))` または `[ "$a" -eq "$b" ]` | `(( hp < 30 ))` |
 | `Single` / `Double` | `awk -v` または `bc` | `awk -v a="$f" 'BEGIN { exit !(a > 5.0) }'` |
 | `String` | `[ "$a" = "$b" ]` | `[ "$state" = "Playing" ]` |
 | Enum | string 比較 | 同上 |
@@ -188,4 +176,4 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 | `Color` | HEX 大小揃えて string 比較 | `[ "${a^^}" = "${b^^}" ]` |
 | `bool` | `[ "$v" = "True" ]` | LP の `ToDisplayString` は `"True"` / `"False"` |
 
-bash の数値比較が複雑なケースは **scenarios の `assert_equals` に逃がす**のが楽。LP 側で型解決してから比較するため bash 側のパースが不要。
+シェルの数値比較が複雑なケースは **scenarios の `assert_equals` に逃がす**のが楽。LP 側で型解決してから比較するためシェル側のパースが不要。

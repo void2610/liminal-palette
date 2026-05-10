@@ -1,6 +1,8 @@
 # LP `/execute` Error Handling — 完全リファレンス
 
-`lp-execute` の失敗パターンを HTTP status code と response body の組み合わせで分類し、根本原因とリカバリ手順を示す。
+`lp exec` の失敗パターンを HTTP status code と response body の組み合わせで分類し、根本原因とリカバリ手順を示す。
+
+`lp` の exit code は **0=成功 / 2=`success:false` (アプリケーション層失敗) / 1=通信・HTTP エラー (4xx/5xx)**。`--json` を付けるとサーバの生レスポンスがそのまま読める。
 
 ---
 
@@ -9,22 +11,22 @@
 ```
 HTTP status を見る
 ├── 200 → body の "success" を見る
-│        ├── true  → 成功
-│        └── false → 「アプリケーション層の失敗」(下記 §1)
-├── 400 → 「リクエスト構文エラー」(下記 §2)
-├── 401 → 「認証エラー」(下記 §3)
-├── 404 → 「path 未登録」(下記 §4)
-├── 405 → 「method 違い」(下記 §5)
-├── 413 → 「body サイズ超過」(下記 §6)
-├── 429 → 「レートリミット」(下記 §7)
-└── 500 → 「サーバ内部例外」(下記 §8)
+│        ├── true  → 成功 (lp exit 0)
+│        └── false → 「アプリケーション層の失敗」(下記 §1) (lp exit 2)
+├── 400 → 「リクエスト構文エラー」(下記 §2) (lp exit 1)
+├── 401 → 「認証エラー」(下記 §3) (lp exit 1)
+├── 404 → 「path 未登録」(下記 §4) (lp exit 1)
+├── 405 → 「method 違い」(下記 §5) (lp exit 1)
+├── 413 → 「body サイズ超過」(下記 §6) (lp exit 1)
+├── 429 → 「レートリミット」(下記 §7) (lp exit 1)
+└── 500 → 「サーバ内部例外」(下記 §8) (lp exit 1)
 ```
 
 ---
 
 ## §1. 200 OK + `success: false`
 
-正しくリクエストが届き処理されたが、コマンド実行が失敗したケース。最も頻出。
+正しくリクエストが届き処理されたが、コマンド実行が失敗したケース。最も頻出。`lp exec` は装飾出力で `failed` + `error:` 行を出し、exit code 2 で終わる。
 
 ### 1a. 引数バインド失敗 (exceptionType: null)
 
@@ -37,12 +39,12 @@ HTTP status を見る
 }
 ```
 
-**原因**: 型変換段階で失敗。args の値が想定形式と違う。
+**原因**: 型変換段階で失敗。値が想定形式と違う。
 
 **対処**:
-1. `lp-list-commands` で対象 path のスキーマを確認
+1. `lp commands --json | jq '.commands[] | select(.path == "<path>")'` でスキーマ確認
 2. `parameters[].type` を見て [type-conversion.md](type-conversion.md) で valid 形式を調べる
-3. args を修正して再実行
+3. `name=value` を修正して再実行
 
 ### 1b. 必須引数の欠落
 
@@ -54,9 +56,9 @@ HTTP status を見る
 }
 ```
 
-**原因**: args の key 名が parameters[].name と一致していない (typo / 大文字小文字違い)、または key 自体が無い。
+**原因**: `name=value` の name が parameters[].name と一致していない (typo / 大文字小文字違い)、または name 自体が無い。
 
-**対処**: `lp-list-commands` で正確な name を確認。
+**対処**: `lp commands --filter <prefix>` で正確な name を確認。
 
 ### 1c. choices 制約違反
 
@@ -88,7 +90,7 @@ HTTP status を見る
 **原因**: コマンド本体 (利用側 C# コード) が例外を投げた。
 
 **対処**:
-1. `stackTrace` を読んで例外発生箇所を特定
+1. `stackTrace` を読んで例外発生箇所を特定 (`lp exec ... --json | jq -r .stackTrace`)
 2. 多くは利用側コードのバグ → ユーザに報告
 3. 環境依存 (例: Player が未生成) なら前提条件を整えて再実行
 
@@ -115,30 +117,21 @@ builder.RegisterEntryPoint<LiminalPaletteEntryPoint>();
 
 ## §2. 400 Bad Request
 
-### 2a. JSON 文法エラー
+`lp exec` は内部で正しい JSON を組み立てるので、通常はここに落ちない。`lp run --steps -` で手書きした JSON が壊れている時に発生する。
+
+### 2a. JSON 文法エラー (`lp run --steps -`)
 
 ```json
 {"error": "Invalid JSON: Unexpected token..."}
 ```
 
-**原因**: request body の JSON が壊れている (クォート抜け / カンマ過剰 / 末尾改行欠落等)。
+**原因**: `--steps` で渡した JSON が壊れている (クォート抜け / カンマ過剰 / 末尾改行欠落等)。
 
-**対処**: curl の `-d` の中身を確認。bash の単引用 / 二重引用 / エスケープを点検:
-
-```bash
-# OK (single quote で JSON 全体を囲む)
--d '{"path":"X","args":{}}'
-
-# NG (double quote の中で " をエスケープし忘れ)
--d "{"path":"X","args":{}}"
-```
-
-長い JSON は HEREDOC が安全:
+**対処**: stdin / ファイルの中身を `jq .` で先に検証:
 
 ```bash
-curl ... -d @- <<'EOF'
-{"path": "X", "args": {"key": "value"}}
-EOF
+cat my-steps.json | jq .   # → 構文エラーなら jq が指摘してくれる
+cat my-steps.json | lp run --steps -
 ```
 
 ### 2b. 必須フィールド欠落
@@ -148,7 +141,7 @@ EOF
 {"error": "Missing required field 'args'"}
 ```
 
-**対処**: `path` と `args` 両方を必ず付ける。引数 0 個でも `"args": {}` 必須。
+`lp exec` 経由では起きない。直接 API を叩いている場合は `path` と `args` 両方を必ず付ける (引数 0 個でも `"args": {}` 必須)。
 
 ### 2c. path が空文字
 
@@ -164,14 +157,13 @@ EOF
 {"error": "Unauthorized"}
 ```
 
-### 原因と対処
+`lp` は token を自動で読むので通常起きないが、起きるケース:
 
 | 原因 | 対処 |
 |---|---|
-| `Authorization` ヘッダ自体が無い | `-H "Authorization: Bearer $LP_TOKEN"` を付ける |
-| `Bearer ` (末尾スペース) が抜けている | `Bearer<TOKEN>` でなく `Bearer <TOKEN>` (1 半角スペース必須) |
-| `$LP_TOKEN` が空 | `echo "$LP_TOKEN"` で確認 |
-| トークンが古い (Editor 再起動でローテートされた) | `export LP_TOKEN=$(cat ~/.liminal-palette/token)` で再読み込み |
+| `~/.liminal-palette/token` が空または存在しない | Editor を再起動して再生成 |
+| `$LP_TOKEN` が古い値で残っている | `unset LP_TOKEN` でファイル読込みに戻す |
+| `--token` で間違った値を渡した | フラグを外して自動読込みに切り替え |
 
 詳細: `/lp-overview` の references/auth.md。
 
@@ -184,9 +176,9 @@ EOF
 {"error": "Command not found: Player/HelthSet"}
 ```
 
-### 4a. URL が違う
+### 4a. URL が違う (基本起きない)
 
-`/api/v1/execute` を `/api/execute` のようにバージョン抜きで叩いている。
+`lp` は内部で `/api/v1/execute` を組み立てるので 404 のうち URL 系は通常出ない。`--base-url` で間違った値を渡した時のみ。
 
 ### 4b. path が未登録 (typo)
 
@@ -196,18 +188,13 @@ EOF
 
 LP は path の **大文字小文字を区別する**。`Player/HelthSet` (typo) と `Player/Health/Set` は別物。
 
-**対処**: `lp-list-commands` で正確な path を確認。fuzzy 検索を使う:
-
-```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands" \
-  | jq '.commands[] | select((.path|ascii_downcase) | contains("health"))'
-```
+**対処**: `lp commands --json | jq '.commands[] | select((.path|ascii_downcase) | contains("health"))'` でゆるい検索。
 
 ### 4c. Editor / Runtime のポート違いで未登録扱い
 
 Editor 限定コマンド (`Editor/Console/Clear` 等) を Runtime ポート (7611) に送ると 404。逆も然り。
 
-**対処**: `lp-find-port` で両方のポートを発見し、適切な base URL を使う。
+**対処**: `lp --port 7610 health` / `lp --port 7611 health` で両方確認し、適切なポートを `--port` で指定。
 
 ---
 
@@ -217,9 +204,7 @@ Editor 限定コマンド (`Editor/Console/Clear` 等) を Runtime ポート (76
 {"error": "Method GET not allowed for /api/v1/execute"}
 ```
 
-**原因**: `/execute` は POST。`-X POST` 抜け、または curl のデフォルト GET で叩いた。
-
-**対処**: `-X POST -H "Content-Type: application/json"` を付ける。
+`lp` は内部で正しい method を選ぶので通常起きない。`--base-url` で別 endpoint を指している時のみ。
 
 ---
 
@@ -229,7 +214,7 @@ Editor 限定コマンド (`Editor/Console/Clear` 等) を Runtime ポート (76
 {"error": "Body exceeds limit (1048576 bytes)"}
 ```
 
-**原因**: request body が `IpcSettings.MaxRequestBodyBytes` (既定 1 MB) を超えた。長文 JSON を args に詰めている時に発生。
+**原因**: request body が `IpcSettings.MaxRequestBodyBytes` (既定 1 MB) を超えた。長文の値を `name=value` で渡している時に発生。
 
 ### 対処オプション
 
@@ -247,7 +232,7 @@ public void Import(string filePath) {
 ```bash
 # AI Agent 側
 echo "$BIG_JSON" > /tmp/payload.json
-curl ... -d '{"path":"Data/Import","args":{"filePath":"/tmp/payload.json"}}'
+lp exec Data/Import filePath=/tmp/payload.json
 ```
 
 #### B. 上限を上げる (利用側で設定)
@@ -277,23 +262,23 @@ static void EnlargeBody() {
 
 ```bash
 for cmd in path1 path2 path3 ...; do
-  curl ... -d "..."
+  lp exec "$cmd"
   sleep 0.05  # 1秒/30req = 33ms 以上空ける
 done
 ```
 
 #### B. 1 リクエストにまとめる (推奨)
 
-`lp-run-scenario` の ad-hoc に複数 command ステップを並べると 1 リクエストで完結 → リミット消費 1:
+`lp run --steps -` に複数 command ステップを並べると 1 リクエストで完結 → リミット消費 1:
 
-```json
-{
-  "steps": [
-    {"type":"command","path":"path1","args":{}},
-    {"type":"command","path":"path2","args":{}},
-    {"type":"command","path":"path3","args":{}}
-  ]
-}
+```bash
+cat <<'EOF' | lp run --steps -
+[
+  {"type":"command","path":"path1","args":{}},
+  {"type":"command","path":"path2","args":{}},
+  {"type":"command","path":"path3","args":{}}
+]
+EOF
 ```
 
 #### C. リミットを上げる (利用側で設定)
@@ -317,7 +302,7 @@ static void TweakRateLimit() {
 
 ### 対処
 
-1. response の `error` 本文を読む
+1. `lp exec ... --json` の `error` 本文を読む
 2. Editor Console を確認 (LP がスタックトレースを出している可能性)
 3. LP の GitHub Issue で報告 (再現手順付き)
 
@@ -325,29 +310,33 @@ static void TweakRateLimit() {
 
 ## connection refused / timeout
 
-HTTP status が返らない場合:
+`lp` 側の出力:
 
 | 状況 | 原因 | 対処 |
 |---|---|---|
-| `curl: (7) Failed to connect` | LP が listener を立てていない | `lp-find-port` でポート再確認 / Editor 起動確認 |
-| `curl: (28) Operation timed out` | サーバが応答しない (Domain Reload 中 / メインスレッド詰まり) | `--max-time` を上げて再試行 |
+| `Liminal Palette サーバーが見つかりません` | LP が listener を立てていない | Editor 起動確認 / `lp health` で再スキャン |
+| `urlopen error: timed out` | サーバが応答しない (Domain Reload 中 / メインスレッド詰まり) | 数秒待って再実行 |
+
+`lp` の HTTP タイムアウトは 10 秒固定 (`Tools~/lp/lp` 内 `TIMEOUT_SEC`)。長時間 async は値を上げる必要あり。
 
 ---
 
 ## AI Agent 向けリトライ戦略
 
 ```
-リクエスト送信
-├── HTTP 200
-│   ├── success: true → 完了
-│   └── success: false
-│       ├── exceptionType: null → 引数を修正して 1 回リトライ
-│       └── exceptionType 非 null → ユーザに報告 (利用側コードのバグの可能性)
-├── HTTP 401 → token 再読み込みして 1 回リトライ
-├── HTTP 404 → lp-list-commands で path 確認 → ユーザに報告
-├── HTTP 429 → sleep 1s してリトライ
-├── HTTP 5xx → 1 回リトライ、それでも失敗ならユーザに報告
-└── connection error → lp-find-port → リトライ
+lp exec ...
+├── exit 0 → 完了
+├── exit 2 (success: false)
+│   ├── exceptionType: null → 値を修正して 1 回リトライ
+│   └── exceptionType 非 null → ユーザに報告 (利用側コードのバグの可能性)
+└── exit 1 (HTTP 4xx/5xx / 通信エラー)
+    ├── 401 → unset LP_TOKEN してリトライ
+    ├── 404 → lp commands で path 確認 → ユーザに報告
+    ├── 429 → sleep 1s してリトライ
+    ├── 5xx → 1 回リトライ、それでも失敗ならユーザに報告
+    └── connection error → lp health → リトライ
 ```
+
+`lp` は `exec` / `run` の `--json` で生レスポンスを返すので、リトライ判定は `--json` で叩いてから `jq` で `success` / `exceptionType` を見るのが確実。
 
 無限ループは避ける。**同じエラーで 2 回失敗したら停止してユーザに状況を報告**するのが定石。

@@ -1,8 +1,10 @@
 # LP `/execute` Type Conversion — 完全リファレンス
 
-LP の `TypeConverterRegistry` は `lp-execute` の `args` (全 string) をターゲット型へ変換する。本ドキュメントは各型の受理フォーマット、寛容度、失敗メッセージを網羅する。
+LP の `TypeConverterRegistry` は `lp exec` で送られた `args` (全 string) をターゲット型へ変換する。本ドキュメントは各型の受理フォーマット、寛容度、失敗メッセージを網羅する。
 
-> 共通: **数値・bool・enum も含めて全引数を string でクォート**して送ること。JSON で `{"value": 100}` のように直接書いても動くが内部で文字列化される。将来の挙動変更を避けるためクォート推奨。
+> 共通: **数値・bool・enum も含めて全引数を string で送る**。`lp exec name=value` は内部で `{"value":"<v>"}` の形で送るので何も意識せずに済む。直接 JSON を組み立てる場合 (例: `lp run --steps -` の中) も string でクォートしておくと将来の挙動変更を避けられる。
+>
+> 以下の例の JSON はワイヤーフォーマット (LP が受け取る側の形)。`lp exec` から送る場合は `name=value` の `value` 部分にそのまま書けばよい (例: JSON `{"v3":"1,2,3"}` は `lp exec ... v3=1,2,3` に対応)。
 
 ---
 
@@ -205,7 +207,7 @@ public enum Permission { None = 0, Read = 1, Write = 2, Execute = 4 }
 
 | 形式 | 用途 | 制限 |
 |---|---|---|
-| `"@<entityID>"` | `Resources.EntityIdToObject` で解決 | UI ピッカーで取得した ID 前提 (curl から組み立てるのは現実的でない) |
+| `"@<entityID>"` | `Resources.EntityIdToObject` で解決 | UI ピッカーで取得した ID 前提 (CLI から組み立てるのは現実的でない) |
 | `"GameObject:<name>"` | シーン上の GameObject 名前検索 | **Runtime 限定**。`GameObject.Find(name)` ベース |
 | `"<name>"` (フォールバック) | (未対応) | Phase 2 で UI ピッカー経由に切り替え予定。現状はエラー |
 
@@ -218,7 +220,7 @@ public enum Permission { None = 0, Read = 1, Write = 2, Execute = 4 }
 
 ### 推奨パターン
 
-curl で `UnityEngine.Object` 引数を送るのは難しい。**利用側で「名前で解決して内部で UnityEngine.Object に変換するファサードコマンド」を `[ConsoleCommand]` で書く** のが筋:
+CLI / HTTP から `UnityEngine.Object` 引数を送るのは難しい。**利用側で「名前で解決して内部で UnityEngine.Object に変換するファサードコマンド」を `[ConsoleCommand]` で書く** のが筋:
 
 ```csharp
 // 利用側コード
@@ -230,7 +232,7 @@ public void Equip(string itemName) {
 }
 ```
 
-これなら curl 側は `{"itemName": "IronSword"}` のような string で済む。
+これなら CLI 側は `lp exec Player/Equip itemName=IronSword` のような string で済む。
 
 ---
 
@@ -250,10 +252,10 @@ public void Equip(string itemName) {
 
 | パターン | 解釈 |
 |---|---|
-| `error: "..."` + `exceptionType: null` | **引数バインド失敗** (型変換段階)。args の値を見直す |
+| `error: "..."` + `exceptionType: null` | **引数バインド失敗** (型変換段階)。`lp exec ... --json` で詳細を見て値を見直す |
 | `error: "..."` + `exceptionType: "System.X"` | **コマンド実行中に例外** が投げられた。stackTrace で原因確認 |
-| `error: "Required parameter '<name>' is missing"` | args のキー名が parameters[].name と一致していない (typo / 大小違い) |
-| `error: "'<value>' is not a valid choice for parameter '<name>'"` | choices 制約違反。`lp-list-commands` で valid 値を確認 |
+| `error: "Required parameter '<name>' is missing"` | `name=value` のキー名が parameters[].name と一致していない (typo / 大小違い) |
+| `error: "'<value>' is not a valid choice for parameter '<name>'"` | choices 制約違反。`lp commands --json` で valid 値を確認 |
 
 ---
 
@@ -286,6 +288,6 @@ LP は登録順序の **逆順** に `CanConvert(t)` を試す。最後に登録
 
 ### 失敗時のリトライ戦略 (AI Agent 向け)
 
-1. `success: false` + `error` を読む
-2. 「引数バインド失敗」(exceptionType: null) なら → `lp-list-commands` で正しい型を確認 → args を修正して再実行
+1. `lp exec ... --json` の `success: false` + `error` を読む (装飾出力でも `failed` + `error` 行が出る)
+2. 「引数バインド失敗」(exceptionType: null) なら → `lp commands --filter <prefix>` で正しい型を確認 → 値を修正して再実行
 3. 「実行中の例外」(exceptionType: 非 null) なら → stackTrace を読む → 利用側のコード修正が必要なケースが多い → ユーザに報告

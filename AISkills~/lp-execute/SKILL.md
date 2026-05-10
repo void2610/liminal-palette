@@ -1,50 +1,33 @@
 ---
 name: lp-execute
-description: 'Invoke a [ConsoleCommand] via LiminalPalette HTTP POST. Triggers gameplay actions (spawn enemies, set HP, teleport, change scene) and reads return values. All args are sent as strings (numbers, bools, Vector3, Color, enum) — see references/type-conversion.md for the format of each type. Use when the user wants Unity to actually do something, not just inspect state.'
+description: 'Invoke a [ConsoleCommand] via `lp exec`. Triggers gameplay actions (spawn enemies, set HP, teleport, change scene) and reads return values. All args are sent as strings (numbers, bools, Vector3, Color, enum) — see references/type-conversion.md for the format of each type. Use when the user wants Unity to actually do something, not just inspect state.'
 when_to_use: 'Trigger phrases: "コマンド実行", "Player/X を Y で実行", "spawn する", "HP を 100 にして", "テレポート", "execute LP command", "run X", "trigger action", "call console command".'
-allowed-tools: Bash(curl *), Bash(jq *), Bash(cat *)
+allowed-tools: Bash(lp *), Bash(jq *)
 ---
 
 # lp-execute
 
-LiminalPalette の `[ConsoleCommand]` を HTTP POST で実行する。**ゲーム操作の中核スキル**。
+LiminalPalette の `[ConsoleCommand]` を `lp exec` で実行する。**ゲーム操作の中核スキル**。
 
-引数の型変換クセが多い (全部 string で送る、Vector3 はカンマ区切り、enum は名前一致など) ため、初見の型が出てきたら **必ず [references/type-conversion.md](references/type-conversion.md) を確認**してから組み立てる。
-
----
-
-## Setup
-
-```bash
-[ -z "${LP_TOKEN:-}" ] && export LP_TOKEN=$(cat ~/.liminal-palette/token)
-[ -z "${LP_BASE:-}" ] && {
-  for p in 7610 7611 7612 7613 7614 7615; do
-    curl -s -m 1 "http://127.0.0.1:$p/api/v1/health" >/dev/null 2>&1 && export LP_PORT=$p && break
-  done
-  export LP_BASE="http://127.0.0.1:$LP_PORT"
-}
-```
+引数の型変換クセが多い (Vector3 はカンマ区切り、enum は名前一致など) ため、初見の型が出てきたら **必ず [references/type-conversion.md](references/type-conversion.md) を確認**してから組み立てる。
 
 ---
 
-## リクエスト形式
+## 構文
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" \
-     -H "Content-Type: application/json" \
-     -X POST "$LP_BASE/api/v1/execute" \
-     -d '{"path": "<Command/Path>", "args": {<key>: <string-value>, ...}}'
+lp exec <Command/Path> [name=value]...
 ```
 
-| フィールド | 必須 | 型 | 説明 |
-|---|---|---|---|
-| `path` | ✅ | string | `lp-list-commands` で発見した path (大文字小文字区別) |
-| `args` | ✅ | object | 引数。**全 value を string で送る**。引数 0 個でも `{}` を必ず付ける |
+| 部分 | 必須 | 説明 |
+|---|---|---|
+| `<Command/Path>` | ✅ | `lp commands` で発見した path (大文字小文字区別) |
+| `name=value` | (引数があれば) | 引数。**全 value は文字列として送られる** |
 
 ### 大原則
 
-1. **全引数を string にクォート**: `"100"` / `"true"` / `"1,2,3"` / `"Goblin"` / `"#FF8800"`
-2. **`args` キーは省略しない**: 引数 0 個でも `"args": {}` 必須
+1. **引数は `name=value` 形式**: `value=100` / `enabled=true` / `pos=1,2,3` / `type=Goblin`
+2. **`value` 側にはクォートなど不要**: シェルが空白を含む値を渡すなら `'pos=1, 2, 3'` のように shell quote
 3. **path は完全一致**: 大文字小文字、スラッシュの数まで完全一致
 
 ---
@@ -54,25 +37,19 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" \
 ### int 引数 1 つ
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Player/Health/Set","args":{"value":"100"}}'
+lp exec Player/Health/Set value=100
 ```
 
 ### 引数 0 個
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Editor/Console/Clear","args":{}}'
+lp exec Editor/Console/Clear
 ```
 
 ### Vector3 (カンマ区切り)
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Player/Position/Teleport","args":{"pos":"1,2,3"}}'
+lp exec Player/Position/Teleport pos=1,2,3
 ```
 
 ### bool / enum / Color の例は [examples/basic.md](examples/basic.md) を参照
@@ -81,7 +58,40 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 
 ---
 
-## Output
+## Output (人間向け)
+
+```
+success  (1.07 ms)
+  value : (2.00, 4.00, 6.00)
+
+  logs (1):
+    Log: [Echo] Hi
+```
+
+失敗時:
+
+```
+failed  (0.5 ms)
+  error : 引数 amount は必須
+  type  : System.ArgumentException
+  ...stack trace...
+```
+
+exit code は **0=成功 / 2=`success:false` / 1=通信エラー** なので、シェルから条件分岐できる:
+
+```bash
+if lp exec Player/Health/Set value=100; then
+  echo "OK"
+else
+  echo "失敗 (rc=$?)"
+fi
+```
+
+---
+
+## Output (`--json`)
+
+`--json` を付けると `/api/v1/execute` のレスポンスがそのまま返る:
 
 ```json
 {
@@ -112,13 +122,11 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 ### 結果の典型パース
 
 ```bash
-RESP=$(curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Math/Add","args":{"a":"3","b":"4"}}')
+RESP=$(lp exec Math/Add a=3 b=4 --json)
 
 echo "$RESP" | jq '{success, value, ms: .durationMs}'
 
-# 失敗時
+# 失敗時の詳細
 if [ "$(echo "$RESP" | jq -r '.success')" = "false" ]; then
   echo "$RESP" | jq '{error, exceptionType, stackTrace}'
 fi
@@ -132,17 +140,17 @@ fi
 
 | 型 | 形式 | 例 |
 |---|---|---|
-| `int` / `long` / `float` / `double` | 数値リテラル (string) | `"42"`, `"3.14"` |
-| `bool` | `"true"` / `"false"` (大小無視) | `"true"` |
-| `string` | そのまま | `"hello"` |
-| `Vector2/3/4` | カンマ区切り | `"1,2,3"`, `"(1, 2, 3)"`, `"[1 2 3]"` |
-| `Vector2Int/3Int` | 同上、整数 | `"10,20,30"` |
-| `Color` (HEX) | `#RRGGBB` / `#RRGGBBAA` | `"#FF8800"` |
-| `Color` (数値 0..1) | `r,g,b[,a]` | `"1.0, 0.53, 0.0"` |
-| `Color32` (数値 0..255) | `r,g,b[,a]` | `"255, 136, 0, 255"` |
-| Enum | 名前 (大小無視) または数値 | `"Up"`, `"0"` |
-| `[Flags]` Enum | カンマ区切り名前 | `"Read,Write"` |
-| `UnityEngine.Object` | `"@<entityID>"` または `"GameObject:<name>"` | curl 経由は限定的 |
+| `int` / `long` / `float` / `double` | 数値リテラル | `value=42` / `value=3.14` |
+| `bool` | `true` / `false` (大小無視) | `enabled=true` |
+| `string` | そのまま | `name=hello` |
+| `Vector2/3/4` | カンマ区切り | `pos=1,2,3` / `'pos=(1, 2, 3)'` / `'pos=[1 2 3]'` |
+| `Vector2Int/3Int` | 同上、整数 | `pos=10,20,30` |
+| `Color` (HEX) | `#RRGGBB` / `#RRGGBBAA` | `color=#FF8800` |
+| `Color` (数値 0..1) | `r,g,b[,a]` | `'color=1.0, 0.53, 0.0'` |
+| `Color32` (数値 0..255) | `r,g,b[,a]` | `'color=255, 136, 0, 255'` |
+| Enum | 名前 (大小無視) または数値 | `dir=Up` / `dir=0` |
+| `[Flags]` Enum | カンマ区切り名前 | `perm=Read,Write` |
+| `UnityEngine.Object` | `@<entityID>` または `GameObject:<name>` | HTTP 経由はサポート限定的 |
 
 詳細 (各 Converter の挙動 / fallback / 失敗時のメッセージ等) は [references/type-conversion.md](references/type-conversion.md)。
 
@@ -150,15 +158,14 @@ fi
 
 ## エラー対処 (要約)
 
-| Status | 状況 | 一次対処 |
+| 症状 | 状況 | 一次対処 |
 |---|---|---|
-| 200 + `success:false` | 実行例外 / 引数バインド失敗 | `result.error` + `result.exceptionType` を読む |
-| 400 BadRequest | JSON 文法エラー / 必須欠落 | request body を再確認 |
-| 401 | Token 不一致 | `~/.liminal-palette/token` 再 cat |
-| 404 | path 未登録 | `lp-list-commands` で綴り確認 |
-| 405 | method 違い | `-X POST` を確認 |
-| 413 | body 1 MB 超過 | ファイルパス渡しに切り替え |
-| 429 | rate limit (30 req/s) | 間隔を空ける |
+| 終了コード 2 + `failed` | 実行例外 / 引数バインド失敗 | 出力の `error` + `type` を読む |
+| HTTP 400 | 引数フォーマット異常 | `lp commands --json | jq '.commands[] | select(.path==...)'` でスキーマ確認 |
+| HTTP 401 | Token 不一致 | `~/.liminal-palette/token` を再生成 (Editor 再起動) |
+| HTTP 404 | path 未登録 | `lp commands --filter <prefix>` で綴り確認 |
+| HTTP 413 | body 1 MB 超過 | ファイルパス渡しに切り替え |
+| HTTP 429 | rate limit (30 req/s) | 間隔を空ける、または `lp run --steps -` でまとめる |
 
 詳細フローチャートと各エラーの根本原因は [references/error-handling.md](references/error-handling.md)。
 
@@ -168,11 +175,7 @@ fi
 
 ### Async コマンド
 
-`isAsync: true` のコマンドは Task 完了まで HTTP レスポンスがブロックされる。`durationMs` がそのまま実時間。タイムアウトは curl 側で:
-
-```bash
-curl --max-time 30 -s -H "Authorization: Bearer $LP_TOKEN" ...
-```
+`isAsync: true` のコマンドは Task 完了まで HTTP レスポンスがブロックされる。`durationMs` がそのまま実時間。`lp` のタイムアウトは 10 秒なので、長時間 async は調整が必要 (現状は CLI 側のソース修正が必要)。
 
 ### `result.logs` の使いどころ
 
@@ -180,11 +183,11 @@ curl --max-time 30 -s -H "Authorization: Bearer $LP_TOKEN" ...
 
 ### Production ビルドでは動かない
 
-LP の HTTP サーバ自体が asmdef defineConstraints で Production 除外。Production の APK / 実行ファイルに curl しても応答しない。Development build か Editor のみ。
+LP の HTTP サーバ自体が asmdef defineConstraints で Production 除外。Production の APK / 実行ファイルに `lp` を向けても応答しない。Development build か Editor のみ。
 
 ### レートリミットの枠は scenarios と共有
 
-`/execute` と `/scenarios/run` は **30 req/s 共有**。連投する場合は `lp-run-scenario` の ad-hoc 経路で 1 リクエストにまとめる方が効率的。
+`lp exec` と `lp run` は **30 req/s 共有**。連投する場合は `lp run --steps -` で 1 リクエストにまとめる方が効率的。
 
 ---
 

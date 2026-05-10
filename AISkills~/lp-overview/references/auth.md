@@ -2,7 +2,7 @@
 
 ## トークン
 
-LP は **Bearer トークン認証**を採用。`/health` 以外の全 endpoint で `Authorization: Bearer <token>` ヘッダが必須。
+LP は **Bearer トークン認証**を採用。`/health` 以外の全 endpoint で `Authorization: Bearer <token>` ヘッダが必須。`lp` CLI はこのヘッダ付与を自動でやる。
 
 ### 場所
 
@@ -26,29 +26,41 @@ LP は **Bearer トークン認証**を採用。`/health` 以外の全 endpoint 
 
 ## トークンの取り扱い
 
-### 環境変数経由が標準
+### `lp` 経由なら何もしなくて良い
 
 ```bash
-export LP_TOKEN=$(cat ~/.liminal-palette/token)
-
-curl -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands"
+lp commands   # → 自動で ~/.liminal-palette/token を読んで Bearer 付与
 ```
 
-シェル履歴に生のトークンが残らないので推奨。
+`lp` の優先順位:
+
+1. `--token T` フラグ (最優先)
+2. 環境変数 `$LP_TOKEN`
+3. `~/.liminal-palette/token` ファイル
+
+### 明示指定したいとき
+
+別マシンの token を CI で使うなど:
+
+```bash
+lp --token "$(cat /path/to/special/token)" commands
+# または
+LP_TOKEN="$(cat /path/to/special/token)" lp commands
+```
 
 ### スクリプトに直書きしない
 
 ```bash
-# NG
+# NG (リポジトリにコミットされる可能性)
 TOKEN="abc123def456..."
-curl -H "Authorization: Bearer $TOKEN" ...
+lp --token "$TOKEN" ...
 ```
 
-リポジトリにコミットされる可能性があるため。代わりに:
+代わりに環境変数経由かファイル参照:
 
 ```bash
 # OK
-TOKEN=$(cat ~/.liminal-palette/token)
+lp commands   # ~/.liminal-palette/token から自動読込
 ```
 
 ### Discord / Slack / GitHub Issue に貼らない
@@ -65,8 +77,11 @@ rm ~/.liminal-palette/token
 
 # 2. Editor 再起動 (Unity > Quit → 再度起動)
 
-# 3. 新しいトークンを読み込み
-export LP_TOKEN=$(cat ~/.liminal-palette/token)
+# 3. 環境変数に古い値が残っていれば消す
+unset LP_TOKEN
+
+# 4. 確認
+lp health   # → 新しい token で疎通
 ```
 
 ## エラー: 401 Unauthorized
@@ -75,32 +90,29 @@ export LP_TOKEN=$(cat ~/.liminal-palette/token)
 
 | 原因 | 対処 |
 |---|---|
-| `Authorization` ヘッダ自体が無い | `-H "Authorization: Bearer $LP_TOKEN"` を付ける |
-| `Bearer ` (末尾スペース) が抜けている | `Bearer<TOKEN>` でなく `Bearer <TOKEN>` (1 半角スペース必須) |
-| `$LP_TOKEN` が空 | `echo "$LP_TOKEN"` で確認。空なら `cat ~/.liminal-palette/token` の戻り値が空 → ファイル不在か読めない |
-| トークンが古い | Editor が再起動して新規トークンが生成された場合、env の古い値で叩いている |
-| ファイルに改行混入 | サーバ側で Trim するので通常は問題ない。手動で `printf` で書き戻したケースのみ要注意 |
+| `~/.liminal-palette/token` が空または存在しない | Editor を再起動して再生成 |
+| `$LP_TOKEN` が古い (token ローテート後) | `unset LP_TOKEN` でファイル読み込みに戻す |
+| `--token` で渡した値が間違っている | フラグ無しで叩いて自動読込に切り替える |
+| ファイルに改行混入 | `lp` 側で Trim するので通常問題ない。手動で `printf` で書き戻したケースのみ要注意 |
 
 ### デバッグの定石
 
 ```bash
-# ヘッダが正しいか
-echo "Authorization: Bearer $LP_TOKEN"
-
 # /health は認証不要なので疎通確認
-curl -s "$LP_BASE/api/v1/health"
+lp health
 
-# /commands は認証必要 → これで 401 が出るかが認証問題の切り分け
-curl -s -w "\nHTTP %{http_code}\n" \
-  -H "Authorization: Bearer $LP_TOKEN" \
-  "$LP_BASE/api/v1/commands" | tail -5
+# /commands は認証必要 → これで通れば認証 OK
+lp commands --filter Player/ | head -5
+
+# token が何を読んでいるか
+lp --token DEADBEEF commands 2>&1 | head   # わざと壊して比較
 ```
 
 ## チームでの運用
 
 ### 各開発者で個別トークン
 
-LP は **マシンごとに** トークンを持つ。共有しない。チームメンバー A の環境で動くスクリプトを B に渡す時、トークンは渡さず `cat ~/.liminal-palette/token` を含むスクリプトを渡せば各自の環境で正しく動く。
+LP は **マシンごとに** トークンを持つ。共有しない。チームメンバー A の環境で動くスクリプトを B に渡す時、トークンは渡さず `lp` を使う形にしておけば各自の環境で正しく動く (各人の `~/.liminal-palette/token` が読まれる)。
 
 ### CI 環境
 
@@ -108,9 +120,9 @@ CI で LP のシナリオを回したい場合:
 
 1. CI 用にダミーの `~/.liminal-palette/token` を seed する
 2. Unity Editor を CI 内で起動 (例: GameCI)
-3. シナリオを `curl` で実行
+3. シナリオを `lp run <path>` で実行 (exit code が 0/1/2 で成否を返す)
 
-LP 自身に CI ヘルパスクリプト (`scripts/ci-run-scenario.sh` の参考実装) はまだ実体ファイルが無いが、`Documentation~/scenarios.md` に終了コード設計が示されている。
+LP 自身に CI ヘルパスクリプト (`scripts/ci-run-scenario.sh` の参考実装) はまだ実体ファイルが無いが、`Documentation~/scenarios.md` に終了コード設計が示されている。`/lp-run-scenario` の examples/named.md にも `lp run` ベースの簡易 CI スクリプトを掲載。
 
 ## なぜ Bearer Token を採用したか
 
@@ -118,7 +130,7 @@ OAuth / API key の代替案もあったが:
 
 - **localhost only バインド** → 外部からの攻撃面が狭く、認証はあくまで「同マシン内の他ユーザーから守る」程度で十分
 - **OAuth は重い** (Editor 起動時に外部サーバにアクセスする運用は避けたい)
-- **API key を `Authorization: Bearer` で送る** ことで通常の HTTP client (curl/jq/Postman/Python requests) と互換性が取れる
+- **API key を `Authorization: Bearer` で送る** ことで通常の HTTP client (curl/jq/Postman/Python requests/`lp`) と互換性が取れる
 
 ## なぜ /health だけ認証不要か
 
@@ -127,4 +139,4 @@ AI Agent や監視スクリプトが「LP が起動しているか」を確認�
 - ポートスキャンする時に毎回トークン送信 → トークン漏洩面の拡大
 - LP が立ち上がっていない時の error と auth error の区別が難しくなる
 
-`/health` は応答内容が limited (status, version, commandCount のみ) で、機密情報を含まないため認証不要。
+`/health` は応答内容が limited (status, version, commandCount のみ) で、機密情報を含まないため認証不要。`lp` はポート発見にこの endpoint を使う。

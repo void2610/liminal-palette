@@ -1,6 +1,6 @@
-# jq Recipes for /api/v1/commands
+# jq Recipes for `lp commands --json`
 
-`curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands"` の出力を絞り込む jq パターン集。すべて `<curl ...> | jq '<expr>'` の `<expr>` 部分を示す。
+`lp commands --json` の出力を絞り込む jq パターン集。すべて `lp commands --json | jq '<expr>'` の `<expr>` 部分を示す。
 
 ## 概要把握
 
@@ -182,14 +182,14 @@
 
 ```bash
 PATH_TO_RUN="Enemy/Spawn"
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands" \
+lp commands --json \
   | jq --arg p "$PATH_TO_RUN" '
     .commands[] | select(.path == $p) | .parameters[]
     | {name, type, hasDefault, choices: (if (.choices | length) > 0 then .choices else null end)}
   '
 ```
 
-→ AI が choices から値を選んで `lp-execute` に渡す。
+→ AI が choices から値を選んで `lp exec` に渡す。
 
 ### 「path だけ取って Markdown のリストにする」
 

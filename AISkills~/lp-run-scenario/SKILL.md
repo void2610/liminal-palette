@@ -1,43 +1,32 @@
 ---
 name: lp-run-scenario
-description: 'Run a named or ad-hoc multi-step scenario via LiminalPalette HTTP API. Bundles command / wait_seconds / wait_frames / assert_equals / assert_not_equals steps into a single request with fail-fast semantics. Use for integration tests, spawn-wait-assert chains, or to bundle multiple lp-execute calls and save rate-limit budget.'
+description: 'Run a named or ad-hoc multi-step scenario via `lp run`. Bundles command / wait_seconds / wait_frames / assert_equals / assert_not_equals steps into a single request with fail-fast semantics. Use for integration tests, spawn-wait-assert chains, or to bundle multiple lp-execute calls and save rate-limit budget.'
 when_to_use: 'Trigger phrases: "シナリオ実行", "シナリオ走らせて", "統合テスト", "spawn して assert", "run scenario", "execute named scenario", "ad-hoc steps", "bundle multiple commands".'
-allowed-tools: Bash(curl *), Bash(jq *), Bash(cat *), Read
+allowed-tools: Bash(lp *), Bash(jq *), Bash(cat *), Read
 ---
 
 # lp-run-scenario
 
-LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行 / 待機 / 状態 assert) を 1 リクエストで順次実行する。**named** (事前宣言済み `[ConsoleScenario]` を path 指定) と **ad-hoc** (curl 側でステップ列を組み立てる) の 2 経路。
+LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行 / 待機 / 状態 assert) を 1 リクエストで順次実行する。**named** (事前宣言済み `[ConsoleScenario]` を path 指定) と **ad-hoc** (CLI 側でステップ列を組み立てて `--steps` で渡す) の 2 経路。
 
 シナリオは **fail-fast** (最初の失敗で打ち切り) + **1 並列 (排他)** で実行される。詳細な内部仕様は [references/step-types.md](references/step-types.md)。
 
 ---
 
-## Setup
+## 構文
 
 ```bash
-[ -z "${LP_TOKEN:-}" ] && export LP_TOKEN=$(cat ~/.liminal-palette/token)
-[ -z "${LP_BASE:-}" ] && {
-  for p in 7610 7611 7612 7613 7614 7615; do
-    curl -s -m 1 "http://127.0.0.1:$p/api/v1/health" >/dev/null 2>&1 && export LP_PORT=$p && break
-  done
-  export LP_BASE="http://127.0.0.1:$LP_PORT"
-}
+# named: 事前宣言済みシナリオを path で叩く
+lp run <Scenario/Path>
+
+# ad-hoc: stdin から JSON ステップ列を流す
+lp run --steps -
+
+# ad-hoc: ファイルから JSON を読む
+lp run --steps path/to/steps.json
 ```
 
----
-
-## リクエスト形式
-
-```bash
-# named
--d '{"path": "<Scenario/Path>"}'
-
-# ad-hoc
--d '{"steps": [...]}'
-```
-
-`path` と `steps` は **排他**。両方指定 / どちらも未指定は 400 BadRequest。
+`<path>` と `--steps` は **排他**。ad-hoc では JSON は配列直書き (`[{...}, ...]`) でも `{"steps":[...]}` でも受ける。
 
 ---
 
@@ -45,7 +34,7 @@ LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行
 
 | `type` | 必須フィールド | 用途 |
 |---|---|---|
-| `command` | `path` (string), `args` (object) | `[ConsoleCommand]` を実行。`args` は `lp-execute` と同じ string 化規則 |
+| `command` | `path` (string), `args` (object) | `[ConsoleCommand]` を実行。`args` は `lp exec` と同じ string 化規則 |
 | `wait_seconds` | `seconds` (number) | 実時間で待機 |
 | `wait_frames` | `frames` (integer) | フレーム数で待機 |
 | `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `[ConsoleObservableField]` の現在値が `expected` と一致するか |
@@ -58,9 +47,7 @@ LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行
 ## 例 1: Named 実行
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/scenarios/run" \
-  -d '{"path":"Combat/EnemyTakesDamage"}'
+lp run Combat/EnemyTakesDamage
 ```
 
 事前宣言済みのシナリオ。CI で安定したテストを回す用途に。
@@ -68,40 +55,60 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 ## 例 2: Ad-hoc (典型的な spawn → assert)
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/scenarios/run" \
-  -d '{
-    "steps": [
-      {"type":"command","path":"Enemy/Spawn","args":{"type":"Goblin"}},
-      {"type":"assert_equals","path":"Enemy/Hp","expected":"100","description":"spawn 直後は満タン"},
-      {"type":"command","path":"Enemy/Damage","args":{"amount":"30"}},
-      {"type":"wait_frames","frames":1},
-      {"type":"assert_equals","path":"Enemy/Hp","expected":"70","description":"30 ダメージ後は 70"}
-    ]
-  }'
+cat <<'EOF' | lp run --steps -
+[
+  {"type":"command","path":"Enemy/Spawn","args":{"type":"Goblin"}},
+  {"type":"assert_equals","path":"Enemy/Hp","expected":"100","description":"spawn 直後は満タン"},
+  {"type":"command","path":"Enemy/Damage","args":{"amount":"30"}},
+  {"type":"wait_frames","frames":1},
+  {"type":"assert_equals","path":"Enemy/Hp","expected":"70","description":"30 ダメージ後は 70"}
+]
+EOF
 ```
 
-## 例 3: Ad-hoc セットアップ (assert なし)
+## 例 3: Ad-hoc セットアップ (assert なし、`lp exec` を 3 連投する代わりに)
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/scenarios/run" \
-  -d '{
-    "steps": [
-      {"type":"command","path":"Player/Health/Set","args":{"value":"100"}},
-      {"type":"command","path":"Player/Mana/Set","args":{"value":"50"}},
-      {"type":"command","path":"Enemy/ClearAll","args":{}}
-    ]
-  }'
+cat <<'EOF' | lp run --steps -
+[
+  {"type":"command","path":"Player/Health/Set","args":{"value":"100"}},
+  {"type":"command","path":"Player/Mana/Set","args":{"value":"50"}},
+  {"type":"command","path":"Enemy/ClearAll","args":{}}
+]
+EOF
 ```
 
-`/execute` を 3 連投する代わりに 1 リクエスト → レートリミット消費 1/3、ネットワーク往復 1/3。
+`lp exec` を 3 連投する代わりに 1 リクエスト → レートリミット消費 1/3、ネットワーク往復 1/3。
+
+## 例 4: ファイルに保存して使い回す
+
+```bash
+# steps.json に保存しておけば再実行が楽
+lp run --steps tests/repro-bug-42.json
+```
 
 より多くの ad-hoc レシピは [examples/ad-hoc-recipes.md](examples/ad-hoc-recipes.md)、named シナリオ運用例は [examples/named.md](examples/named.md)。
 
 ---
 
-## Output
+## Output (人間向け)
+
+```
+PASS  Combat/EnemyTakesDamage  (124.3 ms)
+  ✓ [0] Command          Enemy/Spawn (1.2ms)
+  ✓ [1] AssertEquals     actual=100 (0.1ms)
+  ✓ [2] Command          Enemy/Damage (0.8ms)
+  ✓ [3] WaitFrames       (16.7ms)
+  ✗ [4] AssertEquals     actual=65  expected '70' but got '65' (0.1ms)
+```
+
+exit code は **0=PASS / 2=FAIL / 1=通信エラー**。
+
+---
+
+## Output (`--json`)
+
+`/api/v1/scenarios/run` の生レスポンス:
 
 ```json
 {
@@ -134,9 +141,7 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 ### 結果のパース典型
 
 ```bash
-RESP=$(curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/scenarios/run" \
-  -d '{"path":"Combat/EnemyTakesDamage"}')
+RESP=$(lp run Combat/EnemyTakesDamage --json)
 
 echo "$RESP" | jq '{success, failedAtStep, durationMs}'
 
@@ -148,14 +153,14 @@ echo "$RESP" | jq '.steps[] | select(.success == false)'
 
 ## エラー対処
 
-| Status | 状況 | 対処 |
+| 症状 | 状況 | 対処 |
 |---|---|---|
-| 200 + `success:false` | ステップ失敗 (assert / command 失敗) | `failedAtStep` と該当 `steps[i]` の `error` を読む |
-| 400 BadRequest | body 文法エラー / `path` と `steps` の同時指定 / 未知の `type` 等 | request body を再確認 |
-| 401 Unauthorized | Token 不一致 | `~/.liminal-palette/token` 再読み込み |
-| 404 Not Found | named 実行で path が未登録 | `lp-list-scenarios` で確認 |
-| 409 Conflict | 別シナリオが排他実行中 (`alreadyRunning: true`) | 完了を待つ。1 並列のみ |
-| 429 Too Many Requests | レートリミット (`/execute` と枠共有、30 req/s) | 間隔を空ける。複数 execute を 1 シナリオにまとめる方が効率的 |
+| 終了コード 2 + `FAIL` | ステップ失敗 (assert / command 失敗) | 出力の `failedAtStep` と該当ステップの `error` を読む |
+| HTTP 400 | body 文法エラー / 未知の `type` 等 | `--steps` の JSON を再確認 |
+| HTTP 401 | Token 不一致 | `~/.liminal-palette/token` 再生成 |
+| HTTP 404 | named 実行で path が未登録 | `lp scenarios` で確認 |
+| HTTP 409 | 別シナリオが排他実行中 (`alreadyRunning: true`) | 完了を待つ。1 並列のみ |
+| HTTP 429 | レートリミット (`/execute` と枠共有、30 req/s) | 間隔を空ける。複数 exec を 1 シナリオにまとめる方が効率的 |
 
 ---
 
@@ -167,16 +172,16 @@ echo "$RESP" | jq '.steps[] | select(.success == false)'
 
 ### シナリオ排他 (1 並列)
 
-LP は **`SemaphoreSlim(1, 1)` で 1 並列に絞っている**。実行中に別シナリオを送ると即座に `409 Conflict` で `alreadyRunning: true` が返る (待たない)。並列実行が必要なら別プロセスで Editor を立てるか、ad-hoc を 1 つにまとめる。
+LP は **`SemaphoreSlim(1, 1)` で 1 並列に絞っている**。実行中に別シナリオを送ると即座に 409 で `alreadyRunning: true` が返る (待たない)。並列実行が必要なら別プロセスで Editor を立てるか、ad-hoc を 1 つにまとめる。
 
-通常コマンド (`/execute`) はシナリオ実行中でも並行で叩ける (排他は scenario 同士のみ)。
+通常コマンド (`lp exec`) はシナリオ実行中でも並行で叩ける (排他は scenario 同士のみ)。
 
 ### ad-hoc vs named の使い分け
 
 | ケース | 推奨 |
 |---|---|
 | 同じ手順を何度も再現する / リポジトリで共有する | named (`[ConsoleScenario]` で C# 宣言) |
-| その場限りの統合テスト / 探索的検証 | ad-hoc (curl で steps 列を組む) |
+| その場限りの統合テスト / 探索的検証 | ad-hoc (`lp run --steps -`) |
 | AI Agent が状況に応じて動的にステップ列を組む | ad-hoc |
 | CI で固定シナリオを回す | named |
 
@@ -187,7 +192,8 @@ LP は **`SemaphoreSlim(1, 1)` で 1 並列に絞っている**。実行中に�
 戻り値を見たい場合は `commandResult.value` を結果 JSON から `jq` で取り出すこと:
 
 ```bash
-echo "$RESP" | jq '.steps[] | select(.kind == "Command") | .commandResult.value'
+lp run Combat/EnemyTakesDamage --json \
+  | jq '.steps[] | select(.kind == "Command") | .commandResult.value'
 ```
 
 ### `wait_frames` の挙動
@@ -221,5 +227,5 @@ HTTP 経由は JSON 往復で型が落ちるため、`assert_equals` の `expect
 - references: [step-types.md](references/step-types.md) — 5 ステップ種別の完全仕様
 - examples:
   - [named.md](examples/named.md) — named シナリオ運用 + CI 連携
-  - [ad-hoc-recipes.md](examples/ad-hoc-recipes.md) — bash で steps を動的生成する 10+ パターン
+  - [ad-hoc-recipes.md](examples/ad-hoc-recipes.md) — ad-hoc steps を動的生成する 10+ パターン
 - LP 本体: `Documentation~/scenarios.md`

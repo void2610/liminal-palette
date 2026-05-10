@@ -1,83 +1,76 @@
 ---
 name: lp-list-scenarios
-description: 'List all [ConsoleScenario] declared in the running Unity project via LiminalPalette HTTP API. Use to pick a named scenario before invoking lp-run-scenario, show stepCount and description, or detect VContainer mis-registration via stepCount=-1.'
+description: 'List all [ConsoleScenario] declared in the running Unity project via `lp scenarios`. Use to pick a named scenario before invoking lp-run-scenario, show stepCount and description, or detect VContainer mis-registration via stepCount=-1.'
 when_to_use: 'Trigger phrases: "シナリオ一覧", "scenarios", "宣言済みのシナリオ", "list scenarios", "what scenarios", "before lp-run-scenario", "stepCount を見たい".'
-allowed-tools: Bash(curl *), Bash(jq *), Bash(cat *)
+allowed-tools: Bash(lp *), Bash(jq *)
 ---
 
 # lp-list-scenarios
 
-LiminalPalette に `[ConsoleScenario]` 属性で宣言されたシナリオの一覧を取得する。`lp-run-scenario` で named 実行する前の発見ステップ。
+LiminalPalette に `[ConsoleScenario]` で宣言されたシナリオの一覧を `lp scenarios` で取得する。`lp-run-scenario` で named 実行する前の発見ステップ。
 
 シナリオは「複数ステップ (command / wait / assert) を順次実行する宣言」で、`[ConsoleCommand]` の集合体に近い。詳細は `/lp-run-scenario` を参照。
-
----
-
-## Setup
-
-```bash
-[ -z "${LP_TOKEN:-}" ] && export LP_TOKEN=$(cat ~/.liminal-palette/token)
-[ -z "${LP_BASE:-}" ] && {
-  for p in 7610 7611 7612 7613 7614 7615; do
-    curl -s -m 1 "http://127.0.0.1:$p/api/v1/health" >/dev/null 2>&1 && export LP_PORT=$p && break
-  done
-  export LP_BASE="http://127.0.0.1:$LP_PORT"
-}
-```
 
 ---
 
 ## 基本
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/scenarios"
+lp scenarios
 ```
+
+出力例:
+
+```
+  Combat/EnemyTakesDamage  敵にダメージを与えて HP が減ることを検証 [5 steps]
+  Boot/ResetAllItems       (no description) [? steps]
+
+  total: 2
+```
+
+`[? steps]` は `stepCount: -1` (インスタンス未解決等で計測不能) を表す。
 
 ---
 
-## よく使うパターン
+## `--json` で取って `jq` で絞る
 
 ### 全シナリオの path / stepCount / description
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/scenarios" \
-  | jq '.scenarios[] | {path, stepCount, description}'
+lp scenarios --json | jq '.scenarios[] | {path, stepCount, description}'
 ```
 
 ### prefix で絞り込み
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/scenarios" \
-  | jq '.scenarios[] | select(.path | startswith("Combat/"))'
+lp scenarios --json | jq '.scenarios[] | select(.path | startswith("Combat/"))'
 ```
 
 ### `stepCount: -1` (インスタンス未解決) を検出
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/scenarios" \
-  | jq '.scenarios[] | select(.stepCount == -1) | .path'
+lp scenarios --json | jq -r '.scenarios[] | select(.stepCount == -1) | .path'
 ```
 
 ### シナリオ数 / カテゴリ別件数
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/scenarios" \
-  | jq '{
-    total: (.scenarios | length),
-    byCategory: ([.scenarios[] | (.path | split("/")[0])] | group_by(.) | map({k: .[0], v: length}))
-  }'
+lp scenarios --json | jq '{
+  total: (.scenarios | length),
+  byCategory: ([.scenarios[] | (.path | split("/")[0])] | group_by(.) | map({k: .[0], v: length}))
+}'
 ```
 
 ### Markdown リスト化
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/scenarios" \
+lp scenarios --json \
   | jq -r '.scenarios | sort_by(.path) | map("- `" + .path + "` (steps=" + (.stepCount|tostring) + ")" + (if .description != "" then " — " + .description else "" end)) | .[]'
 ```
 
 ---
 
-## Output
+## Output (`--json`)
 
 ```json
 {
@@ -123,7 +116,7 @@ public class GameLifetimeScope : LifetimeScope
 }
 ```
 
-`stepCount: -1` のシナリオを `lp-run-scenario` で実行しようとすると 500 で「Instance not resolved」が返るので事前に検出しておくと役立つ。
+`stepCount: -1` のシナリオを `lp run` で実行しようとすると 500 で「Instance not resolved」が返るので事前に検出しておくと役立つ。
 
 ---
 
@@ -138,7 +131,7 @@ public class GameLifetimeScope : LifetimeScope
 [ConsoleScenario("Bad/Example")]
 public IEnumerable<ScenarioStep> Bad()
 {
-    Debug.Log("Generating step 1");          // ← /api/v1/scenarios で発火する
+    Debug.Log("Generating step 1");          // ← lp scenarios で発火する
     yield return ScenarioStep.Run("Foo");
 
     SpawnSomething();                         // ← 同上
@@ -165,13 +158,13 @@ public IEnumerable<ScenarioStep> Good()
 
 | 観点 | `[ConsoleCommand]` | `[ConsoleScenario]` |
 |---|---|---|
-| 一覧 endpoint | `/api/v1/commands` | `/api/v1/scenarios` |
-| 実行 endpoint | `POST /execute` | `POST /scenarios/run` |
+| 一覧取得 | `lp commands` | `lp scenarios` |
+| 実行 | `lp exec <path>` | `lp run <path>` (named) / `lp run --steps -` (ad-hoc) |
 | 単位 | 1 メソッド = 1 コマンド | 複数ステップを順次実行 (fail-fast + assert) |
 | 用途 | ゲーム操作の最小単位 | 統合テスト / "敵spawn → 待つ → assert" の連鎖 |
 | 並列 | 制限なし | scenarios 同士は 1 並列 (`SemaphoreSlim`) |
 
-両方とも別々に発見する必要あり。`lp-list-commands` と本スキルで両方を見て使い分ける。
+両方とも別々に発見する必要あり。`lp commands` と本スキルで両方を見て使い分ける。
 
 ---
 
@@ -183,12 +176,10 @@ public IEnumerable<ScenarioStep> Good()
 
 ```bash
 echo "=== Editor ==="
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE_EDITOR/api/v1/scenarios" \
-  | jq '.scenarios[].path'
+lp --port 7610 scenarios --json | jq -r '.scenarios[].path'
 
 echo "=== Runtime ==="
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE_RUNTIME/api/v1/scenarios" \
-  | jq '.scenarios[].path'
+lp --port 7611 scenarios --json | jq -r '.scenarios[].path'
 ```
 
 ### Cmd+K UI との関係
@@ -199,9 +190,9 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE_RUNTIME/api/v1/scenarios"
 
 ## Error Handling
 
-| Status | 状況 | 対処 |
+| 症状 | 状況 | 対処 |
 |---|---|---|
-| 401 | Token 不一致 | `~/.liminal-palette/token` 再読み込み |
+| HTTP 401 | Token 不一致 | `~/.liminal-palette/token` 再生成 |
 
 ---
 

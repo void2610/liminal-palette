@@ -4,21 +4,18 @@ retry / async / 連続実行 / 結果連携の実用パターン。
 
 ## 1. async コマンドの実行
 
-`isAsync: true` のコマンドは Task 完了まで HTTP がブロックされる。タイムアウト指定が安全:
+`isAsync: true` のコマンドは Task 完了まで HTTP がブロックされる。`lp` の HTTP タイムアウトは 10 秒固定なので、長時間 async は注意:
 
 ```bash
-curl --max-time 30 -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Stage/LoadAsync","args":{"name":"Stage02"}}'
+lp exec Stage/LoadAsync name=Stage02
 ```
 
-`--max-time 30` は curl 全体のタイムアウト。LP 側にコマンド実行のタイムアウト機構は無い (Task が永遠に終わらないと curl 側で切るしかない)。
+10 秒を超える可能性があれば現状は CLI ソースの `TIMEOUT_SEC` を上げるか、シナリオ化して非同期に流す。
 
 ### async 一覧の発見
 
 ```bash
-curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands" \
-  | jq '.commands[] | select(.isAsync == true) | .path'
+lp commands --json | jq -r '.commands[] | select(.isAsync == true) | .path'
 ```
 
 ---
@@ -28,44 +25,37 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands" \
 ### 引数バインド失敗 → スキーマ確認 → 修正リトライ
 
 ```bash
-RUN_LP() {
-  curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-    -X POST "$LP_BASE/api/v1/execute" -d "$1"
-}
-
-PAYLOAD='{"path":"Player/Position/Teleport","args":{"pos":"1,2"}}'
-RESP=$(RUN_LP "$PAYLOAD")
+# 第 1 試行
+RESP=$(lp exec Player/Position/Teleport pos=1,2 --json)
 
 if [ "$(echo "$RESP" | jq -r '.success')" = "false" ]; then
   echo "First attempt failed: $(echo "$RESP" | jq -r '.error')"
 
   # スキーマ確認
-  curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/commands" \
+  lp commands --json \
     | jq '.commands[] | select(.path == "Player/Position/Teleport") | .parameters'
   # → [{"name":"pos","type":"Vector3",...}]
 
   # Vector3 なので 3 要素必要だった。修正してリトライ
-  PAYLOAD='{"path":"Player/Position/Teleport","args":{"pos":"1,2,3"}}'
-  RESP=$(RUN_LP "$PAYLOAD")
+  RESP=$(lp exec Player/Position/Teleport pos=1,2,3 --json)
 fi
 
 echo "$RESP" | jq '{success, value}'
 ```
 
-### 401 → token 再読み込み → リトライ
+### 401 が返ったとき
+
+`lp` はトークンを `~/.liminal-palette/token` から自動で読むので通常 401 は出ないが、token がローテートされた直後だけ環境変数 `$LP_TOKEN` の方が古いケースがある:
 
 ```bash
-http_status=$(curl -s -o /tmp/resp -w '%{http_code}' \
-  -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" -d "$PAYLOAD")
+unset LP_TOKEN   # 環境変数を消してファイル読込みに戻す
+lp exec ...
+```
 
-if [ "$http_status" = "401" ]; then
-  export LP_TOKEN=$(cat ~/.liminal-palette/token)
-  curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-    -X POST "$LP_BASE/api/v1/execute" -d "$PAYLOAD"
-else
-  cat /tmp/resp
-fi
+明示指定したい場合は `--token`:
+
+```bash
+lp --token "$(cat ~/.liminal-palette/token)" exec ...
 ```
 
 ---
@@ -77,10 +67,7 @@ fi
 ```bash
 # 50 ms 間隔 = 20 req/s で安全圏
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-    -X POST "$LP_BASE/api/v1/execute" \
-    -d "{\"path\":\"Enemy/Spawn\",\"args\":{\"type\":\"Goblin\",\"position\":\"$i,0,0\"}}" \
-    | jq -r '.success'
+  lp exec Enemy/Spawn type=Goblin "position=$i,0,0" --json | jq -r '.success'
   sleep 0.05
 done
 ```
@@ -90,14 +77,14 @@ done
 10 spawn を 1 リクエストにすると rate limit 消費 1:
 
 ```bash
-# steps 配列を bash で組み立て
-STEPS=$(for i in 1 2 3 4 5 6 7 8 9 10; do
-  echo "{\"type\":\"command\",\"path\":\"Enemy/Spawn\",\"args\":{\"type\":\"Goblin\",\"position\":\"$i,0,0\"}}"
-done | paste -sd, -)
-
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/scenarios/run" \
-  -d "{\"steps\":[$STEPS]}"
+# steps を jq で組み立てて lp run --steps - に流す
+jq -n '
+  [range(1; 11) | {
+    type: "command",
+    path: "Enemy/Spawn",
+    args: { type: "Goblin", position: "\(.),0,0" }
+  }]
+' | lp run --steps -
 ```
 
 詳細: `/lp-run-scenario`。
@@ -106,23 +93,18 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 
 ## 4. 戻り値を次のコマンドに渡す
 
-LP に変数バインディング機構は無い。**bash 側で取り出して再注入**する:
+LP に変数バインディング機構は無い。**シェル側で取り出して再注入**する:
 
 ```bash
 # 1. 現在位置を取得
-POS=$(curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Player/Position/Get","args":{}}' \
-  | jq -r '.value')
+POS=$(lp exec Player/Position/Get --json | jq -r '.value')
 # POS="(1.50, 2.00, 3.00)"
 
 # 2. パース ("(1.50, 2.00, 3.00)" → "1.50,2.00,3.00")
 POS_CSV=$(echo "$POS" | sed -E 's/[()]//g; s/, /,/g')
 
-# 3. オフセットを足して別コマンドに渡す (実用では計算が必要)
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d "{\"path\":\"Marker/Spawn\",\"args\":{\"pos\":\"$POS_CSV\"}}"
+# 3. 別コマンドに渡す
+lp exec Marker/Spawn "pos=$POS_CSV"
 ```
 
 ⚠️ 実行間に他のコマンドが走って状態が変わる可能性 (race condition)。同期的に必要なら `lp-run-scenario` の ad-hoc を検討。
@@ -134,45 +116,56 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json"
 ### 直近の失敗を再現してデバッグ
 
 ```bash
-# 直近 10 件の失敗を取得
-FAILED=$(curl -s -H "Authorization: Bearer $LP_TOKEN" "$LP_BASE/api/v1/logs?limit=200" \
+# 直近の失敗 1 件を取得
+FAILED=$(lp logs --limit 200 --json \
   | jq '[.invocations[] | select(.result.success == false)] | .[0]')
 
 echo "$FAILED" | jq '{path, args, error: .result.error}'
 
 # 引数を修正して再実行
 PATH_TO_FIX=$(echo "$FAILED" | jq -r '.path')
-NEW_ARGS='{"value":"50"}'   # 修正後の args
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d "{\"path\":\"$PATH_TO_FIX\",\"args\":$NEW_ARGS}"
+lp exec "$PATH_TO_FIX" value=50
+```
+
+### args オブジェクトを横展開して再実行
+
+```bash
+# 履歴の args を CLI 形式に変換 (key=value...)
+KV=$(echo "$FAILED" | jq -r '.args | to_entries | map("\(.key)=\(.value)") | join(" ")')
+PATH=$(echo "$FAILED" | jq -r '.path')
+eval "lp exec \"$PATH\" $KV"
+```
+
+⚠️ `eval` は値に空白が入ると壊れる。空白を含む引数があるなら配列で組み立てる:
+
+```bash
+mapfile -t KV_ARR < <(echo "$FAILED" | jq -r '.args | to_entries[] | "\(.key)=\(.value)"')
+lp exec "$PATH" "${KV_ARR[@]}"
 ```
 
 ---
 
 ## 6. 大きい引数を渡す
 
-### 1 MB 以下: そのまま JSON に詰める
+### 1 MB 以下: そのまま渡す
+
+`lp exec` 経由でも大きい文字列は渡せるが、シェルが値を展開する都合上、`'key=...'` のシングルクォート内に直書きすると ARG_MAX に当たることがある。
 
 ```bash
 BIG_TEXT="..."  # ~500 KB
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d "$(jq -n --arg t "$BIG_TEXT" '{path:"Data/Process", args:{text:$t}}')"
+lp exec Data/Process "text=$BIG_TEXT"
 ```
 
-`jq -n --arg` で string を安全にエスケープ。
-
 ### 1 MB 超: ファイルパス渡し
+
+LP 側でファイルパスを引数に受け取って中身を読む設計に変える:
 
 ```bash
 TMPFILE=$(mktemp /tmp/lp-payload-XXXXXX.json)
 echo "$HUGE_DATA" > "$TMPFILE"
 
 # 利用側に [ConsoleCommand("Data/ImportFile")] public void Import(string path) を実装しておく
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d "{\"path\":\"Data/ImportFile\",\"args\":{\"path\":\"$TMPFILE\"}}"
+lp exec Data/ImportFile "path=$TMPFILE"
 
 rm "$TMPFILE"
 ```
@@ -181,39 +174,44 @@ rm "$TMPFILE"
 
 ## 7. Editor / Runtime ポートを使い分ける
 
-両稼働時、操作対象に応じて base URL を切り替える:
+両稼働時、操作対象に応じて `--port` を切り替える:
 
 ```bash
 # Editor 側 (asset / scene 操作)
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE_EDITOR/api/v1/execute" \
-  -d '{"path":"Editor/Console/Clear","args":{}}'
+lp --port 7610 exec Editor/Console/Clear
 
 # Runtime 側 (ゲーム状態操作)
-curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE_RUNTIME/api/v1/execute" \
-  -d '{"path":"Player/Health/Set","args":{"value":"100"}}'
+lp --port 7611 exec Player/Health/Set value=100
 ```
 
-`$LP_BASE_EDITOR` / `$LP_BASE_RUNTIME` のセットは `/lp-find-port` の examples/multi-instance.sh を参照。
+エイリアスを作っておくと便利:
+
+```bash
+alias lpe='lp --port 7610'   # Editor
+alias lpr='lp --port 7611'   # Runtime
+
+lpe exec Editor/Console/Clear
+lpr exec Player/Health/Set value=100
+```
 
 ---
 
-## 8. shell 関数化 (使い回し)
+## 8. シェル関数化 (使い回し)
+
+`lp` 自体が薄いので普通は不要だが、戻り値だけ取り出す用途なら:
 
 ```bash
-lp_exec() {
-  local path="$1"
-  local args="${2:-{\\}}"  # 既定は空オブジェクト
-  curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-    -X POST "$LP_BASE/api/v1/execute" \
-    -d "$(jq -n --arg p "$path" --argjson a "$args" '{path:$p, args:$a}')"
+lp_value() {
+  lp exec "$@" --json | jq -r '.value'
+}
+
+lp_success() {
+  lp exec "$@" --json | jq -r '.success'
 }
 
 # 使用例
-lp_exec "Player/Health/Set" '{"value":"100"}'
-lp_exec "Editor/Console/Clear" '{}'
-lp_exec "Player/Position/Teleport" '{"pos":"1,2,3"}'
+HP=$(lp_value Player/HP/Get)
+OK=$(lp_success Player/HP/Set value=100)
 ```
 
 ---
@@ -221,9 +219,7 @@ lp_exec "Player/Position/Teleport" '{"pos":"1,2,3"}'
 ## 9. デバッグログ全部見る
 
 ```bash
-RESP=$(curl -s -H "Authorization: Bearer $LP_TOKEN" -H "Content-Type: application/json" \
-  -X POST "$LP_BASE/api/v1/execute" \
-  -d '{"path":"Diagnostic/RunFullCheck","args":{}}')
+RESP=$(lp exec Diagnostic/RunFullCheck --json)
 
 echo "Result: $(echo "$RESP" | jq -r '.success')"
 echo "Logs:"
@@ -233,16 +229,27 @@ echo "$RESP" | jq -r '.logs[] | "[\(.type)] \(.message)"'
 echo "$RESP" | jq '.logs[] | select(.type == "Error" or .type == "Exception")'
 ```
 
----
-
-## 10. 環境変数を全部 reset
-
-debug 中にトークンやポートが変わった時:
+`lp exec` の人間向け出力 (`--json` 無し) でも logs はカラー付きで列挙される。詳細解析が要らないならそちらで十分:
 
 ```bash
-unset LP_TOKEN LP_PORT LP_BASE LP_BASE_EDITOR LP_BASE_RUNTIME LP_PORT_EDITOR LP_PORT_RUNTIME
+lp exec Diagnostic/RunFullCheck
+```
 
-export LP_TOKEN=$(cat ~/.liminal-palette/token)
-source <(curl -s file:///path/to/AISkills~/lp-find-port/examples/multi-instance.sh)
-# あるいは手動で再セット
+---
+
+## 10. 環境変数とトークン管理
+
+`lp` は基本的に環境変数不要 (`~/.liminal-palette/token` を自動で読む)。明示指定したい場合のみ:
+
+| 上書き方法 | 優先順位 |
+|---|---|
+| `--token T` / `--port N` / `--base-url URL` フラグ | 最優先 |
+| 環境変数 `$LP_TOKEN` | フラグ無しの時のみ |
+| `~/.liminal-palette/token` ファイル | 環境変数も無い時 |
+
+開発中に token ローテート → ファイルが新しい場合は環境変数を消す:
+
+```bash
+unset LP_TOKEN
+lp exec ...   # → ファイルから最新 token を読む
 ```

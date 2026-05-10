@@ -20,11 +20,12 @@ Editor    → 7610 (Editor 用 IpcServer)
 PlayMode  → 7611 (Runtime 用 IpcServer、Play Mode 中のみ生存)
 ```
 
-`/health` は両方が応答する:
+`/health` は両方が応答する。`lp` は最初に応答した方を取るが、`--port` で個別に指定可能:
 
 ```bash
 for p in 7610 7611; do
-  curl -s -m 1 "http://127.0.0.1:$p/api/v1/health" | jq --arg p "$p" '. + {port: ($p|tonumber)}'
+  lp --port "$p" --json health 2>/dev/null \
+    | jq --arg p "$p" '. + {port: ($p|tonumber)}'
 done
 # {"status":"ok","version":"0.4.0","commandCount":420,"port":7610}   ← Editor 側
 # {"status":"ok","version":"0.4.0","commandCount":312,"port":7611}   ← Runtime 側
@@ -45,30 +46,26 @@ done
 - Editor 側のほうが大きい (Editor 限定 `[ConsoleCommand]` の分)
 - Runtime 側は Editor 限定コマンドが含まれない
 
-### 両 Base URL を保持するパターン
+### 両方を使い分けるパターン
+
+エイリアスやフラグで CLI を切り分ける:
 
 ```bash
-export LP_BASE_EDITOR="http://127.0.0.1:7610"
-export LP_BASE_RUNTIME="http://127.0.0.1:7611"
+alias lpe='lp --port 7610'   # Editor
+alias lpr='lp --port 7611'   # Runtime
 
 # Editor 操作
-curl -s -H "Authorization: Bearer $LP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -X POST "$LP_BASE_EDITOR/api/v1/execute" \
-  -d '{"path":"Editor/Console/Clear","args":{}}'
+lpe exec Editor/Console/Clear
 
 # Runtime 操作
-curl -s -H "Authorization: Bearer $LP_TOKEN" \
-  -H "Content-Type: application/json" \
-  -X POST "$LP_BASE_RUNTIME/api/v1/execute" \
-  -d '{"path":"Player/Health/Set","args":{"value":"100"}}'
+lpr exec Player/Health/Set value=100
 ```
 
 ## Editor 再起動時の動作
 
 - 通常は **同じポートに戻る** (7610 が他プロセスに取られていない限り)
 - Domain Reload 直後は listener が一時的に応答しない瞬間がありうる (数百 ms)
-- 再起動を挟んだ場合は `lp-find-port` でポート再発見が安全
+- 再起動を挟んだ場合は `lp health` でポート再発見が安全
 
 ## なぜポートを 5 個までしか試さないか
 
@@ -78,13 +75,13 @@ curl -s -H "Authorization: Bearer $LP_TOKEN" \
 
 ## トラブルシューティング (ポート絡み)
 
-### Q. Play Mode に入ったら curl が反応しない
-A. Editor (7610) と Runtime (7611) で別 listener。ポートを `lp-find-port` で再発見すること。
+### Q. Play Mode に入ったら lp が反応しない
+A. Editor (7610) と Runtime (7611) で別 listener。`lp --port 7611 ...` で明示指定するか、`lp health` で再スキャン。
 
 ### Q. Editor を再起動したら 7610 で応答しない
-A. 先に他プロセスが 7610 を占有している。`lsof -i :7610` で確認。LP 側は次の隣接 (7611...) にずれているはず。
+A. 先に他プロセスが 7610 を占有している。`lsof -i :7610` で確認。LP 側は次の隣接 (7611...) にずれているはずなので `lp health` で発見できる。
 
-### Q. Production ビルドの実行ファイルに curl しても応答しない
+### Q. Production ビルドの実行ファイルに `lp` を向けても応答しない
 A. **仕様**。Production build は LP HTTP サーバ自体がコンパイル除外される。Development build でビルドし直すこと。
 
 ### Q. /health で応答するが /commands で connection refused
@@ -99,3 +96,5 @@ LP の `IpcServer.Start()` は以下:
 3. `PortRetryCount` (既定 5) まで繰り返し、全失敗したら `Debug.LogWarning` で諦める
 
 エンドユーザーに見える値は `LiminalPalette/IpcServer started on port: <N>` というログメッセージ (Editor Console)。
+
+`lp` 側のスキャンも同じ範囲 (7610〜7615) を順に叩いて最初に応答した方を採用する。

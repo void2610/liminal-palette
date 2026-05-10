@@ -35,7 +35,7 @@ static void DisableLp() {
 
 ### 原因 3: Production ビルドを叩いている
 
-LP の HTTP サーバは asmdef defineConstraints で **Player Production からコンパイル除外** される。Production ビルドの実行ファイルに curl しても応答することはない。
+LP の HTTP サーバは asmdef defineConstraints で **Player Production からコンパイル除外** される。Production ビルドの実行ファイルに `lp` を向けても応答することはない。
 
 → Development build に切り替えるか、Editor を使う。
 
@@ -79,16 +79,15 @@ rm ~/.liminal-palette/token
 
 詳細は [auth.md](auth.md) の「エラー: 401 Unauthorized」セクション。
 
-### 環境変数 `$LP_TOKEN` が次のシェルで消える
+### 環境変数 `$LP_TOKEN` が古いまま使われる
 
-`export` した変数はそのシェルのみ。新しいタブ / セッションでは再 export が必要:
+`lp` は `$LP_TOKEN` をファイルより優先する。Editor が token を再生成した直後だと古い値が使われ 401 になる。対処:
 
 ```bash
-# 永続化したい場合は ~/.bashrc / ~/.zshrc に追加
-echo 'export LP_TOKEN=$(cat ~/.liminal-palette/token 2>/dev/null)' >> ~/.zshrc
+unset LP_TOKEN   # → ~/.liminal-palette/token から最新を読み直す
 ```
 
-注意: 一度 `~/.zshrc` に書くと token が更新された時 (Editor 再生成時) に古い値が読まれ続ける。AI Agent ベースの運用なら毎セッションで `cat` するほうが安全。
+`~/.zshrc` 等に `export LP_TOKEN=$(cat ~/.liminal-palette/token)` を入れている場合は、token 更新後に新しいシェルを開く必要がある。AI Agent ベースの運用ならむしろ環境変数を設定せず、`lp` の自動読込に任せる方が安全。
 
 ---
 
@@ -98,14 +97,14 @@ echo 'export LP_TOKEN=$(cat ~/.liminal-palette/token 2>/dev/null)' >> ~/.zshrc
 
 サーバ自体に届いていない:
 
-- ポートが間違っている → `lp-find-port` で再発見
+- ポートが間違っている → `lp health` で再発見
 - LP が落ちた / Domain Reload 中 → 数秒待って再試行
 
 ### 応答が遅い (10 秒以上)
 
 - async コマンドは Task 完了まで待つ。`isAsync: true` のコマンドはそうなる
 - メインスレッドが詰まっている (Editor で重い処理が走っている)
-- curl 側で `--max-time 30` 等のタイムアウトを付ける運用が安全
+- `lp` のタイムアウトは現状 10 秒固定 (`Tools~/lp/lp` 内 `TIMEOUT_SEC`)。長時間 async を扱うなら値を上げる
 
 ### 200 だが `success: false` で `error: null`
 
@@ -145,12 +144,12 @@ lsof -i :7610 | tail -1 | awk '{print $2}' | xargs kill -9
 ```bash
 # 短い sleep を挟む
 for cmd in path1 path2 path3 ...; do
-  curl ... -d "..."
+  lp exec "$cmd"
   sleep 0.05  # 1秒/30req = 33ms 以上空ける
 done
 ```
 
-または `lp-run-scenario` の ad-hoc に複数操作をまとめると 1 リクエストになり、リミット消費が 1 で済む。
+または `lp run --steps -` の ad-hoc に複数操作をまとめると 1 リクエストになり、リミット消費が 1 で済む。
 
 ### リミットを上げたい場合 (利用側で C# 設定)
 

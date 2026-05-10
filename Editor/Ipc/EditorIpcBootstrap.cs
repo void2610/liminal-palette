@@ -61,7 +61,10 @@ namespace Void2610.LiminalPalette.Editor.Ipc
             router.Register("GET", "/api/v1/scenarios", new ListScenariosEndpoint());
             router.Register("POST", "/api/v1/scenarios/run", new RunScenarioEndpoint());
 
-            _server = new HttpServer(router, IpcSettings.DefaultPort);
+            // プロジェクト固有の preferred port があればそれを起点にする (複数 Unity プロジェクト同時起動対応)。
+            // 未指定なら IpcSettings.DefaultPort にフォールバック。HttpServer 側で衝突時は隣接ポートに retry する。
+            var preferred = ProjectConfig.GetPreferredPort() ?? IpcSettings.DefaultPort;
+            _server = new HttpServer(router, preferred);
             _server.Start();
 
             // Token の場所をログに 1 度だけ表示 (他人に共有しないよう警告も付ける)。

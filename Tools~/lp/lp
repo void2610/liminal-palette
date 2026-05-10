@@ -189,21 +189,49 @@ def _detect_project_from_cwd() -> str | None:
     return None
 
 
-def _resolve_target(explicit: str | None) -> str | None:
-    """target は projectPath (絶対パス) か projectName のいずれか。
+def _resolve_target(explicit: str | None) -> tuple[str | None, str | None]:
+    """target identity と (分かれば) その絶対 projectPath を返す。
     優先順位: --project > $LP_PROJECT > cwd 検出。
-    パスとして存在するものは絶対パスに正規化する。
+    --project が path として存在しない or 単なる名前の場合は projectPath は None を返す。
     """
     raw = explicit or os.environ.get("LP_PROJECT")
     if raw:
         try:
             cand = Path(raw)
-            if cand.exists():
-                return str(cand.resolve())
+            if cand.exists() and cand.is_dir():
+                p = str(cand.resolve())
+                return (p, p)
         except OSError:
             pass
-        return raw
-    return _detect_project_from_cwd()
+        # path として解決できない → 名前として扱う (projectName マッチ用)
+        return (raw, None)
+    cwd_path = _detect_project_from_cwd()
+    if cwd_path:
+        return (cwd_path, cwd_path)
+    return (None, None)
+
+
+def _read_preferred_port(project_path: str | None) -> int | None:
+    """<project_path>/ProjectSettings/LiminalPalette.json から preferred port を読む。"""
+    if not project_path:
+        return None
+    cfg = Path(project_path) / "ProjectSettings" / "LiminalPalette.json"
+    if not cfg.is_file():
+        return None
+    try:
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    port = data.get("port")
+    if isinstance(port, int) and 1 <= port <= 65535:
+        return port
+    return None
+
+
+def _project_config_path(project_path: str) -> Path:
+    return Path(project_path) / "ProjectSettings" / "LiminalPalette.json"
 
 
 def _matches_target(info: dict, target: str | None) -> bool:
@@ -230,6 +258,41 @@ def _format_alive(alive: list[tuple[int, dict]]) -> str:
     )
 
 
+def _find_cached_port(cache: dict, target: str | None, target_path: str | None) -> int | None:
+    """target_path 一致を最優先、なければ target を projectName として一致するエントリを返す。"""
+    projects = cache.get("projects", {})
+    if target_path and target_path in projects:
+        port = projects[target_path].get("port")
+        if isinstance(port, int):
+            return port
+    if target:
+        for entry in projects.values():
+            if entry.get("projectName") == target:
+                port = entry.get("port")
+                if isinstance(port, int):
+                    return port
+    return None
+
+
+def _build_candidate_ports(port: int | None, preferred: int | None) -> list[int]:
+    """probe するポートの順序を決める。
+    --port 明示なら 1 個だけ。
+    preferred 指定があれば preferred..preferred+5 (HttpServer の port retry 範囲) を先頭に置き、
+    その後ろに DEFAULT_PORTS を重複排除して連結。
+    """
+    if port is not None:
+        return [port]
+    out: list[int] = []
+    if preferred is not None:
+        for p in range(preferred, preferred + 6):
+            if 1 <= p <= 65535 and p not in out:
+                out.append(p)
+    for p in DEFAULT_PORTS:
+        if p not in out:
+            out.append(p)
+    return out
+
+
 def _discover_base_url(
     explicit: str | None, port: int | None, project: str | None
 ) -> tuple[str, dict]:
@@ -239,23 +302,22 @@ def _discover_base_url(
         info = _probe_url(explicit) or {}
         return explicit.rstrip("/"), info
 
-    target = _resolve_target(project)
+    target, target_path = _resolve_target(project)
+    preferred = _read_preferred_port(target_path)
     cache = _load_cache()
-    candidate_ports = [port] if port else list(DEFAULT_PORTS)
+    candidate_ports = _build_candidate_ports(port, preferred)
 
     # 1) ターゲット指定 + キャッシュヒット時はそのポートを最優先で試す。
-    if target and not port:
-        cached = cache.get("projects", {}).get(target)
-        if cached:
-            cached_port = cached.get("port")
-            if isinstance(cached_port, int):
-                info = _probe_port(cached_port)
-                if info and _matches_target(info, target):
-                    _record_cache(cache, info, cached_port)
-                    _save_cache(cache)
-                    return f"http://127.0.0.1:{cached_port}", info
+    if target and port is None:
+        cached_port = _find_cached_port(cache, target, target_path)
+        if cached_port is not None:
+            info = _probe_port(cached_port)
+            if info and _matches_target(info, target):
+                _record_cache(cache, info, cached_port)
+                _save_cache(cache)
+                return f"http://127.0.0.1:{cached_port}", info
 
-    # 2) 候補全部 probe (短いタイムアウト)。
+    # 2) 候補全部 probe (短いタイムアウト)。preferred 指定があれば先頭に来ているので最速で当たる。
     alive: list[tuple[int, dict]] = []
     for p in candidate_ports:
         info = _probe_port(p)
@@ -360,8 +422,15 @@ def cmd_doctor(args):
     env_proj = os.environ.get("LP_PROJECT")
     if env_proj:
         print(f"  $LP_PROJECT    : {env_proj}")
-    target = _resolve_target(args.project)
+    target, target_path = _resolve_target(args.project)
     print(f"  resolved target: {target if target else _dim('(none)')}")
+    preferred = _read_preferred_port(target_path)
+    if target_path:
+        cfg_path = _project_config_path(target_path)
+        if cfg_path.is_file():
+            print(f"  preferred port : {_cyan(str(preferred)) if preferred else _red('(invalid in ' + str(cfg_path) + ')')}")
+        else:
+            print(f"  preferred port : {_dim('(no ' + str(cfg_path) + ' — falling back to defaults)')}")
 
     # 3) Cache
     cache = _load_cache()
@@ -376,10 +445,11 @@ def cmd_doctor(args):
             name = entry.get("projectName", "") or "?"
             print(f"    port {entry.get('port'):>5}  {name.ljust(name_w)}  {_dim(path)}")
 
-    # 4) Live probe
-    print(_bold("\nLive probe (7610-7615):"))
+    # 4) Live probe (preferred があれば隣接 5 個もスキャンして、preferred 衝突で +N にずれた場合も拾う)
+    probe_ports = _build_candidate_ports(None, preferred)
+    print(_bold(f"\nLive probe ({','.join(str(p) for p in probe_ports)}):"))
     alive: list[tuple[int, dict]] = []
-    for p in DEFAULT_PORTS:
+    for p in probe_ports:
         info = _probe_port(p)
         if info:
             alive.append((p, info))
@@ -417,6 +487,75 @@ def cmd_doctor(args):
             print(_yellow("  ambiguous: multiple servers alive (specify --project)"))
             for p, info in alive:
                 print(f"    - port {p}: {info.get('projectName','?')}  {_dim(info.get('projectPath','?'))}")
+
+
+def cmd_project(args):
+    """ProjectSettings/LiminalPalette.json を表示 / 編集する。"""
+    if args.project_command == "show":
+        _project_show(args)
+    elif args.project_command == "set-port":
+        _project_set_port(args)
+    else:
+        # argparse 側で防がれているはずだが念のため。
+        raise SystemExit(_red(f"unknown subcommand: {args.project_command}"))
+
+
+def _project_show(args):
+    project_path = _detect_project_from_cwd()
+    if not project_path:
+        raise SystemExit(_red(
+            f"cwd ({Path.cwd()}) 配下に Unity プロジェクトが見つかりません。"
+            "ProjectSettings/ProjectVersion.txt がある場所で実行してください。"
+        ))
+    cfg_path = _project_config_path(project_path)
+    print(_bold("Project:"))
+    print(f"  path  : {project_path}")
+    print(f"  config: {cfg_path}")
+    if not cfg_path.is_file():
+        print(_dim(f"  (no {cfg_path.name} — IpcSettings.DefaultPort=7610 にフォールバック)"))
+        print(_dim(f"  固定するなら: lp project set-port 7613"))
+        return
+    try:
+        raw = cfg_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except (json.JSONDecodeError, OSError) as e:
+        raise SystemExit(_red(f"  parse error: {e}"))
+    port = data.get("port") if isinstance(data, dict) else None
+    if isinstance(port, int) and 1 <= port <= 65535:
+        print(f"  port  : {_cyan(str(port))}")
+    else:
+        print(f"  port  : {_red('(invalid or unset)')}")
+    print(_dim("  raw   :"))
+    for line in raw.rstrip("\n").splitlines():
+        print(_dim(f"    {line}"))
+
+
+def _project_set_port(args):
+    project_path = _detect_project_from_cwd()
+    if not project_path:
+        raise SystemExit(_red(
+            f"cwd ({Path.cwd()}) 配下に Unity プロジェクトが見つかりません。"
+            "ProjectSettings/ProjectVersion.txt がある場所で実行してください。"
+        ))
+    port = args.port_value
+    if not (1 <= port <= 65535):
+        raise SystemExit(_red(f"port は 1..65535 の範囲で指定してください: {port}"))
+    cfg_path = _project_config_path(project_path)
+    data: dict = {}
+    if cfg_path.is_file():
+        try:
+            existing = json.loads(cfg_path.read_text(encoding="utf-8"))
+            if isinstance(existing, dict):
+                data = existing
+        except json.JSONDecodeError:
+            # 既存ファイルが壊れていれば上書き (警告は出す)。
+            print(_yellow(f"warning: {cfg_path} の JSON パースに失敗。上書きします。"))
+    data["port"] = port
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"{_green('wrote')}  {cfg_path}")
+    print(f"  port = {port}")
+    print(_dim("  Unity Editor 再起動 (もしくは DomainReload) で反映されます"))
 
 
 def cmd_commands(args, base_url, token):
@@ -644,6 +783,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("health", help="サーバーの生存確認 (認証不要)")
     sub.add_parser("doctor", help="環境診断: token / プロジェクト解決 / 生存ポート一覧 (認証不要)")
 
+    sp = sub.add_parser("project", help="プロジェクト固有設定 (preferred port 等) を表示 / 編集 (認証不要)")
+    project_sub = sp.add_subparsers(dest="project_command", required=True)
+    project_sub.add_parser("show", help="cwd 配下の ProjectSettings/LiminalPalette.json を表示")
+    sp_set = project_sub.add_parser("set-port", help="ProjectSettings/LiminalPalette.json に preferred port を書く")
+    sp_set.add_argument("port_value", type=int, metavar="PORT", help="ポート番号 (1-65535)")
+
     sp = sub.add_parser("commands", help="登録コマンドの一覧")
     sp.add_argument("--filter", help="path のプレフィックスで絞り込み (例: Player/)")
 
@@ -670,9 +815,12 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    # doctor は server に到達できなくても情報を出すので、discovery / 認証チェックを通さない。
+    # doctor / project はサーバー無しでもローカルファイルだけで動くので discovery / 認証を通さない。
     if args.command == "doctor":
         cmd_doctor(args)
+        return
+    if args.command == "project":
+        cmd_project(args)
         return
 
     token = _read_token(args.token)

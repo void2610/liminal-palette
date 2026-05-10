@@ -3,11 +3,13 @@
 LiminalPalette の HTTP API (`/api/v1/*`) を叩くシングルファイル CLI。
 
 - **依存ゼロ**: Python 3 標準ライブラリのみ。`chmod +x` だけで動く
-- **ポート自動発見 + キャッシュ**: 直近成功したポートを `~/.liminal-palette/ports.json` に覚え、次回はそこから試す。失敗時のみ `7610〜7615` を short timeout で probe
+- **プロジェクト固定ポート**: `ProjectSettings/LiminalPalette.json` (`{"port": 7613}`) を読み、Unity サーバ・lp 双方が最優先候補として使う。複数 Unity プロジェクトを同時起動する運用向け
+- **ポート自動発見 + キャッシュ**: preferred port が無くても直近成功ポートを `~/.liminal-palette/ports.json` に覚え、失敗時は `7610〜7615` を short timeout で probe
 - **複数プロジェクト対応**: cwd / `--project` / `$LP_PROJECT` でターゲットを指定でき、`/health` の `projectName` / `projectPath` で照合してポートを選ぶ
 - **トークン自動読込**: `~/.liminal-palette/token` を勝手に読む
 - **JSON モード**: `--json` で生 JSON が出るので `jq` と組み合わせ可能
-- **`lp doctor`**: トークン・cwd 検出・キャッシュ・生存ポートを一発で可視化
+- **`lp doctor`**: トークン・cwd 検出・preferred port・キャッシュ・生存ポートを一発で可視化
+- **`lp project`**: `lp project show` で設定確認、`lp project set-port N` で `ProjectSettings/LiminalPalette.json` を生成 / 更新
 
 ## インストール
 
@@ -64,7 +66,20 @@ lp run Battle/Repro/StairDescendingBack
 ## 複数プロジェクト同時起動
 
 同一マシンで複数の Unity Editor / Play Mode が走っていても、各インスタンスが固有のポートを取るので
-ターゲットを 1 つに決める必要がある。優先順位は次の通り:
+ターゲットを 1 つに決める必要がある。**推奨: 各プロジェクトに固定ポートを宣言する**:
+
+```bash
+# プロジェクト A の repo ルートで
+lp project set-port 7613   # → ProjectSettings/LiminalPalette.json に { "port": 7613 } を書く
+
+# プロジェクト B の repo ルートで
+lp project set-port 7620
+```
+
+これで Unity Editor は対応する preferred port にバインドし、`lp` は cwd から自動でそのポートを引く。
+ファイルは ProjectSettings 配下なので Git にコミットしてチームで共有可能。
+
+固定していない場合の解決優先順位:
 
 1. `--project NAME_OR_PATH`
 2. `$LP_PROJECT`
@@ -74,9 +89,16 @@ lp run Battle/Repro/StairDescendingBack
 2 つ以上ヒットした場合や、ターゲット未指定で複数プロジェクトが生きている場合はエラーで止めて生存中の
 ポート一覧を表示するので、`--project` を付けて再実行する。
 
-ポートはプロジェクト単位で `~/.liminal-palette/ports.json` にキャッシュされ、次回起動時はキャッシュ済みの
-ポートを最初に試すので普段は 1 リクエストで discovery が終わる。Unity 側が再起動して別ポートを取った場合は
-キャッシュ照合に失敗するので、自動で `7610〜7615` の probe にフォールバックする。
+### Discovery の挙動
+
+`lp` は次の順で probe する (`--port` / `--base-url` 明示時はそれを最優先):
+
+1. `ProjectSettings/LiminalPalette.json` の `port` (cwd / `--project` から判定) → その値と隣接 5 個 (HttpServer の port retry 範囲)
+2. `~/.liminal-palette/ports.json` キャッシュにヒットした候補
+3. デフォルト `7610〜7615`
+
+各 probe は short timeout (0.4s) で済むので、preferred port が立っていれば 1 リクエストで終わる。
+Unity 側が preferred port を取れず隣接にずれた場合 (port 競合) も 1 で拾える。
 
 ## Exit code
 

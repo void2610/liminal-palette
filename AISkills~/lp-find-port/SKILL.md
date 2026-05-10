@@ -64,7 +64,22 @@ lp --port 7611 health   # → Play Mode
 
 ## 複数 Unity プロジェクト同時起動
 
-別々のプロジェクト Editor が 2 つ以上立っている場合、`lp` は cwd を辿って `ProjectSettings/ProjectVersion.txt` を見つけるとそのプロジェクトをターゲット扱いする。明示的に切り替えるなら:
+**推奨セットアップ: プロジェクトごとに固定ポートを宣言**
+
+```bash
+# プロジェクト A で
+cd ~/dev/MyGame
+lp project set-port 7613   # → ProjectSettings/LiminalPalette.json を生成
+
+# プロジェクト B で
+cd ~/dev/Other
+lp project set-port 7620
+```
+
+`ProjectSettings/LiminalPalette.json` は Git にコミット可能。Unity Editor は次回起動時に
+そのポートにバインドし、`lp` は cwd から自動でそのポートを引く。`lp project show` で現在の設定を確認できる。
+
+**固定していない場合の指定手段** (優先順位順):
 
 ```bash
 # プロジェクト名で指定 (Application.productName と一致)
@@ -78,7 +93,8 @@ export LP_PROJECT=MyGame
 lp state
 ```
 
-ターゲット未指定で複数生存している場合、`lp` は曖昧として停止し生存中のポート + プロジェクト一覧を出すので、それを見て `--project` を付け直す。
+`lp` は cwd を辿って `ProjectSettings/ProjectVersion.txt` を見つけるとそのプロジェクトをターゲット扱いする。
+ターゲット未指定で複数生存している場合は曖昧として停止し、生存中のポート + プロジェクト一覧を出すので、それを見て `--project` を付け直す。
 
 `commandCount` を比較すると判別できる (Editor 側に Editor 限定 `[LiminalCommand]` が含まれるため通常 Editor の方が多い):
 

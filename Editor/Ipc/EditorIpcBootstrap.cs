@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using UnityEditor;
 using UnityEngine;
@@ -53,7 +54,16 @@ namespace Void2610.LiminalPalette.Editor.Ipc
 
             var token = TokenStore.LoadOrCreate();
             var router = new IpcRouter(new TokenAuthenticator(token));
-            router.Register("GET", "/api/v1/health", new HealthEndpoint("editor"));
+
+            // Application.productName / Application.dataPath はメインスレッド専用 API。
+            // bootstrap はメインスレッドで動くのでここで取り、HealthEndpoint に渡しておく
+            // (HTTP ワーカースレッドから直接読むと "can only be called from the main thread" で 500 になる)。
+            var projectName = Application.productName ?? "";
+            var dataPath = Application.dataPath;
+            var projectPath = string.IsNullOrEmpty(dataPath)
+                ? ""
+                : (Path.GetDirectoryName(dataPath) ?? "");
+            router.Register("GET", "/api/v1/health", new HealthEndpoint("editor", projectName, projectPath));
             router.Register("GET", "/api/v1/commands", new ListCommandsEndpoint());
             router.Register("POST", "/api/v1/execute", new ExecuteCommandEndpoint());
             router.Register("GET", "/api/v1/logs", new ListLogsEndpoint());

@@ -33,7 +33,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         [Test]
         public async Task Health_ReturnsOkAndCommandCount()
         {
-            var ep = new HealthEndpoint("editor");
+            var ep = new HealthEndpoint("editor", "TestProject", "/tmp/TestProject");
             var res = await ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
             Assert.AreEqual(200, res.StatusCode);
             StringAssert.Contains("\"status\":\"ok\"", res.Body);
@@ -41,25 +41,56 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         }
 
         [Test]
-        public async Task Health_ReturnsProjectIdentity()
+        public async Task Health_ReturnsProjectIdentityFromConstructor()
         {
-            // 複数 Unity プロジェクト同時起動時に lp CLI が紐付け判定に使う 2 フィールド。
-            var ep = new HealthEndpoint("editor");
+            // bootstrap (メインスレッド) で取得した projectName / projectPath を
+            // そのまま JSON に書き出す。HTTP ワーカースレッドから Unity API を呼ばないため。
+            var ep = new HealthEndpoint("editor", "MyGame", "/Users/me/dev/MyGame");
             var res = await ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
             Assert.AreEqual(200, res.StatusCode);
-            StringAssert.Contains("\"projectName\":", res.Body);
-            StringAssert.Contains("\"projectPath\":", res.Body);
+            StringAssert.Contains("\"projectName\":\"MyGame\"", res.Body);
+            StringAssert.Contains("\"projectPath\":\"/Users/me/dev/MyGame\"", res.Body);
+        }
+
+        [Test]
+        public async Task Health_DoesNotTouchUnityApiOnWorkerThread()
+        {
+            // Application.productName 等を内部で呼ばずに、ctor の値だけで応答することを保証する。
+            // 実装が main-thread 限定 API を呼ぶようになると、ここで例外が立ち上がる想定。
+            var ep = new HealthEndpoint("editor", "", "");
+            var done = new System.Threading.ManualResetEventSlim();
+            System.Exception captured = null;
+            string body = null;
+            int status = 0;
+            var t = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    var res = ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None)
+                        .GetAwaiter().GetResult();
+                    status = res.StatusCode;
+                    body = res.Body;
+                }
+                catch (System.Exception ex) { captured = ex; }
+                finally { done.Set(); }
+            });
+            t.IsBackground = true;
+            t.Start();
+            Assert.IsTrue(done.Wait(System.TimeSpan.FromSeconds(2)), "HandleAsync did not complete");
+            Assert.IsNull(captured, $"HandleAsync threw on worker thread: {captured}");
+            Assert.AreEqual(200, status);
+            StringAssert.Contains("\"status\":\"ok\"", body);
         }
 
         [Test]
         public async Task Health_IncludesModeFromConstructor()
         {
             // 同一プロジェクト内で Editor / Runtime を区別するために mode を返す。
-            var editor = new HealthEndpoint("editor");
+            var editor = new HealthEndpoint("editor", "P", "/p");
             var editorRes = await editor.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
             StringAssert.Contains("\"mode\":\"editor\"", editorRes.Body);
 
-            var runtime = new HealthEndpoint("runtime");
+            var runtime = new HealthEndpoint("runtime", "P", "/p");
             var runtimeRes = await runtime.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
             StringAssert.Contains("\"mode\":\"runtime\"", runtimeRes.Body);
         }
@@ -67,7 +98,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         [Test]
         public void Health_DoesNotRequireAuth()
         {
-            Assert.IsFalse(new HealthEndpoint("editor").RequiresAuth);
+            Assert.IsFalse(new HealthEndpoint("editor", "", "").RequiresAuth);
         }
 
         // ---------- ListCommandsEndpoint ----------

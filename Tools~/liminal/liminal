@@ -798,7 +798,23 @@ def _project_unset_port(args):
         print(_dim(f"  (no {cfg_path.name} — 何もしません)"))
         return
     field = "runtimePort" if getattr(args, "runtime", False) else "port"
-    data = _read_project_config(cfg_path)
+    # unset は破壊的操作なので _read_project_config の lenient ({} fallback) は使わず、
+    # JSON パース失敗を致命エラーとして可視化する (lenient だと「フィールドは元々無い」と誤認させる)。
+    try:
+        raw = cfg_path.read_text(encoding="utf-8")
+    except OSError as e:
+        raise SystemExit(_red(f"read error: {cfg_path}: {e}"))
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise SystemExit(_red(
+            f"parse error: {cfg_path}: {e}\n"
+            "  → ファイルを手動修正するか削除してから再実行してください。"
+        ))
+    if not isinstance(data, dict):
+        raise SystemExit(_red(
+            f"{cfg_path}: 想定形式 (JSON object) ではありません。手動修正してください。"
+        ))
     if field not in data:
         print(_dim(f"  {field} は元々設定されていません"))
         return
@@ -853,7 +869,9 @@ def cmd_init(args):
     schema_was_missing = isinstance(existing, dict) and "$schema" not in existing
     file_existed = cfg_path.is_file()
 
-    if updates or (file_existed and schema_was_missing):
+    # フラグ無しの init は read-only に保つ (副作用ゼロを保証)。$schema が無くても自動注入はせず、
+    # 必要ならヒントだけ出して set-port / init --port での明示的書き込みに任せる。
+    if updates:
         try:
             written = _write_project_config(cfg_path, existing, updates)
         except OSError as e:
@@ -862,8 +880,6 @@ def cmd_init(args):
             print(f"  {_green('set')}      {k} = {v}")
         if schema_was_missing:
             print(_dim("  $schema reference を追加 (IDE autocomplete 用)"))
-        if not updates:
-            print(_dim("  (port/runtimePort は変更なし)"))
         existing = written  # 以降の表示で最新状態を使う
     else:
         if file_existed:
@@ -871,6 +887,12 @@ def cmd_init(args):
             rt = existing.get("runtimePort")
             print(f"  port     : {_cyan(str(ed)) if isinstance(ed, int) else _dim('(unset)')}")
             print(f"  runtimePort: {_cyan(str(rt)) if isinstance(rt, int) else _dim('(unset, falls back to port)')}")
+            if schema_was_missing:
+                hint_port = ed if isinstance(ed, int) else 7613
+                print(_yellow(
+                    f"  $schema reference 無し → IDE 補完を有効にするには "
+                    f"`liminal init --port {hint_port}` で再書き込みしてください"
+                ))
         else:
             print(_dim("  (no config file — fixed port が要らないなら省略可。設定するなら --port / --runtime-port)"))
 
@@ -926,11 +948,25 @@ def cmd_init(args):
     print(_dim("  Unity Editor で Tools > LiminalPalette > Install AI Skills... を実行するとコピーされます"))
 
     # 6) Live probe (このプロジェクト宛にサーバが立っているか)
+    # _build_candidate_ports に full cache を渡すと他プロジェクト分の port も probe してしまうので、
+    # ここでは preferred + 当該プロジェクトの cached port + DEFAULT_PORTS だけを候補にする。
     print(f"\n{_bold('Live check')}")
     found = None
     cache = _load_cache()
     preferred = _read_preferred_ports(project_path)
-    for p in _build_candidate_ports(None, preferred, None, cache):
+    probe_ports: list[int] = []
+    for seed in (preferred.get("editor"), preferred.get("runtime")):
+        if isinstance(seed, int):
+            for p in range(seed, seed + 6):
+                if 1 <= p <= 65535 and p not in probe_ports:
+                    probe_ports.append(p)
+    for p in _find_cached_ports(cache, project_path, project_path, None):
+        if p not in probe_ports:
+            probe_ports.append(p)
+    for p in DEFAULT_PORTS:
+        if p not in probe_ports:
+            probe_ports.append(p)
+    for p in probe_ports:
         info = _probe_port(p)
         if info and _matches_project(info, project_path):
             found = (p, info)

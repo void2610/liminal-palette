@@ -346,14 +346,13 @@ def _find_cached_ports(cache: dict, target: str | None, target_path: str | None,
     return out
 
 
-def _build_candidate_ports(port: int | None, preferred: dict, mode: str | None) -> list[int]:
+def _build_candidate_ports(port: int | None, preferred: dict, mode: str | None,
+                           cache: dict | None = None) -> list[int]:
     """probe するポート順序を決める。
     --port 明示 → 1 個だけ。
     そうでなければ:
-      mode='editor'   : preferred.editor → DEFAULT_PORTS
-      mode='runtime'  : preferred.runtime → preferred.editor (fallback) → DEFAULT_PORTS
-      mode=None (any) : preferred.editor → preferred.runtime → DEFAULT_PORTS
-    各 preferred 値は preferred..preferred+5 まで隣接展開する (HttpServer の port retry 範囲)。
+      preferred (mode 別シード) と隣接 5 個 → cache 既知ポート (mode フィルタ済) → DEFAULT_PORTS。
+    cache を混ぜることで target 未指定 (cwd 検出失敗時等) でも過去成功ポートを優先できる。
     """
     if port is not None:
         return [port]
@@ -376,6 +375,11 @@ def _build_candidate_ports(port: int | None, preferred: dict, mode: str | None) 
         for p in range(seed, seed + 6):
             if 1 <= p <= 65535 and p not in out:
                 out.append(p)
+    if cache is not None:
+        modes_wanted = (mode,) if mode in KNOWN_MODES else KNOWN_MODES
+        for _, _, m, p in _cache_iter_entries(cache):
+            if m in modes_wanted and p not in out:
+                out.append(p)
     for p in DEFAULT_PORTS:
         if p not in out:
             out.append(p)
@@ -394,7 +398,7 @@ def _discover_base_url(
     target, target_path = _resolve_target(project)
     preferred = _read_preferred_ports(target_path)
     cache = _load_cache()
-    candidate_ports = _build_candidate_ports(port, preferred, mode)
+    candidate_ports = _build_candidate_ports(port, preferred, mode, cache)
 
     # 1) ターゲット指定 + キャッシュヒット時はそのポートを最優先で試す。
     #    mode 指定時は同じ mode の cache のみ使う。
@@ -451,8 +455,18 @@ def _discover_base_url(
         ))
 
     if len(matching) > 1:
-        # 同一プロジェクト内で editor + runtime 両方生存している等
-        hint = "--port" if target else "--project / --mode"
+        # 一致内容を見て適切なヒントを出す:
+        # - 同一 projectPath で mode だけ違う → --mode
+        # - 別プロジェクト同士 → --project
+        # - それ以外 (同一 project + 同一 mode で複数 port = 異常) → --port
+        paths = {i.get("projectPath") for _, i in matching if i.get("projectPath")}
+        modes = {i.get("mode") for _, i in matching if i.get("mode")}
+        if len(paths) <= 1 and len(modes) > 1:
+            hint = "--mode editor|runtime"
+        elif len(paths) > 1:
+            hint = "--project (または --mode)"
+        else:
+            hint = "--port"
         raise SystemExit(_red(
             f"複数のサーバーが一致しました。{hint} で 1 つに絞ってください:\n"
             f"{_format_alive(matching)}"
@@ -568,7 +582,7 @@ def cmd_doctor(args):
             print(f"    port {port:>5}  [{mode:<7}] {disp_name.ljust(name_w)}  {_dim(path)}")
 
     # 4) Live probe — preferred のレンジ + cache 内の port + DEFAULT_PORTS をユニーク順序で probe。
-    probe_ports = _build_candidate_ports(None, preferred, getattr(args, "mode", None))
+    probe_ports = _build_candidate_ports(None, preferred, getattr(args, "mode", None), cache)
     for _, _, _, cport in rows:
         if cport not in probe_ports:
             probe_ports.append(cport)
@@ -722,14 +736,21 @@ def _project_set_port(args):
     data: dict = {}
     if cfg_path.is_file():
         try:
-            existing = json.loads(cfg_path.read_text(encoding="utf-8"))
+            existing_raw = cfg_path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise SystemExit(_red(f"read error: {cfg_path}: {e}"))
+        try:
+            existing = json.loads(existing_raw)
             if isinstance(existing, dict):
                 data = existing
         except json.JSONDecodeError:
             print(_yellow(f"warning: {cfg_path} の JSON パースに失敗。上書きします。"))
     data[field] = port
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
-    cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except OSError as e:
+        raise SystemExit(_red(f"write error: {cfg_path}: {e}"))
     print(f"{_green('wrote')}  {cfg_path}")
     print(f"  {field} = {port}")
     if field == "port":
@@ -746,21 +767,28 @@ def _project_unset_port(args):
         return
     field = "runtimePort" if getattr(args, "runtime", False) else "port"
     try:
-        data = json.loads(cfg_path.read_text(encoding="utf-8"))
+        raw = cfg_path.read_text(encoding="utf-8")
+    except OSError as e:
+        raise SystemExit(_red(f"read error: {cfg_path}: {e}"))
+    try:
+        data = json.loads(raw)
     except json.JSONDecodeError as e:
         raise SystemExit(_red(f"parse error: {e}"))
     if not isinstance(data, dict) or field not in data:
         print(_dim(f"  {field} は元々設定されていません"))
         return
     data.pop(field, None)
-    if not data:
-        # 全フィールド消えたらファイルごと削除 (空ファイルを残さない)
-        cfg_path.unlink()
-        print(f"{_green('removed')}  {cfg_path} (全フィールド消えたためファイルごと削除)")
-    else:
-        cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        print(f"{_green('updated')}  {cfg_path}")
-        print(f"  {field} を削除")
+    try:
+        if not data:
+            # 全フィールド消えたらファイルごと削除 (空ファイルを残さない)
+            cfg_path.unlink()
+            print(f"{_green('removed')}  {cfg_path} (全フィールド消えたためファイルごと削除)")
+        else:
+            cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            print(f"{_green('updated')}  {cfg_path}")
+            print(f"  {field} を削除")
+    except OSError as e:
+        raise SystemExit(_red(f"write error: {cfg_path}: {e}"))
 
 
 def cmd_commands(args, base_url, token):

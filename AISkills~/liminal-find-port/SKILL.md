@@ -28,6 +28,7 @@ liminal health
 ```
 ok  http://127.0.0.1:7610
   version       : 0.4.0
+  mode          : editor
   projectName   : MyGame
   projectPath   : /Users/me/dev/MyGame
   commandCount  : 395

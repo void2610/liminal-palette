@@ -7,7 +7,7 @@ allowed-tools: Bash(lp *), Bash(jq *), Bash(cat *), Read
 
 # lp-run-scenario
 
-LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行 / 待機 / 状態 assert) を 1 リクエストで順次実行する。**named** (事前宣言済み `[ConsoleScenario]` を path 指定) と **ad-hoc** (CLI 側でステップ列を組み立てて `--steps` で渡す) の 2 経路。
+LiminalPalette のシナリオ機能で、複数ステップ (コマンド実行 / 待機 / 状態 assert) を 1 リクエストで順次実行する。**named** (事前宣言済み `[LiminalScenario]` を path 指定) と **ad-hoc** (CLI 側でステップ列を組み立てて `--steps` で渡す) の 2 経路。
 
 シナリオは **fail-fast** (最初の失敗で打ち切り) + **1 並列 (排他)** で実行される。詳細な内部仕様は [references/step-types.md](references/step-types.md)。
 
@@ -34,10 +34,10 @@ lp run --steps path/to/steps.json
 
 | `type` | 必須フィールド | 用途 |
 |---|---|---|
-| `command` | `path` (string), `args` (object) | `[ConsoleCommand]` を実行。`args` は `lp exec` と同じ string 化規則 |
+| `command` | `path` (string), `args` (object) | `[LiminalCommand]` を実行。`args` は `lp exec` と同じ string 化規則 |
 | `wait_seconds` | `seconds` (number) | 実時間で待機 |
 | `wait_frames` | `frames` (integer) | フレーム数で待機 |
-| `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `[ConsoleObservableField]` の現在値が `expected` と一致するか |
+| `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `[LiminalObservableField]` の現在値が `expected` と一致するか |
 | `assert_not_equals` | `path` (string), `expected` | 上記の否定 |
 
 各ステップに任意の `description` フィールドを足せる (結果 JSON に出る)。詳細仕様 (`expected` の型解決 / 失敗時の挙動 / フィールド一覧) は [references/step-types.md](references/step-types.md)。
@@ -180,12 +180,12 @@ LP は **`SemaphoreSlim(1, 1)` で 1 並列に絞っている**。実行中に�
 
 | ケース | 推奨 |
 |---|---|
-| 同じ手順を何度も再現する / リポジトリで共有する | named (`[ConsoleScenario]` で C# 宣言) |
+| 同じ手順を何度も再現する / リポジトリで共有する | named (`[LiminalScenario]` で C# 宣言) |
 | その場限りの統合テスト / 探索的検証 | ad-hoc (`lp run --steps -`) |
 | AI Agent が状況に応じて動的にステップ列を組む | ad-hoc |
 | CI で固定シナリオを回す | named |
 
-### Assert 対象は `[ConsoleObservableField]` のみ
+### Assert 対象は `[LiminalObservableField]` のみ
 
 直前 `command` ステップの戻り値に対する assert はできない (LP の設計判断、暗黙の "前ステップ" を排除するため)。「Command 経由で副作用 → ObservableField で観測される値を assert」のスタイルに統一。
 
@@ -223,7 +223,7 @@ HTTP 経由は JSON 往復で型が落ちるため、`assert_equals` の `expect
 - `/lp-list-scenarios` — named 実行用の path 発見
 - `/lp-list-commands` — ad-hoc の `command` ステップで使う path 発見
 - `/lp-execute` — 単発実行 (シナリオ化するほどでもない場合)
-- `/lp-get-state` — assert 対象の `[ConsoleObservableField]` の現在値確認
+- `/lp-get-state` — assert 対象の `[LiminalObservableField]` の現在値確認
 - references: [step-types.md](references/step-types.md) — 5 ステップ種別の完全仕様
 - examples:
   - [named.md](examples/named.md) — named シナリオ運用 + CI 連携

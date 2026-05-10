@@ -106,11 +106,11 @@ public class GameLifetimeScope : LifetimeScope
 
 ### Q. Current values に何も出ない (セクション自体が消えている)
 
-**A**: 選択コマンドの Path prefix と一致する `[ConsoleObservableField]` がレジストリに無い。
+**A**: 選択コマンドの Path prefix と一致する `[LiminalObservableField]` がレジストリに無い。
 
 確認:
-- `[ConsoleObservableField("Player/Health")]` と `[ConsoleCommand("Player/Health/Set")]` のように prefix を揃える
-- `[ConsoleObservableField]` を付けたメンバーが `public` で `ReactiveProperty<T>` または `Observable<T>` を返すか
+- `[LiminalObservableField("Player/Health")]` と `[LiminalCommand("Player/Health/Set")]` のように prefix を揃える
+- `[LiminalObservableField]` を付けたメンバーが `public` で `ReactiveProperty<T>` または `Observable<T>` を返すか
 - `Bootstrap.Initialize` 後に `ObservableFieldRegistry.Default.All` をデバッグ出力して登録されているか確認
 
 ```csharp
@@ -134,7 +134,7 @@ foreach (var f in ObservableFieldRegistry.Default.All)
 
 **A**: いくつか原因が考えられる:
 
-1. **`public` でない**: `[ConsoleScenario]` は public メソッドのみ対応
+1. **`public` でない**: `[LiminalScenario]` は public メソッドのみ対応
 2. **メソッドが引数を取っている**: 引数なしが必須 (Scanner が弾いて警告ログ)
 3. **戻り値が `IEnumerable<ScenarioStep>` でない**: `IList<ScenarioStep>` / `ScenarioStep[]` でも可
 4. **`Path` が空文字 / 末尾 `/`**: Scanner が例外で弾く
@@ -149,7 +149,7 @@ foreach (var s in ScenarioRegistry.Default.All)
 
 ### Q. シナリオ Run で 「ObservableField not found」
 
-**A**: Assert 対象の Path が `[ConsoleObservableField]` で登録されていない。typo / public 漏れ / VContainer 未登録のいずれか。詳細は [scenarios.md](scenarios.md) のトラブルシューティング章。
+**A**: Assert 対象の Path が `[LiminalObservableField]` で登録されていない。typo / public 漏れ / VContainer 未登録のいずれか。詳細は [scenarios.md](scenarios.md) のトラブルシューティング章。
 
 ### Q. 「Scenario already running」になる (HTTP 409 Conflict)
 
@@ -359,10 +359,10 @@ UI / Editor / Player.InputSystem / Player.Ipc は `autoReferenced: false` また
 
 | 項目 | 制約 |
 |---|---|
-| `[ConsoleCommand]` のメソッド | `public static` または `public instance method`。インスタンスは VContainer の `IObjectResolver.Resolve(type)` で解決される。VContainer に未登録の型は実行時に「Instance not resolved」エラーで Fail |
+| `[LiminalCommand]` のメソッド | `public static` または `public instance method`。インスタンスは VContainer の `IObjectResolver.Resolve(type)` で解決される。VContainer に未登録の型は実行時に「Instance not resolved」エラーで Fail |
 | 必須依存 | R3 + VContainer の両方が必須 (Phase 5a 以降)。両方未導入のプロジェクトでは Core asmdef がコンパイルできない |
 | 複数インスタンス | `IObjectResolver.Resolve(typeof(T))` は単一インスタンスを返す前提。`Player[0]` / `Player[1]` のような区別はサポート外 |
-| `[ConsoleObservableField]` の値型 | `ReactiveProperty<T>` (推奨) / `Observable<T>`。後者は subscribe 後に値が来るまで `(no value)` 表示 |
+| `[LiminalObservableField]` の値型 | `ReactiveProperty<T>` (推奨) / `Observable<T>`。後者は subscribe 後に値が来るまで `(no value)` 表示 |
 | `LogCapture` | 並列実行で混線する可能性 (1 ホスト 1 コマンドが前提) |
 | `Time.timeScale` | パレット表示中もゲーム時間は進む。ポーズが必要なら利用側で `OnEngage` / `OnDisengage` 購読 |
 | `PaletteInputBlocker` | `Update()` で `Input.GetKey` を直接読むコードは止められない (ベストエフォート) |

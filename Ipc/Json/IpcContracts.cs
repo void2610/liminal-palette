@@ -81,7 +81,7 @@ namespace Void2610.LiminalPalette.Ipc.Json
                 for (var i = 0; i < p.Choices.Count; i++) w.WriteString(p.Choices[i]);
                 w.EndArray();
             }
-            // Min / Max は ConsoleParam.Min/Max 由来。float.NaN は「未指定」の Sentinel なので
+            // Min / Max は LiminalParam.Min/Max 由来。float.NaN は「未指定」の Sentinel なので
             // JSON null を出力する (NaN は JSON 標準で表現できないため代替)。
             if (float.IsNaN(p.Min)) w.WriteNull("min");
             else w.WriteNumber("min", p.Min);

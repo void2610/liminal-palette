@@ -7,7 +7,7 @@ allowed-tools: Bash(lp *), Bash(jq *), Read
 
 # lp-overview
 
-LiminalPalette (LP) は Unity プロジェクトに `[ConsoleCommand]` で登録された C# メソッドを HTTP API 経由で実行できるライブラリ。AI Agent (Claude Code 等) が Editor / Play Mode を CLI で自動操作することを主用途とする。
+LiminalPalette (LP) は Unity プロジェクトに `[LiminalCommand]` で登録された C# メソッドを HTTP API 経由で実行できるライブラリ。AI Agent (Claude Code 等) が Editor / Play Mode を CLI で自動操作することを主用途とする。
 
 このスキルは LP を使う **最初の入り口**。専用 CLI `lp` 経由で叩く前提で、他 7 個の `lp-*` スキルへの索引と運用ルールを提供する。
 
@@ -100,7 +100,7 @@ lp state --json | jq '.fields[] | select(.value != null)'
 |---|---|---|
 | Unity Editor 自体の操作 (asset 作成, scene 編集) | `uloop-*` | Editor SDK へのフルアクセス |
 | Game View スクリーンショット | `uloop-screenshot` | LP に対応 endpoint なし |
-| 利用側プロジェクトに `[ConsoleCommand]` で公開された **ゲームロジック** | `lp-*` | プロジェクトコードへの最短パス |
+| 利用側プロジェクトに `[LiminalCommand]` で公開された **ゲームロジック** | `lp-*` | プロジェクトコードへの最短パス |
 | ゲーム内 reactive 状態 (`ReactiveProperty<T>`) を読む | `lp-get-state` | Observable 専用の endpoint |
 | spawn → wait → assert の連鎖 (統合テスト) | `lp-run-scenario` ad-hoc | fail-fast + 1 リクエストで完結 |
 

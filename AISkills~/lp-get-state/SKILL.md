@@ -1,13 +1,13 @@
 ---
 name: lp-get-state
-description: 'Read current values of [ConsoleObservableField] reactive snapshots (HP, mana, count, position, ...) via `lp state`. Use to observe game state before/after lp-execute calls, iterate all reactive fields, or detect VContainer instance resolution failures via instanceResolved=false.'
+description: 'Read current values of [LiminalObservableField] reactive snapshots (HP, mana, count, position, ...) via `lp state`. Use to observe game state before/after lp-execute calls, iterate all reactive fields, or detect VContainer instance resolution failures via instanceResolved=false.'
 when_to_use: 'Trigger phrases: "現在のHP", "Player の状態", "観測する", "値を読む", "ReactiveProperty の現在値", "what''s the current X", "read state", "before/after check".'
 allowed-tools: Bash(lp *), Bash(jq *)
 ---
 
 # lp-get-state
 
-`[ConsoleObservableField]` で公開された `ReactiveProperty<T>` / `IReadOnlyReactiveProperty<T>` の現在値スナップショットを `lp state` で取得する。AI Agent が「現在の状態を観測してから次のコマンドを決める」用途、および `lp exec` の前後検証で使う。
+`[LiminalObservableField]` で公開された `ReactiveProperty<T>` / `IReadOnlyReactiveProperty<T>` の現在値スナップショットを `lp state` で取得する。AI Agent が「現在の状態を観測してから次のコマンドを決める」用途、および `lp exec` の前後検証で使う。
 
 ---
 
@@ -100,7 +100,7 @@ fi
 
 | フィールド | 説明 |
 |---|---|
-| `path` | `[ConsoleObservableField("...")]` で指定された path |
+| `path` | `[LiminalObservableField("...")]` で指定された path |
 | `value` | `ReactiveProperty.Value` を `TypeConverterRegistry.ToDisplayString` で string 化 |
 | `type` | T の `Type.Name` |
 
@@ -161,12 +161,12 @@ EOF
 
 ## 物理 / アニメ / Rigidbody のタイミング問題
 
-`[ConsoleCommand]` 内で `ReactiveProperty.Value = X` した直後に `lp state` を叩けば**新値が読める** (R3 は同期更新)。
+`[LiminalCommand]` 内で `ReactiveProperty.Value = X` した直後に `lp state` を叩けば**新値が読める** (R3 は同期更新)。
 
 ただし「物理 / アニメ / Rigidbody 経由で間接的に変わる」状態は `Update` を 1 フレーム待つ必要がある:
 
 ```csharp
-[ConsoleCommand("Player/Position/Teleport")]
+[LiminalCommand("Player/Position/Teleport")]
 public void Teleport(Vector2 pos) {
     _rb.MovePosition(pos);  // Rigidbody 経由 → 1 frame 待たないと反映されない
 }
@@ -190,7 +190,7 @@ EOF
 ### `Observable<T>` 単体は使えない
 
 ```csharp
-[ConsoleObservableField("Player/HitStream")]
+[LiminalObservableField("Player/HitStream")]
 public Observable<int> HitStream { get; }   // ← lp state では常に null
 ```
 
@@ -238,4 +238,4 @@ lp --port 7611 state --json | jq '.fields[] | select(.value != null)'
 - `/lp-execute` — 状態を変える
 - `/lp-run-scenario` — execute + assert_equals を 1 リクエストに
 - examples: [verify-patterns.md](examples/verify-patterns.md) — bash での検証パターン集
-- LP 本体: `Documentation~/commands.md` の `[ConsoleObservableField]` セクション
+- LP 本体: `Documentation~/commands.md` の `[LiminalObservableField]` セクション

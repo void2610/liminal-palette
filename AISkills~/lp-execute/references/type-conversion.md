@@ -220,11 +220,11 @@ public enum Permission { None = 0, Read = 1, Write = 2, Execute = 4 }
 
 ### 推奨パターン
 
-CLI / HTTP から `UnityEngine.Object` 引数を送るのは難しい。**利用側で「名前で解決して内部で UnityEngine.Object に変換するファサードコマンド」を `[ConsoleCommand]` で書く** のが筋:
+CLI / HTTP から `UnityEngine.Object` 引数を送るのは難しい。**利用側で「名前で解決して内部で UnityEngine.Object に変換するファサードコマンド」を `[LiminalCommand]` で書く** のが筋:
 
 ```csharp
 // 利用側コード
-[ConsoleCommand("Player/Equip")]
+[LiminalCommand("Player/Equip")]
 public void Equip(string itemName) {
     var item = ItemDatabase.Find(itemName);
     if (item == null) throw new ArgumentException($"Item not found: {itemName}");

@@ -32,7 +32,7 @@ namespace Void2610.LiminalPalette.UI
         private Label _bottomCmd;
         private Label _bottomStatus;
         private VisualElement _argumentPanel;
-        // Phase 5a: 選択コマンドの prefix と一致する [ConsoleObservableField] を表示するセクション。
+        // Phase 5a: 選択コマンドの prefix と一致する [LiminalObservableField] を表示するセクション。
         private ObservableFieldsView _observableFields;
         private Button _runButton;
         private ResultView _resultView;
@@ -758,7 +758,7 @@ namespace Void2610.LiminalPalette.UI
         }
 
         // "Current" 列の値:
-        //   1) コマンドの親階層 (= Path の最後の "/" 前) prefix に紐づく [ConsoleObservableField] が
+        //   1) コマンドの親階層 (= Path の最後の "/" 前) prefix に紐づく [LiminalObservableField] が
         //      あればその現在値を表示。値変化は RebuildListFieldSubscriptions の Subscribe で
         //      RefreshItems() に流れ、行が再描画される。
         //   2) ObservableField が無いコマンドは従来通り「第 1 引数の DefaultValue」を表示。

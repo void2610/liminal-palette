@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
-    /// 全 Assembly をスキャンし、[ConsoleScenario] を付与したメソッドを ScenarioDescriptor に変換する。
+    /// 全 Assembly をスキャンし、[LiminalScenario] を付与したメソッドを ScenarioDescriptor に変換する。
     /// 起動時に Bootstrap から 1 回だけ呼ばれる想定。
     ///
     /// 受け入れる戻り値型:
@@ -101,10 +101,10 @@ namespace Void2610.LiminalPalette
                     for (var mi = 0; mi < methods.Length; mi++)
                     {
                         var method = methods[mi];
-                        ConsoleScenarioAttribute attr;
+                        LiminalScenarioAttribute attr;
                         try
                         {
-                            attr = method.GetCustomAttribute<ConsoleScenarioAttribute>();
+                            attr = method.GetCustomAttribute<LiminalScenarioAttribute>();
                         }
                         catch
                         {
@@ -128,7 +128,7 @@ namespace Void2610.LiminalPalette
         /// <summary>MethodInfo + 属性から ScenarioDescriptor を構築する。テスト用に公開。</summary>
         public static bool TryBuildDescriptor(
             MethodInfo method,
-            ConsoleScenarioAttribute attr,
+            LiminalScenarioAttribute attr,
             out ScenarioDescriptor descriptor,
             out string error)
         {

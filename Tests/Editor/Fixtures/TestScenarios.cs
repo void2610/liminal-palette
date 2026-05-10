@@ -3,31 +3,31 @@ using System.Collections.Generic;
 namespace Void2610.LiminalPalette.Tests
 {
     /// <summary>
-    /// 各テストから参照する [ConsoleScenario] 付き static メソッド群。
+    /// 各テストから参照する [LiminalScenario] 付き static メソッド群。
     /// パスは "TestScenario/..." で始め、製品コードのシナリオと衝突しないようにしている。
     /// </summary>
     internal static class TestScenarios
     {
-        [ConsoleScenario("TestScenario/Empty", Description = "no-op scenario")]
+        [LiminalScenario("TestScenario/Empty", Description = "no-op scenario")]
         public static IEnumerable<ScenarioStep> Empty()
         {
             yield break;
         }
 
-        [ConsoleScenario("TestScenario/SingleCommand")]
+        [LiminalScenario("TestScenario/SingleCommand")]
         public static IEnumerable<ScenarioStep> SingleCommand()
         {
             yield return ScenarioStep.Run("Test/NoArg");
         }
 
-        [ConsoleScenario("TestScenario/CommandThenWait")]
+        [LiminalScenario("TestScenario/CommandThenWait")]
         public static IEnumerable<ScenarioStep> CommandThenWait()
         {
             yield return ScenarioStep.Run("Test/NoArg");
             yield return ScenarioStep.WaitFrames(0);
         }
 
-        [ConsoleScenario("TestScenario/FailingCommand")]
+        [LiminalScenario("TestScenario/FailingCommand")]
         public static IEnumerable<ScenarioStep> FailingCommand()
         {
             // Throws コマンドは InvalidOperationException を投げるので CommandResult.Success=false。
@@ -39,7 +39,7 @@ namespace Void2610.LiminalPalette.Tests
 
     // 不正なシグネチャの「シナリオもどき」メソッド。
     //
-    // [ConsoleScenario] を直接付けると Bootstrap の ScanAll が起動毎に拾って
+    // [LiminalScenario] を直接付けると Bootstrap の ScanAll が起動毎に拾って
     // 「Skipping invalid scenario...」警告を吐き続けるので、属性は付けず
     // ScannerTests 側で TryBuildDescriptor に手で属性インスタンスを渡して検証する。
     internal static class InvalidScenarioShapes

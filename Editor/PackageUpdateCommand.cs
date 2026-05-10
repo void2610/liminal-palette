@@ -20,7 +20,7 @@ namespace Void2610.LiminalPalette.Editor
 
         // Path prefix "Editor/" が予約済みで CommandDescriptor.IsEditorOnly が自動 true になるため、
         // Play Mode / Player ビルドのランタイムパレットからは表示されない (Editor Window のみ)。
-        [ConsoleCommand("Editor/Package/Update LiminalPalette",
+        [LiminalCommand("Editor/Package/Update LiminalPalette",
             Description = "LiminalPalette を git の最新コミットに再フェッチし packages-lock.json を更新")]
         public static void Update()
         {

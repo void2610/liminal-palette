@@ -1,6 +1,6 @@
 # Named Scenario — 運用例
 
-事前に C# で `[ConsoleScenario]` を宣言したシナリオを `lp run` から実行するパターン。**CI / 開発者間で共有する固定テスト**に向く。
+事前に C# で `[LiminalScenario]` を宣言したシナリオを `lp run` から実行するパターン。**CI / 開発者間で共有する固定テスト**に向く。
 
 ## 1. C# 側の宣言例 (利用側プロジェクト)
 
@@ -10,7 +10,7 @@ using Void2610.LiminalPalette;
 
 public static class CombatScenarios
 {
-    [ConsoleScenario("Combat/EnemyTakesDamage", Description = "敵にダメージを与えて HP が減ることを検証")]
+    [LiminalScenario("Combat/EnemyTakesDamage", Description = "敵にダメージを与えて HP が減ることを検証")]
     public static IEnumerable<ScenarioStep> EnemyTakesDamage()
     {
         yield return ScenarioStep.Run("Enemy/Spawn", new() { ["type"] = "Goblin" });
@@ -38,7 +38,7 @@ public sealed class CombatScenarios
     private readonly EnemySpawner _spawner;
     public CombatScenarios(EnemySpawner spawner) { _spawner = spawner; }
 
-    [ConsoleScenario("Combat/EnemyTakesDamage")]
+    [LiminalScenario("Combat/EnemyTakesDamage")]
     public IEnumerable<ScenarioStep> EnemyTakesDamage()
     {
         yield return ScenarioStep.Run("Enemy/Spawn", new() { ["type"] = _spawner.DefaultType });

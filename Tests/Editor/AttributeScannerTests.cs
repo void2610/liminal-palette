@@ -14,7 +14,7 @@ namespace Void2610.LiminalPalette.Tests
             var commands = AttributeScanner.Scan(new[] { asm });
 
             // TestCommands に定義した 6 件が見つかること。
-            // 他の本番コードに [ConsoleCommand] が将来増えても、このアセンブリ単体スキャンには影響しない。
+            // 他の本番コードに [LiminalCommand] が将来増えても、このアセンブリ単体スキャンには影響しない。
             var paths = commands.Select(c => c.Path).ToHashSet();
             Assert.IsTrue(paths.Contains("Test/NoArg"), "Test/NoArg should be detected");
             Assert.IsTrue(paths.Contains("Test/Int"), "Test/Int should be detected");
@@ -73,7 +73,7 @@ namespace Void2610.LiminalPalette.Tests
         public void TryBuildDescriptor_RejectsEmptyPath()
         {
             var method = typeof(TestCommands).GetMethod(nameof(TestCommands.NoArg), BindingFlags.Public | BindingFlags.Static);
-            var ok = AttributeScanner.TryBuildDescriptor(method, new ConsoleCommandAttribute(""), out _, out var err);
+            var ok = AttributeScanner.TryBuildDescriptor(method, new LiminalCommandAttribute(""), out _, out var err);
             Assert.IsFalse(ok);
             Assert.IsNotNull(err);
         }
@@ -82,7 +82,7 @@ namespace Void2610.LiminalPalette.Tests
         public void TryBuildDescriptor_RejectsTrailingSlash()
         {
             var method = typeof(TestCommands).GetMethod(nameof(TestCommands.NoArg), BindingFlags.Public | BindingFlags.Static);
-            var ok = AttributeScanner.TryBuildDescriptor(method, new ConsoleCommandAttribute("Foo/"), out _, out var err);
+            var ok = AttributeScanner.TryBuildDescriptor(method, new LiminalCommandAttribute("Foo/"), out _, out var err);
             Assert.IsFalse(ok);
             Assert.IsNotNull(err);
         }
@@ -91,7 +91,7 @@ namespace Void2610.LiminalPalette.Tests
         public void TryBuildDescriptor_RejectsDoubleSlash()
         {
             var method = typeof(TestCommands).GetMethod(nameof(TestCommands.NoArg), BindingFlags.Public | BindingFlags.Static);
-            var ok = AttributeScanner.TryBuildDescriptor(method, new ConsoleCommandAttribute("Foo//Bar"), out _, out var err);
+            var ok = AttributeScanner.TryBuildDescriptor(method, new LiminalCommandAttribute("Foo//Bar"), out _, out var err);
             Assert.IsFalse(ok);
             Assert.IsNotNull(err);
         }

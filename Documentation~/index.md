@@ -4,8 +4,8 @@
 
 1. **[getting-started](getting-started.md)** — インストールと最初のコマンド (5 分)
 2. **[integrations](integrations.md)** — R3 + VContainer 統合 (必須)
-3. **[commands](commands.md)** — `[ConsoleCommand]` / `[ConsoleObservableField]` でできることのすべて
-4. **[scenarios](scenarios.md)** — `[ConsoleScenario]` でコマンドチェイン (= デバッグ再現 + 統合テスト)
+3. **[commands](commands.md)** — `[LiminalCommand]` / `[LiminalObservableField]` でできることのすべて
+4. **[scenarios](scenarios.md)** — `[LiminalScenario]` でコマンドチェイン (= デバッグ再現 + 統合テスト)
 5. **[ui](ui.md)** — Editor Window と Runtime UI の使い分け、Current values セクション
 6. **[ipc](ipc.md)** — AI Agent / curl から叩く HTTP API (`/state` / `/scenarios` 含む)
 7. **[extensibility](extensibility.md)** — `ITypeConverter` / `IParameterEditor` / `IInstanceResolver` で拡張する
@@ -20,7 +20,7 @@
 ```
 [ ユーザーのコード ]
          │
-         │ [ConsoleCommand] 属性
+         │ [LiminalCommand] 属性
          ↓
 [ AttributeScanner ]                      ← 起動時に全 Assembly をリフレクションスキャン
          ↓
@@ -46,9 +46,9 @@
 | **Palette** | UI 全体 (`PaletteView`、`VisualElement`)。Editor / Runtime で同じものをホストする |
 | **Host** | パレットを表示する側 (Editor: `LiminalPaletteWindow`、Runtime: `LiminalPaletteRuntime`) |
 | **IPC** | HTTP API のこと。`HttpServer` + 7 エンドポイント (health / commands / execute / logs / state / scenarios / scenarios/run) |
-| **InstanceResolver** | インスタンスメソッド `[ConsoleCommand]` のインスタンス解決経路 (`IInstanceResolver`)。VContainer 統合経由で設定される |
-| **ObservableField** | `[ConsoleObservableField]` で公開された読み取り専用状態。`ReactiveProperty<T>` / `Observable<T>` を保持し、UI が R3 push 駆動で表示 |
-| **Scenario** | `[ConsoleScenario]` で宣言したコマンドチェイン。Run / Wait / Assert ステップを順次実行し、デバッグ再現 + 統合テストとして使う |
+| **InstanceResolver** | インスタンスメソッド `[LiminalCommand]` のインスタンス解決経路 (`IInstanceResolver`)。VContainer 統合経由で設定される |
+| **ObservableField** | `[LiminalObservableField]` で公開された読み取り専用状態。`ReactiveProperty<T>` / `Observable<T>` を保持し、UI が R3 push 駆動で表示 |
+| **Scenario** | `[LiminalScenario]` で宣言したコマンドチェイン。Run / Wait / Assert ステップを順次実行し、デバッグ再現 + 統合テストとして使う |
 
 ## ファサード API
 

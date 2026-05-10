@@ -164,7 +164,7 @@ LP 側でファイルパスを引数に受け取って中身を読む設計に�
 TMPFILE=$(mktemp /tmp/lp-payload-XXXXXX.json)
 echo "$HUGE_DATA" > "$TMPFILE"
 
-# 利用側に [ConsoleCommand("Data/ImportFile")] public void Import(string path) を実装しておく
+# 利用側に [LiminalCommand("Data/ImportFile")] public void Import(string path) を実装しておく
 lp exec Data/ImportFile "path=$TMPFILE"
 
 rm "$TMPFILE"

@@ -43,7 +43,7 @@ done
 
 明示的なフラグはないが、`commandCount` の差で推定可能:
 
-- Editor 側のほうが大きい (Editor 限定 `[ConsoleCommand]` の分)
+- Editor 側のほうが大きい (Editor 限定 `[LiminalCommand]` の分)
 - Runtime 側は Editor 限定コマンドが含まれない
 
 ### 両方を使い分けるパターン

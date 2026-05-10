@@ -1,13 +1,13 @@
 ---
 name: lp-execute
-description: 'Invoke a [ConsoleCommand] via `lp exec`. Triggers gameplay actions (spawn enemies, set HP, teleport, change scene) and reads return values. All args are sent as strings (numbers, bools, Vector3, Color, enum) — see references/type-conversion.md for the format of each type. Use when the user wants Unity to actually do something, not just inspect state.'
+description: 'Invoke a [LiminalCommand] via `lp exec`. Triggers gameplay actions (spawn enemies, set HP, teleport, change scene) and reads return values. All args are sent as strings (numbers, bools, Vector3, Color, enum) — see references/type-conversion.md for the format of each type. Use when the user wants Unity to actually do something, not just inspect state.'
 when_to_use: 'Trigger phrases: "コマンド実行", "Player/X を Y で実行", "spawn する", "HP を 100 にして", "テレポート", "execute LP command", "run X", "trigger action", "call console command".'
 allowed-tools: Bash(lp *), Bash(jq *)
 ---
 
 # lp-execute
 
-LiminalPalette の `[ConsoleCommand]` を `lp exec` で実行する。**ゲーム操作の中核スキル**。
+LiminalPalette の `[LiminalCommand]` を `lp exec` で実行する。**ゲーム操作の中核スキル**。
 
 引数の型変換クセが多い (Vector3 はカンマ区切り、enum は名前一致など) ため、初見の型が出てきたら **必ず [references/type-conversion.md](references/type-conversion.md) を確認**してから組み立てる。
 

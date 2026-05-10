@@ -45,7 +45,7 @@ namespace Void2610.LiminalPalette
 
         /// <summary>
         /// Editor 専用コマンドかどうか。Path の prefix から自動判定する:
-        ///   - "Editor/..."  : 利用側が手書きで [ConsoleCommand("Editor/...")] と宣言した Editor 専用コマンド
+        ///   - "Editor/..."  : 利用側が手書きで [LiminalCommand("Editor/...")] と宣言した Editor 専用コマンド
         ///   - "Menu/..."    : EditorMenuItemBootstrap が Unity の [MenuItem] から自動収集したコマンド
         /// true の場合、Play Mode / Player ビルドのランタイムパレット UI からは表示対象外。
         /// レジストリ登録自体は共通なので Editor 側 Window では引き続き見える。

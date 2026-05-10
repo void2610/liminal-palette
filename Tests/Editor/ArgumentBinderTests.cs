@@ -100,7 +100,7 @@ namespace Void2610.LiminalPalette.Tests
             Assert.IsNotNull(err);
         }
 
-        // ---- ConsoleParam.Min / Max による範囲バリデーション ----
+        // ---- LiminalParam.Min / Max による範囲バリデーション ----
 
         [Test]
         public void Range_Min_BelowMin_Errors()

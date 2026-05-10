@@ -7,13 +7,13 @@ namespace Void2610.LiminalPalette.Tests.Registry
 {
     public sealed class ObservableFieldRegistryTests
     {
-        // テスト対象。[ConsoleObservableField] 付き ReactiveProperty<int> を持つ。
+        // テスト対象。[LiminalObservableField] 付き ReactiveProperty<int> を持つ。
         private sealed class FakeMonoBehaviour
         {
-            [ConsoleObservableField("Test/Hp", Description = "test field")]
+            [LiminalObservableField("Test/Hp", Description = "test field")]
             public ReactiveProperty<int> Hp { get; } = new ReactiveProperty<int>(50);
 
-            [ConsoleObservableField("Test/Stream")]
+            [LiminalObservableField("Test/Stream")]
             public Observable<int> Stream => Hp;
         }
 

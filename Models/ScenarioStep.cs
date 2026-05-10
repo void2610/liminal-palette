@@ -57,7 +57,7 @@ namespace Void2610.LiminalPalette
             return new WaitStep(ScenarioStepKind.WaitFrames, 0f, frames, description);
         }
 
-        /// <summary>ConsoleObservableField の現在値が expected と一致することを検証するステップ。</summary>
+        /// <summary>LiminalObservableField の現在値が expected と一致することを検証するステップ。</summary>
         public static ScenarioStep AssertEquals(
             string observableFieldPath,
             object expected,
@@ -68,7 +68,7 @@ namespace Void2610.LiminalPalette
             return new AssertStep(ScenarioStepKind.AssertEquals, observableFieldPath, expected, description);
         }
 
-        /// <summary>ConsoleObservableField の現在値が unexpected と一致しないことを検証するステップ。</summary>
+        /// <summary>LiminalObservableField の現在値が unexpected と一致しないことを検証するステップ。</summary>
         public static ScenarioStep AssertNotEquals(
             string observableFieldPath,
             object unexpected,

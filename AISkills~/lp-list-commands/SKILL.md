@@ -1,13 +1,13 @@
 ---
 name: lp-list-commands
-description: 'List all [ConsoleCommand] registered in a running Unity project via `lp commands`. Use to discover available commands, filter by category prefix (Player/, Enemy/, etc.), inspect parameter schemas (type, hasDefault, choices), find async commands, or verify path spelling before invoking lp-execute.'
+description: 'List all [LiminalCommand] registered in a running Unity project via `lp commands`. Use to discover available commands, filter by category prefix (Player/, Enemy/, etc.), inspect parameter schemas (type, hasDefault, choices), find async commands, or verify path spelling before invoking lp-execute.'
 when_to_use: 'Trigger phrases: "コマンド一覧", "何が呼べる", "Player カテゴリのコマンド", "list LP commands", "what can I run", "show schema for X", "fuzzy search command", "before lp-execute".'
 allowed-tools: Bash(lp *), Bash(jq *)
 ---
 
 # lp-list-commands
 
-LiminalPalette に `[ConsoleCommand]` で登録されたコマンドの **スキーマ一覧**を取得する。AI Agent が「何を呼べるか」を発見し、`lp-execute` の引数を組み立てる前の必須ステップ。
+LiminalPalette に `[LiminalCommand]` で登録されたコマンドの **スキーマ一覧**を取得する。AI Agent が「何を呼べるか」を発見し、`lp-execute` の引数を組み立てる前の必須ステップ。
 
 ---
 
@@ -109,10 +109,10 @@ lp commands --json | jq '.commands[] | select(.isAsync == true) | .path'
 | `path` | "/" 区切りの一意識別子 | `lp exec <path> ...` の path に |
 | `name` | path の末尾セグメント | (UI 表示用) |
 | `category` | path の前段 | (UI のグループ化用) |
-| `description` | `[ConsoleCommand(Description = ...)]` の値 | 引数を組み立てる時の意図把握 |
+| `description` | `[LiminalCommand(Description = ...)]` の値 | 引数を組み立てる時の意図把握 |
 | `isAsync` | `Task<T>`/`ValueTask<T>` 戻り値で true | 実行に時間がかかる可能性 |
 | `returnType` | 戻り値の `Type.Name` (短縮名) | `result.value` の解釈に使う |
-| `aliases` | `[ConsoleCommand(Aliases = ...)]` の別名配列 | path 同様に invoke 可 |
+| `aliases` | `[LiminalCommand(Aliases = ...)]` の別名配列 | path 同様に invoke 可 |
 | `parameters[]` | 引数のスキーマ (下記) | `lp exec` の `key=value` を組み立てる |
 
 ### parameters[] の中身
@@ -166,12 +166,12 @@ lp commands --json | jq '.commands[] | select(.isAsync == true) | .path'
 
 ### scenarios はここに出ない
 
-`[ConsoleScenario]` は別 endpoint。`lp scenarios` (`/lp-list-scenarios`) を使う。
+`[LiminalScenario]` は別 endpoint。`lp scenarios` (`/lp-list-scenarios`) を使う。
 
 ### Editor / Runtime で違うコマンド一覧
 
 両稼働時、ポートごとに `commandCount` が違う:
-- Editor 側 (7610) は Editor 限定 `[ConsoleCommand]` (例: `Editor/Console/Clear`) を含む
+- Editor 側 (7610) は Editor 限定 `[LiminalCommand]` (例: `Editor/Console/Clear`) を含む
 - Runtime 側 (7611) は Runtime 専用コマンドのみ
 
 両方を見たいなら両ポートに対して本スキルを実行する:

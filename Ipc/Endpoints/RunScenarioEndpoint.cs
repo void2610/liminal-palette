@@ -214,7 +214,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                             switch (av)
                             {
                                 // ExecuteCommandEndpoint と同じく、すべて string に正規化して args に詰める。
-                                // ArgumentBinder が ConsoleCommand のパラメータ型に応じて変換する。
+                                // ArgumentBinder が LiminalCommand のパラメータ型に応じて変換する。
                                 case JsonToken.String: args[argKey] = r.StringValue; break;
                                 case JsonToken.Number: args[argKey] = r.NumberValue.ToString(CultureInfo.InvariantCulture); break;
                                 case JsonToken.True: args[argKey] = "true"; break;

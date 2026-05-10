@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
-    /// [ConsoleScenario] が付与されたメソッド由来のシナリオを保持するレジストリ。
+    /// [LiminalScenario] が付与されたメソッド由来のシナリオを保持するレジストリ。
     /// CommandRegistry / ObservableFieldRegistry と同じく Default シングルトンを持つ。
     /// </summary>
     public interface IScenarioRegistry

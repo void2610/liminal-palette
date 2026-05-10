@@ -7,7 +7,7 @@ using Void2610.LiminalPalette.Ipc.Threading;
 namespace Void2610.LiminalPalette.Ipc.Endpoints
 {
     /// <summary>
-    /// GET /api/v1/state[?path=Player/Health]: [ConsoleObservableField] が公開する状態のスナップショット。
+    /// GET /api/v1/state[?path=Player/Health]: [LiminalObservableField] が公開する状態のスナップショット。
     /// path 指定時はそのフィールドのみ、未指定時は全フィールドの一覧を返す。
     /// 値は ReactiveProperty.Value 相当を ToDisplayString で文字列化して返す。
     /// </summary>

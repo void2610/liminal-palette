@@ -23,7 +23,7 @@ namespace Void2610.LiminalPalette.Editor
         private const string PathPrefix = "Editor/Open/";
 
         // 直前の Rescan で登録したコマンドパス。次回 Rescan で先に Unregister するために保持する。
-        // 利用側が手書きで登録した [ConsoleCommand("Editor/Open/Foo")] を巻き込まないよう、
+        // 利用側が手書きで登録した [LiminalCommand("Editor/Open/Foo")] を巻き込まないよう、
         // 自動登録分のみここで管理する。
         private static readonly HashSet<string> _registeredPaths = new HashSet<string>();
 
@@ -50,7 +50,7 @@ namespace Void2610.LiminalPalette.Editor
             {
                 var registry = LiminalPalette.Registry;
 
-                // 前回の自動登録分だけを掃除。手書き [ConsoleCommand] と被らないよう参照同一性ではなく
+                // 前回の自動登録分だけを掃除。手書き [LiminalCommand] と被らないよう参照同一性ではなく
                 // _registeredPaths のセット管理で識別する。
                 foreach (var p in _registeredPaths)
                 {

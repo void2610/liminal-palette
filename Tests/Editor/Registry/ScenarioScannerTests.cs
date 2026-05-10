@@ -22,11 +22,11 @@ namespace Void2610.LiminalPalette.Tests
         public void TryBuildDescriptor_RejectsMethodsWithArguments()
         {
             // 属性は付けず、テスト時に手で属性インスタンスを生成して TryBuildDescriptor に渡す。
-            // [ConsoleScenario] を直接付けると Bootstrap が起動毎に警告を出し続けるため、
+            // [LiminalScenario] を直接付けると Bootstrap が起動毎に警告を出し続けるため、
             // 「不正なシグネチャ」のテストはローカルでのみ検証する。
             var method = typeof(InvalidScenarioShapes)
                 .GetMethod(nameof(InvalidScenarioShapes.WithArgs), BindingFlags.Public | BindingFlags.Static);
-            var attr = new ConsoleScenarioAttribute("TestScenario/WithArgs");
+            var attr = new LiminalScenarioAttribute("TestScenario/WithArgs");
             var ok = ScenarioScanner.TryBuildDescriptor(method, attr, out _, out var error);
             Assert.IsFalse(ok);
             StringAssert.Contains("no parameters", error);
@@ -37,7 +37,7 @@ namespace Void2610.LiminalPalette.Tests
         {
             var method = typeof(InvalidScenarioShapes)
                 .GetMethod(nameof(InvalidScenarioShapes.BadReturnType), BindingFlags.Public | BindingFlags.Static);
-            var attr = new ConsoleScenarioAttribute("TestScenario/BadReturn");
+            var attr = new LiminalScenarioAttribute("TestScenario/BadReturn");
             var ok = ScenarioScanner.TryBuildDescriptor(method, attr, out _, out var error);
             Assert.IsFalse(ok);
             StringAssert.Contains("IEnumerable<ScenarioStep>", error);

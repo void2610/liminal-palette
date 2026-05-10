@@ -104,7 +104,7 @@ HTTP status を見る
 }
 ```
 
-**原因**: インスタンスメソッドの `[ConsoleCommand]` だが、利用側で VContainer 登録が抜けている。
+**原因**: インスタンスメソッドの `[LiminalCommand]` だが、利用側で VContainer 登録が抜けている。
 
 **対処**: 利用側で:
 
@@ -222,7 +222,7 @@ Editor 限定コマンド (`Editor/Console/Clear` 等) を Runtime ポート (76
 
 ```csharp
 // 利用側
-[ConsoleCommand("Data/Import")]
+[LiminalCommand("Data/Import")]
 public void Import(string filePath) {
     var json = File.ReadAllText(filePath);
     // ...

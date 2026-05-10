@@ -68,9 +68,24 @@ curl -H "Authorization: Bearer $LP_TOKEN" ...
 {
   "status": "ok",
   "version": "0.4.0",
+  "projectName": "MyGame",
+  "projectPath": "/Users/me/dev/MyGame",
   "commandCount": 356
 }
 ```
+
+`projectName` は `Application.productName`、`projectPath` は `Application.dataPath` の親ディレクトリ。
+同一マシンで複数 Unity プロジェクトが同時起動しているとき、CLI 側がポートとプロジェクトを
+紐付けるための識別子として使う。値が取れない場合は空文字列。
+
+### ポート固定 (プロジェクトごと)
+
+`<project>/ProjectSettings/LiminalPalette.json` に `{"port": <N>}` を置くと、Unity サーバはそのポート
+にバインドする (取れなければ既存どおり port+1, port+2, ... と隣接にリトライ)。複数プロジェクト同時
+起動時に各プロジェクトに別ポートを割り当てるための仕組み。
+
+ファイルは `lp project set-port <N>` で生成 / 更新できる。読み込みは `Void2610.LiminalPalette.Ipc.ProjectConfig`。
+未設定なら `IpcSettings.DefaultPort` (7610) にフォールバック。
 
 ### `GET /api/v1/commands` (認証必須)
 
@@ -353,7 +368,7 @@ H="Authorization: Bearer $TOKEN"
 
 # Health
 curl -s $BASE/api/v1/health
-# → {"status":"ok","version":"0.4.0","commandCount":356}
+# → {"status":"ok","version":"0.4.0","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
 
 # コマンド一覧 (Player/ 配下だけ)
 curl -s -H "$H" $BASE/api/v1/commands | jq '.commands[] | select(.path | startswith("Player/"))'

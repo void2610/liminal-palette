@@ -4,6 +4,7 @@
 #
 # 使い方:
 #   lp health
+#   lp doctor
 #   lp commands [--filter Player/]
 #   lp exec Player/Health/Set value=100
 #   lp logs --limit 10
@@ -12,7 +13,11 @@
 #   lp run Combat/EnemyTakesDamage
 #
 # トークンは ~/.liminal-palette/token を自動で読む。
-# ポートは /health で 7610〜7615 を順に叩いて自動発見する。
+# ポート発見:
+#   1. ~/.liminal-palette/ports.json のキャッシュを最初に試す
+#   2. キャッシュ無効/未一致なら 7610〜7615 を short timeout で probe
+# 複数 Unity プロジェクトが同時起動している場合は cwd や --project で
+# どのインスタンスを操作するか指定できる (/health の projectName/projectPath で照合)。
 
 import argparse
 import json
@@ -27,7 +32,9 @@ from pathlib import Path
 
 DEFAULT_PORTS = [7610, 7611, 7612, 7613, 7614, 7615]
 DEFAULT_TOKEN_PATH = Path.home() / ".liminal-palette" / "token"
+DEFAULT_CACHE_PATH = Path.home() / ".liminal-palette" / "ports.json"
 TIMEOUT_SEC = 10
+PROBE_TIMEOUT_SEC = 0.4  # discovery 中の /health probe 用 (本リクエストとは別)
 
 # -- 端末カラー (TTY のみ) ------------------------------------------------
 
@@ -99,27 +106,259 @@ def _read_token(explicit: str | None) -> str | None:
     return None
 
 
-def _discover_base_url(explicit: str | None, port: int | None) -> str:
-    # 明示の --base-url が最優先。
-    if explicit:
-        return explicit.rstrip("/")
-    # 明示の --port があればそれだけ試す。
-    candidates = [port] if port else DEFAULT_PORTS
-    last_err: str | None = None
-    for p in candidates:
-        url = f"http://127.0.0.1:{p}"
+def _probe_port(port: int, timeout: float = PROBE_TIMEOUT_SEC) -> dict | None:
+    """/health を short timeout で叩いて dict を返す。失敗は None。例外は出さない。"""
+    url = f"http://127.0.0.1:{port}/api/v1/health"
+    req = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status != 200:
+                return None
+            data = json.loads(resp.read().decode("utf-8"))
+            return data if isinstance(data, dict) else None
+    except (urllib.error.URLError, json.JSONDecodeError, ValueError, OSError):
+        return None
+
+
+def _probe_url(base_url: str, timeout: float = 2.0) -> dict | None:
+    """--base-url 指定時に /health を引いて info を取る (失敗は致命でない)。"""
+    url = base_url.rstrip("/") + "/api/v1/health"
+    req = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status != 200:
+                return None
+            data = json.loads(resp.read().decode("utf-8"))
+            return data if isinstance(data, dict) else None
+    except (urllib.error.URLError, json.JSONDecodeError, ValueError, OSError):
+        return None
+
+
+# -- ポートキャッシュ -----------------------------------------------------
+#
+# ~/.liminal-palette/ports.json:
+#   {"version":1,"projects":{"<projectPath>":{"port":<n>,"projectName":"..."}}}
+#
+# キーは projectPath (絶対パス) — 同一マシン内で唯一なので projectName 衝突に強い。
+
+def _load_cache() -> dict:
+    if not DEFAULT_CACHE_PATH.is_file():
+        return {"version": 1, "projects": {}}
+    try:
+        data = json.loads(DEFAULT_CACHE_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("version") != 1:
+            return {"version": 1, "projects": {}}
+        if not isinstance(data.get("projects"), dict):
+            data["projects"] = {}
+        return data
+    except (json.JSONDecodeError, OSError):
+        return {"version": 1, "projects": {}}
+
+
+def _save_cache(cache: dict) -> None:
+    try:
+        DEFAULT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DEFAULT_CACHE_PATH.write_text(
+            json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except OSError:
+        pass  # cache はベストエフォート
+
+
+def _record_cache(cache: dict, info: dict, port: int) -> None:
+    path = info.get("projectPath") or ""
+    if not path:
+        return
+    cache.setdefault("projects", {})[path] = {
+        "port": port,
+        "projectName": info.get("projectName") or "",
+    }
+
+
+# -- プロジェクト解決 -----------------------------------------------------
+
+def _detect_project_from_cwd() -> str | None:
+    """cwd から ProjectSettings/ProjectVersion.txt を持つ親ディレクトリを探す。Unity プロジェクトの目印。"""
+    try:
+        p = Path.cwd().resolve()
+    except OSError:
+        return None
+    for d in [p, *p.parents]:
+        if (d / "ProjectSettings" / "ProjectVersion.txt").is_file():
+            return str(d)
+    return None
+
+
+def _resolve_target(explicit: str | None) -> tuple[str | None, str | None]:
+    """target identity と (分かれば) その絶対 projectPath を返す。
+    優先順位: --project > $LP_PROJECT > cwd 検出。
+    --project が path として存在しない or 単なる名前の場合は projectPath は None を返す。
+    """
+    raw = explicit or os.environ.get("LP_PROJECT")
+    if raw:
         try:
-            status, _ = _request("GET", f"{url}/api/v1/health", token=None)
-            if status == 200:
-                return url
-        except ApiError as e:
-            last_err = str(e)
-            continue
-    msg = "Liminal Palette サーバーが見つかりません (試したポート: "
-    msg += ",".join(str(p) for p in candidates) + ")"
-    if last_err:
-        msg += f"\n最後のエラー: {last_err}"
-    raise SystemExit(_red(msg))
+            cand = Path(raw)
+            if cand.exists() and cand.is_dir():
+                p = str(cand.resolve())
+                return (p, p)
+        except OSError:
+            pass
+        # path として解決できない → 名前として扱う (projectName マッチ用)
+        return (raw, None)
+    cwd_path = _detect_project_from_cwd()
+    if cwd_path:
+        return (cwd_path, cwd_path)
+    return (None, None)
+
+
+def _read_preferred_port(project_path: str | None) -> int | None:
+    """<project_path>/ProjectSettings/LiminalPalette.json から preferred port を読む。"""
+    if not project_path:
+        return None
+    cfg = Path(project_path) / "ProjectSettings" / "LiminalPalette.json"
+    if not cfg.is_file():
+        return None
+    try:
+        data = json.loads(cfg.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    port = data.get("port")
+    if isinstance(port, int) and 1 <= port <= 65535:
+        return port
+    return None
+
+
+def _project_config_path(project_path: str) -> Path:
+    return Path(project_path) / "ProjectSettings" / "LiminalPalette.json"
+
+
+def _matches_target(info: dict, target: str | None) -> bool:
+    if target is None:
+        return True
+    if info.get("projectPath") == target:
+        return True
+    if info.get("projectName") == target:
+        return True
+    # target がパスとして resolve できる場合は normalize して再判定。
+    try:
+        t = str(Path(target).resolve())
+        if info.get("projectPath") == t:
+            return True
+    except OSError:
+        pass
+    return False
+
+
+def _format_alive(alive: list[tuple[int, dict]]) -> str:
+    return "\n".join(
+        f"  - port {p}: {i.get('projectName','?')}  ({i.get('projectPath','?')})"
+        for p, i in alive
+    )
+
+
+def _find_cached_port(cache: dict, target: str | None, target_path: str | None) -> int | None:
+    """target_path 一致を最優先、なければ target を projectName として一致するエントリを返す。"""
+    projects = cache.get("projects", {})
+    if target_path and target_path in projects:
+        port = projects[target_path].get("port")
+        if isinstance(port, int):
+            return port
+    if target:
+        for entry in projects.values():
+            if entry.get("projectName") == target:
+                port = entry.get("port")
+                if isinstance(port, int):
+                    return port
+    return None
+
+
+def _build_candidate_ports(port: int | None, preferred: int | None) -> list[int]:
+    """probe するポートの順序を決める。
+    --port 明示なら 1 個だけ。
+    preferred 指定があれば preferred..preferred+5 (HttpServer の port retry 範囲) を先頭に置き、
+    その後ろに DEFAULT_PORTS を重複排除して連結。
+    """
+    if port is not None:
+        return [port]
+    out: list[int] = []
+    if preferred is not None:
+        for p in range(preferred, preferred + 6):
+            if 1 <= p <= 65535 and p not in out:
+                out.append(p)
+    for p in DEFAULT_PORTS:
+        if p not in out:
+            out.append(p)
+    return out
+
+
+def _discover_base_url(
+    explicit: str | None, port: int | None, project: str | None
+) -> tuple[str, dict]:
+    """(base_url, /health の dict) を返す。/health 失敗時は dict が空。"""
+    # 明示の --base-url が最優先。/health は best-effort で取る。
+    if explicit:
+        info = _probe_url(explicit) or {}
+        return explicit.rstrip("/"), info
+
+    target, target_path = _resolve_target(project)
+    preferred = _read_preferred_port(target_path)
+    cache = _load_cache()
+    candidate_ports = _build_candidate_ports(port, preferred)
+
+    # 1) ターゲット指定 + キャッシュヒット時はそのポートを最優先で試す。
+    if target and port is None:
+        cached_port = _find_cached_port(cache, target, target_path)
+        if cached_port is not None:
+            info = _probe_port(cached_port)
+            if info and _matches_target(info, target):
+                _record_cache(cache, info, cached_port)
+                _save_cache(cache)
+                return f"http://127.0.0.1:{cached_port}", info
+
+    # 2) 候補全部 probe (短いタイムアウト)。preferred 指定があれば先頭に来ているので最速で当たる。
+    alive: list[tuple[int, dict]] = []
+    for p in candidate_ports:
+        info = _probe_port(p)
+        if info:
+            alive.append((p, info))
+            _record_cache(cache, info, p)
+    _save_cache(cache)
+
+    if not alive:
+        msg = (
+            "Liminal Palette サーバーが見つかりません (試したポート: "
+            + ",".join(str(p) for p in candidate_ports)
+            + ")"
+        )
+        raise SystemExit(_red(msg))
+
+    # 3) ターゲットがあれば一致するものだけを採用。
+    if target:
+        matching = [(p, i) for p, i in alive if _matches_target(i, target)]
+        if not matching:
+            raise SystemExit(_red(
+                f"指定のプロジェクト '{target}' に一致する Unity サーバーが見つかりません。\n"
+                f"生存中:\n{_format_alive(alive)}"
+            ))
+        if len(matching) > 1:
+            raise SystemExit(_red(
+                f"プロジェクト '{target}' に複数のサーバーが一致しました。--port で 1 つに絞ってください:\n"
+                f"{_format_alive(matching)}"
+            ))
+        p, info = matching[0]
+        return f"http://127.0.0.1:{p}", info
+
+    # 4) ターゲット未指定。生存 1 つなら採用、複数なら曖昧として弾く。
+    if len(alive) == 1:
+        p, info = alive[0]
+        return f"http://127.0.0.1:{p}", info
+
+    raise SystemExit(_red(
+        "複数の Unity プロジェクトが起動中です。--project (または cwd を Unity プロジェクト配下にして) "
+        "ターゲットを指定してください:\n" + _format_alive(alive)
+    ))
 
 
 # -- 出力ヘルパ -----------------------------------------------------------
@@ -148,7 +387,199 @@ def cmd_health(args, base_url, _token):
         return
     print(f"{_green('ok')}  {base_url}")
     print(f"  version       : {body.get('version')}")
+    print(f"  projectName   : {body.get('projectName') or _dim('(unknown)')}")
+    print(f"  projectPath   : {body.get('projectPath') or _dim('(unknown)')}")
     print(f"  commandCount  : {body.get('commandCount')}")
+
+
+def cmd_doctor(args):
+    """環境診断: token / cwd / cache / 生存ポート / 解決結果 を一覧表示。"""
+    # 1) Token — _read_token と同じ判定 (strip 後に空なら「未取得」扱い) で表示する。
+    print(_bold("Token:"))
+    env_token_raw = os.environ.get("LP_TOKEN")
+    env_token_stripped = env_token_raw.strip() if env_token_raw else ""
+    token_displayed = False
+    if env_token_stripped:
+        print(f"  {_green('found')}  via $LP_TOKEN ({len(env_token_stripped)} chars)")
+        token_displayed = True
+    elif env_token_raw:
+        # 設定はされているが strip すると空 → _read_token は "" を返し auth に失敗する。
+        print(f"  {_yellow('empty')}  $LP_TOKEN は空白のみ。実質未設定として扱われます")
+        token_displayed = True
+    if not token_displayed:
+        if DEFAULT_TOKEN_PATH.is_file():
+            try:
+                t = DEFAULT_TOKEN_PATH.read_text(encoding="utf-8").strip()
+                if t:
+                    print(f"  {_green('found')}  {DEFAULT_TOKEN_PATH}  ({len(t)} chars)")
+                else:
+                    print(f"  {_yellow('empty')}  {DEFAULT_TOKEN_PATH} は空。Unity Editor を起動して再生成してください")
+            except OSError as e:
+                print(f"  {_red('error')}  {DEFAULT_TOKEN_PATH}: {e}")
+        else:
+            print(f"  {_red('NOT FOUND')}  expected at {DEFAULT_TOKEN_PATH}")
+            print(_dim(f"    Unity Editor を一度起動するか、{DEFAULT_TOKEN_PATH} を作ってください"))
+
+    # 2) cwd / project detection (cwd が削除済み等で取れないこともあるので握る)
+    print(_bold("\nProject detection:"))
+    try:
+        cwd_disp = str(Path.cwd())
+    except OSError as e:
+        cwd_disp = _red(f"(unavailable: {e})")
+    print(f"  cwd            : {cwd_disp}")
+    detected = _detect_project_from_cwd()
+    if detected:
+        print(f"  cwd→project    : {_green(detected)}")
+    else:
+        print(f"  cwd→project    : {_dim('(no Unity project marker found above cwd)')}")
+    if args.project:
+        print(f"  --project      : {args.project}")
+    env_proj = os.environ.get("LP_PROJECT")
+    if env_proj:
+        print(f"  $LP_PROJECT    : {env_proj}")
+    target, target_path = _resolve_target(args.project)
+    print(f"  resolved target: {target if target else _dim('(none)')}")
+    preferred = _read_preferred_port(target_path)
+    if target_path:
+        cfg_path = _project_config_path(target_path)
+        if cfg_path.is_file():
+            print(f"  preferred port : {_cyan(str(preferred)) if preferred else _red('(invalid in ' + str(cfg_path) + ')')}")
+        else:
+            print(f"  preferred port : {_dim('(no ' + str(cfg_path) + ' — falling back to defaults)')}")
+
+    # 3) Cache (手で編集された壊れた entry でも doctor 自体は落ちないようにする)
+    cache = _load_cache()
+    projects = cache.get("projects", {})
+    print(_bold("\nPort cache:"))
+    print(f"  {DEFAULT_CACHE_PATH}")
+    if not isinstance(projects, dict) or not projects:
+        print(_dim("  (empty)"))
+    else:
+        rows = []
+        for path, entry in projects.items():
+            if not isinstance(entry, dict):
+                rows.append((str(path), "?", "?"))
+                continue
+            port = entry.get("port")
+            port_disp = str(port) if isinstance(port, int) else "?"
+            name = entry.get("projectName")
+            name_disp = name if isinstance(name, str) and name else "?"
+            rows.append((str(path), port_disp, name_disp))
+        name_w = max((len(name) for _, _, name in rows), default=8)
+        for path, port_disp, name in rows:
+            print(f"    port {port_disp:>5}  {name.ljust(name_w)}  {_dim(path)}")
+
+    # 4) Live probe (preferred があれば隣接 5 個もスキャンして、preferred 衝突で +N にずれた場合も拾う)
+    probe_ports = _build_candidate_ports(None, preferred)
+    print(_bold(f"\nLive probe ({','.join(str(p) for p in probe_ports)}):"))
+    alive: list[tuple[int, dict]] = []
+    for p in probe_ports:
+        info = _probe_port(p)
+        if info:
+            alive.append((p, info))
+            _record_cache(cache, info, p)
+            name = info.get("projectName") or "(no name)"
+            path = info.get("projectPath") or "(no path)"
+            ver = info.get("version") or "?"
+            cnt = info.get("commandCount", "?")
+            print(f"  {_green('●')} {p}  {name:<24} {_dim(f'v{ver} cmds={cnt}')}  {_dim(path)}")
+        else:
+            print(_dim(f"  ○ {p}  (no response)"))
+    _save_cache(cache)
+
+    # 5) Resolution
+    print(_bold("\nResolution:"))
+    if not alive:
+        print(_red("  no live server"))
+        return
+    if target:
+        matching = [(p, i) for p, i in alive if _matches_target(i, target)]
+        if not matching:
+            print(_red(f"  no port matches target '{target}'"))
+        elif len(matching) == 1:
+            p, info = matching[0]
+            print(f"  {_green('selected')} → http://127.0.0.1:{p}  ({info.get('projectName','?')})")
+        else:
+            print(_yellow(f"  ambiguous: multiple ports match '{target}'"))
+            for p, info in matching:
+                print(f"    - port {p}: {info.get('projectName','?')}")
+    else:
+        if len(alive) == 1:
+            p, info = alive[0]
+            print(f"  {_green('selected')} → http://127.0.0.1:{p}  ({info.get('projectName','?')})")
+        else:
+            print(_yellow("  ambiguous: multiple servers alive (specify --project)"))
+            for p, info in alive:
+                print(f"    - port {p}: {info.get('projectName','?')}  {_dim(info.get('projectPath','?'))}")
+
+
+def cmd_project(args):
+    """ProjectSettings/LiminalPalette.json を表示 / 編集する。"""
+    if args.project_command == "show":
+        _project_show(args)
+    elif args.project_command == "set-port":
+        _project_set_port(args)
+    else:
+        # argparse 側で防がれているはずだが念のため。
+        raise SystemExit(_red(f"unknown subcommand: {args.project_command}"))
+
+
+def _project_show(args):
+    project_path = _detect_project_from_cwd()
+    if not project_path:
+        raise SystemExit(_red(
+            f"cwd ({Path.cwd()}) 配下に Unity プロジェクトが見つかりません。"
+            "ProjectSettings/ProjectVersion.txt がある場所で実行してください。"
+        ))
+    cfg_path = _project_config_path(project_path)
+    print(_bold("Project:"))
+    print(f"  path  : {project_path}")
+    print(f"  config: {cfg_path}")
+    if not cfg_path.is_file():
+        print(_dim(f"  (no {cfg_path.name} — IpcSettings.DefaultPort=7610 にフォールバック)"))
+        print(_dim(f"  固定するなら: lp project set-port 7613"))
+        return
+    try:
+        raw = cfg_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except (json.JSONDecodeError, OSError) as e:
+        raise SystemExit(_red(f"  parse error: {e}"))
+    port = data.get("port") if isinstance(data, dict) else None
+    if isinstance(port, int) and 1 <= port <= 65535:
+        print(f"  port  : {_cyan(str(port))}")
+    else:
+        print(f"  port  : {_red('(invalid or unset)')}")
+    print(_dim("  raw   :"))
+    for line in raw.rstrip("\n").splitlines():
+        print(_dim(f"    {line}"))
+
+
+def _project_set_port(args):
+    project_path = _detect_project_from_cwd()
+    if not project_path:
+        raise SystemExit(_red(
+            f"cwd ({Path.cwd()}) 配下に Unity プロジェクトが見つかりません。"
+            "ProjectSettings/ProjectVersion.txt がある場所で実行してください。"
+        ))
+    port = args.port_value
+    if not (1 <= port <= 65535):
+        raise SystemExit(_red(f"port は 1..65535 の範囲で指定してください: {port}"))
+    cfg_path = _project_config_path(project_path)
+    data: dict = {}
+    if cfg_path.is_file():
+        try:
+            existing = json.loads(cfg_path.read_text(encoding="utf-8"))
+            if isinstance(existing, dict):
+                data = existing
+        except json.JSONDecodeError:
+            # 既存ファイルが壊れていれば上書き (警告は出す)。
+            print(_yellow(f"warning: {cfg_path} の JSON パースに失敗。上書きします。"))
+    data["port"] = port
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"{_green('wrote')}  {cfg_path}")
+    print(f"  port = {port}")
+    print(_dim("  Unity Editor 再起動 (もしくは DomainReload) で反映されます"))
 
 
 def cmd_commands(args, base_url, token):
@@ -365,13 +796,22 @@ def build_parser() -> argparse.ArgumentParser:
         description="LiminalPalette HTTP API CLI",
     )
     p.add_argument("--base-url", help="ベース URL を直接指定 (例: http://127.0.0.1:7611)")
-    p.add_argument("--port", type=int, help="ポート番号を指定 (省略時は 7610〜7615 を自動探索)")
+    p.add_argument("--port", type=int, help="ポート番号を指定 (省略時はキャッシュ→7610〜7615 自動探索)")
+    p.add_argument("--project", help="ターゲット Unity プロジェクト (projectName または projectPath)。"
+                                       "省略時は $LP_PROJECT または cwd から自動検出")
     p.add_argument("--token", help="Bearer トークン (省略時は ~/.liminal-palette/token または $LP_TOKEN)")
     p.add_argument("--json", action="store_true", help="JSON のままパイプ可能な形で出力")
 
     sub = p.add_subparsers(dest="command", required=True)
 
     sub.add_parser("health", help="サーバーの生存確認 (認証不要)")
+    sub.add_parser("doctor", help="環境診断: token / プロジェクト解決 / 生存ポート一覧 (認証不要)")
+
+    sp = sub.add_parser("project", help="プロジェクト固有設定 (preferred port 等) を表示 / 編集 (認証不要)")
+    project_sub = sp.add_subparsers(dest="project_command", required=True)
+    project_sub.add_parser("show", help="cwd 配下の ProjectSettings/LiminalPalette.json を表示")
+    sp_set = project_sub.add_parser("set-port", help="ProjectSettings/LiminalPalette.json に preferred port を書く")
+    sp_set.add_argument("port_value", type=int, metavar="PORT", help="ポート番号 (1-65535)")
 
     sp = sub.add_parser("commands", help="登録コマンドの一覧")
     sp.add_argument("--filter", help="path のプレフィックスで絞り込み (例: Player/)")
@@ -399,6 +839,14 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
+    # doctor / project はサーバー無しでもローカルファイルだけで動くので discovery / 認証を通さない。
+    if args.command == "doctor":
+        cmd_doctor(args)
+        return
+    if args.command == "project":
+        cmd_project(args)
+        return
+
     token = _read_token(args.token)
     # health 以外は認証必須なのでトークンが無ければ早期終了。
     needs_auth = args.command not in ("health",)
@@ -408,7 +856,7 @@ def main() -> None:
             "--token か $LP_TOKEN で指定してください。"
         ))
 
-    base_url = _discover_base_url(args.base_url, args.port)
+    base_url, _info = _discover_base_url(args.base_url, args.port, args.project)
 
     handlers = {
         "health": cmd_health,

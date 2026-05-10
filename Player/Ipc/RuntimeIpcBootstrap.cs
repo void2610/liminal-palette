@@ -100,7 +100,10 @@ namespace Void2610.LiminalPalette.Player.Ipc
             router.Register("GET", "/api/v1/scenarios", new ListScenariosEndpoint());
             router.Register("POST", "/api/v1/scenarios/run", new RunScenarioEndpoint());
 
-            _server = new HttpServer(router, IpcSettings.DefaultPort);
+            // Play Mode 中は <project>/ProjectSettings/LiminalPalette.json が読めるので preferred port を採用。
+            // Player ビルドでは ProjectSettings/ が同梱されないので null になり、DefaultPort にフォールバック。
+            var preferred = ProjectConfig.GetPreferredPort() ?? IpcSettings.DefaultPort;
+            _server = new HttpServer(router, preferred);
             _server.Start();
 
             Debug.Log($"[LiminalPalette.Ipc] Runtime server listening on http://127.0.0.1:{_server.Port}/  Token: {TokenStore.TokenFilePath}  (do not share)");

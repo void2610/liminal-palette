@@ -10,6 +10,8 @@ LiminalPalette の HTTP API (`/api/v1/*`) を叩くシングルファイル CLI�
 - **JSON モード**: `--json` で生 JSON が出るので `jq` と組み合わせ可能
 - **`liminal doctor`**: トークン・cwd 検出・preferred port・キャッシュ・生存ポートを一発で可視化 (`--prune-stale` で古い cache エントリを削除)
 - **`liminal project`**: `show` で設定確認 + ライブ probe、`set-port [--runtime] N` で書き込み、`unset-port [--runtime]` で削除
+- **`liminal init`**: cwd / config / token / Skills / live probe を 1 コマンドで確認 + 任意で port を書き込み (新規プロジェクトの onboarding 用)
+- **JSON Schema**: `ProjectSettings/LiminalPalette.json` に `$schema` 参照を自動付与。VS Code 等の IDE で port / runtimePort の autocomplete + range validation が効く
 
 ## インストール
 
@@ -26,6 +28,10 @@ cp Tools~/liminal/liminal ~/.local/bin/liminal
 ## 使い方
 
 ```bash
+# 新規プロジェクトの onboarding (cwd / config / token / Skills / live probe をまとめて確認)
+liminal init                                   # 状態を確認するだけ
+liminal init --port 7613 --runtime-port 7700   # 同時にポート固定も書き込む
+
 # 生存確認 (認証不要)
 liminal health
 
@@ -77,13 +83,17 @@ liminal run 'Battle/**' --report reports/liminal.xml
 
 ```bash
 # プロジェクト A の repo ルートで
+liminal init --port 7613 --runtime-port 7700  # 1 ショットで両方書き込み + 状態確認
+
+# 個別にも書ける
 liminal project set-port 7613             # Editor (port)
 liminal project set-port --runtime 7700   # Play Mode (runtimePort)
 
 # プロジェクト B の repo ルートで
-liminal project set-port 7620
-liminal project set-port --runtime 7720
+liminal init --port 7620 --runtime-port 7720
 ```
+
+書き出される `ProjectSettings/LiminalPalette.json` は `$schema` 参照を自動で含み、VS Code / JetBrains 系の IDE で `port` / `runtimePort` の autocomplete と範囲チェックが効きます。Schema 本体: [`Documentation~/schemas/LiminalPalette.schema.json`](../../Documentation~/schemas/LiminalPalette.schema.json)。
 
 `ProjectSettings/LiminalPalette.json` は次のような形になる:
 

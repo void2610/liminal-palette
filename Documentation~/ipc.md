@@ -102,8 +102,13 @@ CLI 側が「どのプロジェクトの、Editor 側と Runtime 側のどちら
 
 両方未設定なら `IpcSettings.DefaultPort` (7610)。占有時は port+1, port+2, ... と隣接ポートに最大 5 回リトライする。
 
-ファイルは `liminal project set-port <N>` (Editor) / `liminal project set-port --runtime <N>` (Runtime) で生成 / 更新できる。
+ファイルは `liminal project set-port <N>` (Editor) / `liminal project set-port --runtime <N>` (Runtime)、または
+`liminal init [--port N] [--runtime-port M]` で 1 ショット生成 / 更新できる。
 読み込みは `Void2610.LiminalPalette.Ipc.ProjectConfig.GetPreferredPort()` (Editor) / `GetPreferredRuntimePort()` (Runtime)。
+
+CLI が書き出す JSON には [`Documentation~/schemas/LiminalPalette.schema.json`](schemas/LiminalPalette.schema.json) を指す
+`$schema` 参照が自動的に含まれるので、VS Code / JetBrains 系の IDE で `port` / `runtimePort` の autocomplete と範囲
+バリデーションが効く。`JsonUtility` は未知フィールドを無視するので `$schema` の存在は ProjectConfig 側でも問題にならない。
 
 ### `GET /api/v1/commands` (認証必須)
 

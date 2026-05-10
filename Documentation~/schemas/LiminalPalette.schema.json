@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/void2610/liminal-palette/main/Documentation~/schemas/LiminalPalette.schema.json",
+  "title": "LiminalPalette project config",
+  "description": "<project>/ProjectSettings/LiminalPalette.json schema. プロジェクトごとの IPC サーバ設定 (Editor / Play Mode の固定ポート) を宣言する。読み込みは Void2610.LiminalPalette.Ipc.ProjectConfig が行い、liminal CLI も cwd 検出経由で同じファイルを参照する。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema 参照 URL。IDE の autocomplete / validation 用。手で編集する場合は変更しないこと。"
+    },
+    "port": {
+      "type": "integer",
+      "description": "Editor IpcServer が bind する port。省略時は IpcSettings.DefaultPort (7610)。占有時は port+1, port+2, ... と隣接ポートに最大 5 回リトライする。",
+      "minimum": 1,
+      "maximum": 65535,
+      "examples": [7610, 7613]
+    },
+    "runtimePort": {
+      "type": "integer",
+      "description": "Play Mode / Player ビルド (Runtime IpcServer) が bind する port。省略時は port にフォールバック。port と分けて宣言すると、同じプロジェクトで Editor と Play Mode が衝突せず別ポートに固定される。",
+      "minimum": 1,
+      "maximum": 65535,
+      "examples": [7700]
+    }
+  }
+}

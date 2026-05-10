@@ -127,5 +127,18 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             File.WriteAllText(ConfigPath, "{\"runtimePort\":70000}");
             Assert.IsNull(ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
         }
+
+        [Test]
+        public void GetPreferredPortAt_TolerantToUnknownFields()
+        {
+            // liminal CLI は IDE autocomplete のために $schema を頭に書き出す。
+            // 将来別 field が増える可能性もあるので、未知のキーがあっても port が読めることを保証する。
+            File.WriteAllText(
+                ConfigPath,
+                "{\"$schema\":\"https://example.com/schema.json\"," +
+                "\"port\":7613,\"runtimePort\":7700,\"unknownFutureField\":42}");
+            Assert.AreEqual(7613, ProjectConfig.GetPreferredPortAt(_tempRoot));
+            Assert.AreEqual(7700, ProjectConfig.GetPreferredRuntimePortAt(_tempRoot));
+        }
     }
 }

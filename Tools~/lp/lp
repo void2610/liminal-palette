@@ -1,0 +1,430 @@
+#!/usr/bin/env python3
+# LiminalPalette HTTP API を叩くシングルファイル CLI。
+# 依存は Python 3 標準ライブラリのみ。chmod +x で動かす想定。
+#
+# 使い方:
+#   lp health
+#   lp commands [--filter Player/]
+#   lp exec Player/Health/Set value=100
+#   lp logs --limit 10
+#   lp state [Player/Health]
+#   lp scenarios
+#   lp run Combat/EnemyTakesDamage
+#
+# トークンは ~/.liminal-palette/token を自動で読む。
+# ポートは /health で 7610〜7615 を順に叩いて自動発見する。
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+# -- 設定 -----------------------------------------------------------------
+
+DEFAULT_PORTS = [7610, 7611, 7612, 7613, 7614, 7615]
+DEFAULT_TOKEN_PATH = Path.home() / ".liminal-palette" / "token"
+TIMEOUT_SEC = 10
+
+# -- 端末カラー (TTY のみ) ------------------------------------------------
+
+_USE_COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+def _c(code: str, s: str) -> str:
+    return f"\033[{code}m{s}\033[0m" if _USE_COLOR else s
+
+
+def _green(s): return _c("32", s)
+def _red(s): return _c("31", s)
+def _yellow(s): return _c("33", s)
+def _cyan(s): return _c("36", s)
+def _dim(s): return _c("2", s)
+def _bold(s): return _c("1", s)
+
+
+# -- HTTP -----------------------------------------------------------------
+
+class ApiError(Exception):
+    def __init__(self, status: int, body: str, url: str):
+        self.status = status
+        self.body = body
+        self.url = url
+        super().__init__(f"HTTP {status} {url}: {body}")
+
+
+def _request(method: str, url: str, token: str | None, body: dict | None = None) -> tuple[int, dict | str]:
+    data = None
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as resp:
+            raw = resp.read().decode("utf-8")
+            return resp.status, _try_json(raw)
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        return e.code, _try_json(raw)
+    except urllib.error.URLError as e:
+        raise ApiError(0, str(e.reason), url) from e
+
+
+def _try_json(raw: str):
+    if not raw:
+        return ""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
+# -- ベース URL とトークンの解決 ------------------------------------------
+
+def _read_token(explicit: str | None) -> str | None:
+    if explicit:
+        return explicit
+    env = os.environ.get("LP_TOKEN")
+    if env:
+        return env.strip()
+    if DEFAULT_TOKEN_PATH.is_file():
+        return DEFAULT_TOKEN_PATH.read_text(encoding="utf-8").strip()
+    return None
+
+
+def _discover_base_url(explicit: str | None, port: int | None) -> str:
+    # 明示の --base-url が最優先。
+    if explicit:
+        return explicit.rstrip("/")
+    # 明示の --port があればそれだけ試す。
+    candidates = [port] if port else DEFAULT_PORTS
+    last_err: str | None = None
+    for p in candidates:
+        url = f"http://127.0.0.1:{p}"
+        try:
+            status, _ = _request("GET", f"{url}/api/v1/health", token=None)
+            if status == 200:
+                return url
+        except ApiError as e:
+            last_err = str(e)
+            continue
+    msg = "Liminal Palette サーバーが見つかりません (試したポート: "
+    msg += ",".join(str(p) for p in candidates) + ")"
+    if last_err:
+        msg += f"\n最後のエラー: {last_err}"
+    raise SystemExit(_red(msg))
+
+
+# -- 出力ヘルパ -----------------------------------------------------------
+
+def _emit_json(obj):
+    print(json.dumps(obj, ensure_ascii=False, indent=2))
+
+
+def _check_status(status: int, body) -> None:
+    if 200 <= status < 300:
+        return
+    if isinstance(body, dict) and "error" in body:
+        msg = body["error"]
+    else:
+        msg = str(body)
+    raise SystemExit(_red(f"HTTP {status}: {msg}"))
+
+
+# -- サブコマンド ---------------------------------------------------------
+
+def cmd_health(args, base_url, _token):
+    status, body = _request("GET", f"{base_url}/api/v1/health", token=None)
+    _check_status(status, body)
+    if args.json:
+        _emit_json(body)
+        return
+    print(f"{_green('ok')}  {base_url}")
+    print(f"  version       : {body.get('version')}")
+    print(f"  commandCount  : {body.get('commandCount')}")
+
+
+def cmd_commands(args, base_url, token):
+    status, body = _request("GET", f"{base_url}/api/v1/commands", token)
+    _check_status(status, body)
+    cmds = body.get("commands", []) if isinstance(body, dict) else []
+    if args.filter:
+        cmds = [c for c in cmds if c.get("path", "").startswith(args.filter)]
+    if args.json:
+        _emit_json({"commands": cmds})
+        return
+    if not cmds:
+        print(_dim("(コマンドなし)"))
+        return
+    width = min(max((len(c.get("path", "")) for c in cmds), default=0), 60)
+    for c in cmds:
+        path = c.get("path", "")
+        desc = c.get("description") or ""
+        params = c.get("parameters", []) or []
+        sig = ", ".join(f"{p.get('name')}:{p.get('type')}" for p in params)
+        if sig:
+            sig = f" ({sig})"
+        line = f"  {_cyan(path.ljust(width))}  {desc}{_dim(sig)}"
+        print(line)
+    print(_dim(f"\n  total: {len(cmds)}"))
+
+
+def cmd_exec(args, base_url, token):
+    parsed_args = {}
+    for kv in args.kvargs:
+        if "=" not in kv:
+            raise SystemExit(_red(f"引数は key=value 形式で指定: {kv!r}"))
+        k, v = kv.split("=", 1)
+        parsed_args[k] = v
+    body = {"path": args.path, "args": parsed_args}
+    status, resp = _request("POST", f"{base_url}/api/v1/execute", token, body)
+    _check_status(status, resp)
+    if args.json:
+        _emit_json(resp)
+        # 失敗時はシェル exit code を 2 にする。
+        sys.exit(0 if resp.get("success") else 2)
+    success = resp.get("success", False)
+    if success:
+        head = _green("success")
+    else:
+        head = _red("failed")
+    duration = resp.get("durationMs")
+    print(f"{head}  ({duration} ms)")
+    value = resp.get("value")
+    if value is not None:
+        print(f"  value : {value}")
+    if not success:
+        err = resp.get("error")
+        if err:
+            print(f"  error : {_red(err)}")
+        et = resp.get("exceptionType")
+        if et:
+            print(f"  type  : {et}")
+        st = resp.get("stackTrace")
+        if st:
+            print(_dim(st))
+    logs = resp.get("logs") or []
+    if logs:
+        print(_dim(f"\n  logs ({len(logs)}):"))
+        for log in logs:
+            t = log.get("type", "Log")
+            m = log.get("message", "")
+            color = _red if t == "Error" else (_yellow if t == "Warning" else _dim)
+            print(f"    {color(t)}: {m}")
+    sys.exit(0 if success else 2)
+
+
+def cmd_logs(args, base_url, token):
+    qs = urllib.parse.urlencode({"limit": args.limit}) if args.limit else ""
+    url = f"{base_url}/api/v1/logs" + (f"?{qs}" if qs else "")
+    status, body = _request("GET", url, token)
+    _check_status(status, body)
+    if args.json:
+        _emit_json(body)
+        return
+    invocations = body.get("invocations", [])
+    for inv in invocations:
+        ts = inv.get("timestamp", "")
+        path = inv.get("path", "")
+        result = inv.get("result", {}) or {}
+        ok = result.get("success", False)
+        marker = _green("✓") if ok else _red("✗")
+        dur = result.get("durationMs", 0)
+        args_dict = inv.get("args", {}) or {}
+        args_str = ", ".join(f"{k}={v}" for k, v in args_dict.items())
+        print(f"  {marker}  {_dim(ts)}  {_cyan(path)}  {_dim(f'({dur}ms)')}")
+        if args_str:
+            print(_dim(f"      args: {args_str}"))
+        value = result.get("value")
+        if value is not None:
+            print(_dim(f"      value: {value}"))
+        if not ok:
+            err = result.get("error")
+            if err:
+                print(_red(f"      error: {err}"))
+    print(_dim(f"\n  shown {len(invocations)} / total {body.get('total', '?')}"))
+
+
+def cmd_state(args, base_url, token):
+    if args.path:
+        qs = urllib.parse.urlencode({"path": args.path})
+        url = f"{base_url}/api/v1/state?{qs}"
+    else:
+        url = f"{base_url}/api/v1/state"
+    status, body = _request("GET", url, token)
+    _check_status(status, body)
+    if args.json:
+        _emit_json(body)
+        return
+    if args.path:
+        # 単一: {path, value, type}
+        print(f"  {_cyan(body.get('path', ''))}")
+        print(f"    value : {body.get('value')}")
+        print(f"    type  : {_dim(body.get('type', ''))}")
+        return
+    fields = body.get("fields", [])
+    if not fields:
+        print(_dim("(state なし)"))
+        return
+    width = min(max((len(f.get("path", "")) for f in fields), default=0), 50)
+    for f in fields:
+        path = f.get("path", "")
+        value = f.get("value")
+        type_ = f.get("type", "")
+        resolved = f.get("instanceResolved", True)
+        marker = _green("●") if resolved else _yellow("○")
+        v_disp = "null" if value is None else value
+        print(f"  {marker} {_cyan(path.ljust(width))}  {v_disp} {_dim(f'({type_})')}")
+
+
+def cmd_scenarios(args, base_url, token):
+    status, body = _request("GET", f"{base_url}/api/v1/scenarios", token)
+    _check_status(status, body)
+    scenarios = body.get("scenarios", [])
+    if args.json:
+        _emit_json(body)
+        return
+    if not scenarios:
+        print(_dim("(scenario なし)"))
+        return
+    width = min(max((len(s.get("path", "")) for s in scenarios), default=0), 60)
+    for s in scenarios:
+        path = s.get("path", "")
+        desc = s.get("description") or ""
+        steps = s.get("stepCount", -1)
+        steps_disp = "?" if steps == -1 else str(steps)
+        print(f"  {_cyan(path.ljust(width))}  {desc} {_dim(f'[{steps_disp} steps]')}")
+    print(_dim(f"\n  total: {len(scenarios)}"))
+
+
+def cmd_run(args, base_url, token):
+    if args.steps is not None:
+        # ad-hoc: --steps - は stdin、--steps FILE はファイル読み込み。
+        if args.steps == "-":
+            raw = sys.stdin.read()
+        else:
+            raw = Path(args.steps).read_text(encoding="utf-8")
+        try:
+            steps_obj = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise SystemExit(_red(f"--steps の JSON パースに失敗: {e}"))
+        # 配列直書きと {"steps":[...]} のどちらでも受ける。
+        if isinstance(steps_obj, list):
+            body = {"steps": steps_obj}
+        elif isinstance(steps_obj, dict) and "steps" in steps_obj:
+            body = {"steps": steps_obj["steps"]}
+        else:
+            raise SystemExit(_red("--steps は配列 or {steps:[...]} を渡す"))
+    elif args.path:
+        body = {"path": args.path}
+    else:
+        raise SystemExit(_red("path か --steps を指定"))
+    status, resp = _request("POST", f"{base_url}/api/v1/scenarios/run", token, body)
+    _check_status(status, resp)
+    if args.json:
+        _emit_json(resp)
+        sys.exit(0 if resp.get("success") else 2)
+    ok = resp.get("success", False)
+    head = _green("PASS") if ok else _red("FAIL")
+    dur = resp.get("durationMs")
+    print(f"{head}  {args.path}  ({dur} ms)")
+    if not ok:
+        idx = resp.get("failedAtStep", -1)
+        print(f"  failedAtStep: {idx}")
+    steps = resp.get("steps", []) or []
+    for i, s in enumerate(steps):
+        kind = s.get("kind", "?")
+        s_ok = s.get("success", False)
+        marker = _green("✓") if s_ok else _red("✗")
+        s_dur = s.get("durationMs", 0)
+        extra = ""
+        if kind == "Command":
+            extra = s.get("commandPath", "")
+        elif kind in ("AssertEquals", "AssertNotEquals"):
+            actual = s.get("actualValue")
+            err = s.get("error")
+            extra = f"actual={actual}"
+            if err:
+                extra += f"  {_red(err)}"
+        print(f"  {marker} [{i}] {kind:<16} {extra} {_dim(f'({s_dur}ms)')}")
+    sys.exit(0 if ok else 2)
+
+
+# -- argparse -------------------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="lp",
+        description="LiminalPalette HTTP API CLI",
+    )
+    p.add_argument("--base-url", help="ベース URL を直接指定 (例: http://127.0.0.1:7611)")
+    p.add_argument("--port", type=int, help="ポート番号を指定 (省略時は 7610〜7615 を自動探索)")
+    p.add_argument("--token", help="Bearer トークン (省略時は ~/.liminal-palette/token または $LP_TOKEN)")
+    p.add_argument("--json", action="store_true", help="JSON のままパイプ可能な形で出力")
+
+    sub = p.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("health", help="サーバーの生存確認 (認証不要)")
+
+    sp = sub.add_parser("commands", help="登録コマンドの一覧")
+    sp.add_argument("--filter", help="path のプレフィックスで絞り込み (例: Player/)")
+
+    sp = sub.add_parser("exec", help="コマンド実行")
+    sp.add_argument("path", help="コマンドパス (例: Player/Health/Set)")
+    sp.add_argument("kvargs", nargs="*", help="key=value 形式の引数")
+
+    sp = sub.add_parser("logs", help="実行履歴")
+    sp.add_argument("--limit", type=int, default=20, help="取得件数 (既定 20、上限 200)")
+
+    sp = sub.add_parser("state", help="ConsoleObservableField のスナップショット")
+    sp.add_argument("path", nargs="?", help="単一フィールドの path。省略で全件")
+
+    sub.add_parser("scenarios", help="登録シナリオの一覧")
+
+    sp = sub.add_parser("run", help="シナリオ実行 (named or ad-hoc)")
+    sp.add_argument("path", nargs="?", help="シナリオパス (例: Combat/EnemyTakesDamage)。--steps を使う場合は省略")
+    sp.add_argument("--steps", metavar="FILE_OR_DASH", help="ad-hoc: '-' で stdin、それ以外はファイルから JSON を読む")
+
+    return p
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    token = _read_token(args.token)
+    # health 以外は認証必須なのでトークンが無ければ早期終了。
+    needs_auth = args.command not in ("health",)
+    if needs_auth and not token:
+        raise SystemExit(_red(
+            f"トークンが見つかりません。{DEFAULT_TOKEN_PATH} を作成するか、"
+            "--token か $LP_TOKEN で指定してください。"
+        ))
+
+    base_url = _discover_base_url(args.base_url, args.port)
+
+    handlers = {
+        "health": cmd_health,
+        "commands": cmd_commands,
+        "exec": cmd_exec,
+        "logs": cmd_logs,
+        "state": cmd_state,
+        "scenarios": cmd_scenarios,
+        "run": cmd_run,
+    }
+    handler = handlers[args.command]
+    try:
+        handler(args, base_url, token)
+    except ApiError as e:
+        raise SystemExit(_red(str(e)))
+
+
+if __name__ == "__main__":
+    main()

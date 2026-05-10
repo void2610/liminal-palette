@@ -490,13 +490,26 @@ static void TweakIpcLimits()
 
 ---
 
-## 拡張ポイント (Phase 4 のスコープ外、将来検討)
+## 専用 CLI
+
+`Tools~/lp/lp` に Python 3 標準ライブラリ製のシングルファイル CLI を同梱。
+`chmod +x` するか PATH に symlink すれば `lp health` / `lp exec` / `lp logs` 等が使える。
+
+```bash
+ln -s "$(pwd)/Tools~/lp/lp" ~/.local/bin/lp
+lp health
+lp exec Player/HP/Heal amount=10
+lp logs --limit 10 --json | jq '.invocations[].path'
+```
+
+詳細は [Tools~/lp/README.md](../Tools~/lp/README.md)。
+
+## 拡張ポイント (将来検討)
 
 - WebSocket / SSE によるストリーミング (長時間 async コマンドのプログレス通知)
 - HTTPS / TLS (LAN 経由のリモート用)
 - 動的コマンド登録 API (`POST /api/v1/commands`、任意コード実行リスクのため要慎重)
 - キャンセルトークンの cancel エンドポイント
-- 専用 CLI binary (`lp run` 等)
 
 ---
 

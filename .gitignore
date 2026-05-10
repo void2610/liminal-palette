@@ -25,3 +25,7 @@ Thumbs.db
 *.pidb
 *.suo
 *.userprefs
+
+# Python (Tools~/lp/ 等のスクリプトが生成する中間ファイル)
+__pycache__/
+*.pyc

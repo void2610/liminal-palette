@@ -1,0 +1,16 @@
+/* ============================================================
+   Runtime (UIDocument) 専用のフォント上書き。
+   Editor の EditorWindow では適用しないこと (既定 Inter + OS フォールバックの方が表示品質が高い)。
+
+   WebGL 等システムフォント不在の環境では Unity 既定 Inter フォントが日本語グリフを持たず
+   tofu (□) になるため、Noto Sans JP の Static atlas FontAsset を全体に適用する。
+   font は子孫に継承されるので :root 相当の本セレクタだけで足りる。
+
+   font 系コミット履歴: 56130ae -> 67e0a12 (Dynamic→Static 切替) -> c0d3237 (常用漢字補完)。
+   Dynamic atlas モードは Unity WebGL で FontAsset_TryAddGlyphToAtlas が memory access out of
+   bounds でクラッシュするため使えない。
+   ============================================================ */
+
+.palette-root {
+    -unity-font-definition: url("project://database/Packages/com.void2610.liminal-palette/UI/Resources/Fonts/NotoSansJP.asset");
+}

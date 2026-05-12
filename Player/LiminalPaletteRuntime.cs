@@ -167,6 +167,12 @@ namespace Void2610.LiminalPalette.Player
             // PanelRootElement 自体は PanelSettings の参照解像度に合わせて画面サイズになる。
             var root = _document.rootVisualElement;
             root.style.flexGrow = 1;
+            // Runtime (Play Mode / Player ビルド) 経路でのみ Noto Sans JP FontAsset を適用する。
+            // EditorWindow 経路では既定 Inter + OS フォントフォールバックの方が表示品質が高いため
+            // PaletteStyles.uss からはフォント定義を外し、Runtime 側だけ PaletteFont.uss を追加する。
+            // セレクタは .palette-root で PaletteView 直下にマッチするので root に追加すればカスケードで効く。
+            var fontSheet = Resources.Load<StyleSheet>("PaletteFont");
+            if (fontSheet != null) root.styleSheets.Add(fontSheet);
             _view.style.flexGrow = 1;
             _view.style.position = Position.Absolute;
             _view.style.left = 0;

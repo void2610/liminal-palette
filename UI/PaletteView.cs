@@ -675,24 +675,11 @@ namespace Void2610.LiminalPalette.UI
             var subtitle = row.Q<Label>("row-subtitle");
             var meta = row.Q<Label>("row-meta");
 
-            // 説明があれば主、Path を副。説明が無いコマンドは Path をハイライト付きで主のみに昇格させる。
-            var description = ranked.Descriptor.Description;
-            var hasDescription = !string.IsNullOrEmpty(description);
-            if (hasDescription)
-            {
-                title.text = description;
-                title.style.color = StyleKeyword.Null;
-                subtitle.text = BuildHighlightedPath(ranked.Descriptor.Path, ranked.MatchedIndices);
-                subtitle.style.color = StyleKeyword.Null;
-                subtitle.style.display = DisplayStyle.Flex;
-            }
-            else
-            {
-                title.text = BuildHighlightedPath(ranked.Descriptor.Path, ranked.MatchedIndices);
-                title.style.color = StyleKeyword.Null;
-                subtitle.text = "";
-                subtitle.style.display = DisplayStyle.None;
-            }
+            // 説明は必須前提。1 行目に Description、2 行目に Path (検索ハイライト付き) を必ず表示する。
+            title.text = ranked.Descriptor.Description ?? "";
+            title.style.color = StyleKeyword.Null;
+            subtitle.text = BuildHighlightedPath(ranked.Descriptor.Path, ranked.MatchedIndices);
+            subtitle.style.color = StyleKeyword.Null;
 
             meta.text = FormatCurrentColumn(ranked.Descriptor);
             meta.style.color = StyleKeyword.Null;
@@ -714,22 +701,11 @@ namespace Void2610.LiminalPalette.UI
             var subtitle = row.Q<Label>("row-subtitle");
             var meta = row.Q<Label>("row-meta");
 
-            var hasDescription = !string.IsNullOrEmpty(d.Description);
-            if (hasDescription)
-            {
-                title.text = d.Description;
-                title.style.color = StyleKeyword.Null;
-                subtitle.text = d.Path;
-                subtitle.style.color = StyleKeyword.Null;
-                subtitle.style.display = DisplayStyle.Flex;
-            }
-            else
-            {
-                title.text = d.Path;
-                title.style.color = StyleKeyword.Null;
-                subtitle.text = "";
-                subtitle.style.display = DisplayStyle.None;
-            }
+            // 説明は必須前提。1 行目に Description、2 行目に Path を必ず表示する。
+            title.text = d.Description ?? "";
+            title.style.color = StyleKeyword.Null;
+            subtitle.text = d.Path;
+            subtitle.style.color = StyleKeyword.Null;
 
             var count = _scenarioStepCounts.TryGetValue(d.Path, out var c) ? c : -1;
             meta.text = count < 0 ? "?" : $"{count.ToString(CultureInfo.InvariantCulture)} steps";
@@ -761,7 +737,6 @@ namespace Void2610.LiminalPalette.UI
                 : new Color(0.92f, 0.45f, 0.45f, 1f);
 
             subtitle.style.color = new Color(0.6f, 0.6f, 0.6f, 1f);
-            subtitle.style.display = DisplayStyle.Flex;
             if (showArgs)
             {
                 subtitle.text = FormatArgsSummary(inv.Args);

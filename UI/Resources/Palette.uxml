@@ -11,7 +11,7 @@
 
         <!-- メイン: 結果リスト (VSCode 風 2 段表示。列ヘッダは廃止) -->
         <ui:ListView name="results-list" class="palette-results"
-                     fixed-item-height="42" virtualization-method="FixedHeight"
+                     fixed-item-height="36" virtualization-method="FixedHeight"
                      show-bound-collection-size="false" show-foldout-header="false" />
 
         <!-- 下部固定パネル: Cmd / Status / 引数 / Run ボタン / 結果 -->

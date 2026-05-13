@@ -189,8 +189,8 @@ namespace Void2610.LiminalPalette.UI
             var columnHeader = this.Q<VisualElement>("palette-column-header");
             if (columnHeader != null) columnHeader.style.display = DisplayStyle.None;
 
-            // 行が 2 行構造になったので fixed-item-height を広げる。UXML 側の 28 から上書き。
-            _resultsList.fixedItemHeight = 42;
+            // 行は title + subtitle の 2 段構造。Runtime の Label metrics が乗っても破綻しない高さに調整。
+            _resultsList.fixedItemHeight = 36;
             _resultsList.makeItem = MakeRow;
             _resultsList.bindItem = BindRow;
             _resultsList.selectionType = SelectionType.Single;

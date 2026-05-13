@@ -139,13 +139,17 @@
     border-width: 0;
 }
 
-/* VSCode コマンドパレット風: 説明を 1 段目に大きく、Path を 2 段目に薄く。 */
+/* VSCode コマンドパレット風: 説明を 1 段目に大きく、Path を 2 段目に薄く。
+   Runtime UIDocument の Label はデフォルトで上下 metrics が乗りやすいため、
+   margin / padding を 0 に固定して、title と subtitle が密着して 1 つのカードに
+   見えるようにする。行高は内容 + 上下パディングで決まる小さめの値にする。 */
 .palette-row {
     padding-left: 10px;
     padding-right: 10px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    height: 42px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    height: 36px;
+    overflow: hidden;
 }
 
 .palette-row-selected {
@@ -158,30 +162,39 @@
     flex-shrink: 0;
     font-size: 11px;
     -unity-text-align: middle-left;
+    margin: 0;
+    padding: 0;
 }
 
 .palette-row-text {
     flex-grow: 1;
     flex-shrink: 1;
+    justify-content: center;
+    overflow: hidden;
 }
 
 .palette-row-title {
     color: rgb(232, 232, 232);
     -unity-text-align: middle-left;
     font-size: 13px;
+    margin: 0;
+    padding: 0;
 }
 
 .palette-row-subtitle {
     color: rgb(130, 130, 130);
     -unity-text-align: middle-left;
     font-size: 11px;
-    margin-top: 1px;
+    margin: 0;
+    padding: 0;
 }
 
 .palette-row-meta {
     color: rgb(150, 150, 150);
     -unity-text-align: middle-right;
     font-size: 11px;
+    margin: 0;
+    padding: 0;
 }
 
 .lp-input-error {

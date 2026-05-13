@@ -198,7 +198,15 @@ namespace Void2610.LiminalPalette.Player
             // KeyDownEvent が拾うのでここまで届かないことが多いが、フォーカス外でも Escape で閉じられるよう保険として用意。
             // ↑↓ Enter Tab 等の UI ナビは UIDocument 側で完結するためここでは扱わない。
             if (!IsVisible) return;
-            if (_input.ConsumeCancel()) Hide();
+            if (_input.ConsumeCancel())
+            {
+                // PaletteView.OnKeyDown が直近 1〜2 フレーム以内に Esc を処理していたら、
+                // それは「引数フローを抜ける」など UI 内部での消費なので Hide しない。
+                // (IMGUI イベントは UIToolkit の OnKeyDown が走るフレームと別フレームで
+                //  Update に届くことがあるため許容窓を 2 フレームとる)。
+                if (_view != null && Time.frameCount - _view.LastEscFrame <= 2) return;
+                Hide();
+            }
         }
 
         // EventPaletteInput は IMGUI 経由で KeyDown を拾う設計のため、ここで Event.current を流し込む。

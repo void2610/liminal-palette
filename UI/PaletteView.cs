@@ -56,13 +56,6 @@ namespace Void2610.LiminalPalette.UI
         // 直前にバインドされたコマンドのパス。SelectedCommand が変わったときだけ引数パネルを再構築する。
         private string _boundCommandPath;
 
-        // PaletteView.OnKeyDown で Esc を処理した最後のフレーム番号。
-        // Runtime (LiminalPaletteRuntime) は IMGUI 経由で Esc を別ルートで拾い、
-        // 同じ Esc 1 回に対して PaletteView 側と Runtime 側の両方が反応してしまうため、
-        // 直近フレームに UI 側で消費された Esc はランタイムが無視できるよう公開する。
-        private int _lastEscFrame = -100;
-        public int LastEscFrame => _lastEscFrame;
-
         // VSCode 風の複数ステップ引数入力フロー用の状態。
         // Enter で 1 つずつパラメータを確定していき、最後の Enter で実行する。
         // Esc で検索 (results-list) モードに戻す。フロー中は results-list と bottom 引数パネルを隠す。
@@ -1182,7 +1175,9 @@ namespace Void2610.LiminalPalette.UI
             _resultsList.style.display = DisplayStyle.Flex;
             if (_bottom != null) _bottom.style.display = DisplayStyle.Flex;
             if (clearArgs) _currentArgValues.Clear();
-            // 検索バーに戻す。
+            // 検索バーに戻す。同フレーム内で focus を再付与しておかないと、Runtime 側の
+            // Esc フォールバックが「パレット内にフォーカス無し」と誤判定して Hide を呼ぶ可能性がある。
+            _searchInput?.Focus();
             schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
         }
 
@@ -1271,7 +1266,6 @@ namespace Void2610.LiminalPalette.UI
                         evt.StopImmediatePropagation();
                         return;
                     case KeyCode.Escape:
-                        _lastEscFrame = Time.frameCount;
                         EndParamFlow(clearArgs: true);
                         evt.StopImmediatePropagation();
                         return;
@@ -1304,7 +1298,6 @@ namespace Void2610.LiminalPalette.UI
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Escape:
-                    _lastEscFrame = Time.frameCount;
                     CloseRequested?.Invoke();
                     evt.StopImmediatePropagation();
                     break;

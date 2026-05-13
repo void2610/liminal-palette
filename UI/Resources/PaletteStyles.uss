@@ -139,10 +139,13 @@
     border-width: 0;
 }
 
+/* VSCode コマンドパレット風: 説明を 1 段目に大きく、Path を 2 段目に薄く。 */
 .palette-row {
     padding-left: 10px;
     padding-right: 10px;
-    height: 28px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    height: 42px;
 }
 
 .palette-row-selected {
@@ -154,33 +157,95 @@
     width: 14px;
     flex-shrink: 0;
     font-size: 11px;
-}
-
-.palette-row-path {
-    color: rgb(228, 228, 228);
     -unity-text-align: middle-left;
-    font-size: 12px;
 }
 
-.palette-row-description {
+.palette-row-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.palette-row-title {
+    color: rgb(232, 232, 232);
+    -unity-text-align: middle-left;
+    font-size: 13px;
+}
+
+.palette-row-subtitle {
+    color: rgb(130, 130, 130);
+    -unity-text-align: middle-left;
+    font-size: 11px;
+    margin-top: 1px;
+}
+
+.palette-row-meta {
     color: rgb(150, 150, 150);
-    -unity-text-align: middle-left;
+    -unity-text-align: middle-right;
     font-size: 11px;
-    width: 240px;
-    flex-shrink: 0;
-}
-
-.palette-row-current {
-    color: rgb(228, 228, 228);
-    -unity-text-align: middle-left;
-    font-size: 11px;
-    width: 80px;
-    flex-shrink: 0;
 }
 
 .lp-input-error {
     border-color: rgb(230, 110, 110);
     border-width: 1px;
+}
+
+/* ============================================================
+   Param flow panel (VSCode QuickPick 風の複数ステップ入力)
+   ============================================================ */
+
+.palette-param-flow {
+    background-color: rgba(22, 22, 26, 0.95);
+    border-top-width: 1px;
+    border-top-color: rgb(45, 45, 50);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(45, 45, 50);
+}
+
+.palette-param-flow-cmd {
+    color: rgb(180, 200, 240);
+    font-size: 13px;
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.palette-param-flow-breadcrumbs {
+    margin-bottom: 6px;
+}
+
+.palette-param-flow-chip {
+    color: rgb(200, 200, 200);
+    background-color: rgba(56, 64, 82, 0.6);
+    font-size: 11px;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    margin-right: 4px;
+    margin-bottom: 2px;
+    border-radius: 3px;
+}
+
+.palette-param-flow-step {
+    color: rgb(228, 228, 228);
+    font-size: 12px;
+    -unity-font-style: bold;
+    margin-bottom: 2px;
+}
+
+.palette-param-flow-step-desc {
+    color: rgb(150, 150, 150);
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+
+.palette-param-flow-editor {
+    margin-bottom: 6px;
+}
+
+.palette-param-flow-hint {
+    color: rgb(120, 120, 120);
+    font-size: 10px;
+    -unity-text-align: middle-left;
 }
 
 /* ============================================================

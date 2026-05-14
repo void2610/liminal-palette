@@ -1,8 +1,8 @@
 using NUnit.Framework;
 using UnityEngine;
-using Void2610.LiminalPalette.Player;
+using Void2610.LiminalPalette.Runtime;
 
-namespace Void2610.LiminalPalette.Tests.Player
+namespace Void2610.LiminalPalette.Tests.Runtime
 {
     public sealed class PaletteInputFactoryTests
     {

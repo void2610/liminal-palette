@@ -1,4 +1,4 @@
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// Runtime におけるパレットの入力経路の抽象化。

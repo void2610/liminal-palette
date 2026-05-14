@@ -8,14 +8,15 @@ using Void2610.LiminalPalette.Ipc.Endpoints;
 using Void2610.LiminalPalette.Ipc.Server;
 using Void2610.LiminalPalette.Ipc.Threading;
 
-namespace Void2610.LiminalPalette.Player.Ipc
+namespace Void2610.LiminalPalette.Runtime.Ipc
 {
     /// <summary>
     /// Runtime (Player ビルド / Play Mode) で IPC HTTP サーバーを立てるブートストラップ。
     ///
     /// 三重防御:
-    ///   (1) asmdef defineConstraints: "UNITY_EDITOR || DEVELOPMENT_BUILD"
+    ///   (1) asmdef defineConstraints: "UNITY_EDITOR || DEVELOPMENT_BUILD || LIMINAL_PALETTE_FORCE_ENABLE"
     ///       → Production ビルドでは asmdef 自体がコンパイルされず、HttpServer のシンボルが Player に混入しない。
+    ///         FORCE_ENABLE は QA ビルド等の明示的オプトイン用で、デフォルトでは未定義。
     ///   (2) ProductionGuard.ShouldDisableInRuntime
     ///       → 設定で「Production ビルドでは無効」を明示できる。
     ///   (3) IpcSettings.EnableInRuntime = false

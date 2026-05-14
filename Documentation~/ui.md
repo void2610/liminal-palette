@@ -182,7 +182,7 @@ Runtime UI は **画面全体を半透明黒でディマー** したオーバー
 
 仕組み:
 - `PaletteInputBlocker` が **静的イベント** `OnEngage` / `OnDisengage` を提供
-- `Player.InputSystem` asmdef (defineConstraint で隔離) が両イベントを購読:
+- `Runtime.InputSystem` asmdef (defineConstraint で隔離) が両イベントを購読:
   - **Engage**: 全 `InputActionAsset` の `actionMaps` をスナップショットして `Disable()`
   - **Disengage**: スナップショットされた map を `Enable()` で復元
 

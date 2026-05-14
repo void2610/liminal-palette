@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- 組み込みランタイムコマンド `Time/SetScale` / `Time/Reset` / `Time/Pause` / `Time/Resume` + 観測フィールド `Time/Scale` (静的 `ReactiveProperty<float>`) を追加 (`Runtime/Time/TimeCommands.cs`)。`Editor/` prefix ではないので Editor / PlayMode / Player ビルドの 3 経路すべてから呼べる。`AssertEquals("Time/Scale", 5f)` でシナリオから検証可能。`Time.timeScale` 変更通知 API が無いため、`TimeScalePoller` (HideAndDontSave な常駐 GameObject) で 1 フレームごとにポーリングして外部書き換えも追従させる。
+- `ObservableFieldDescriptor.IsStatic` を追加: `static` プロパティ / フィールドに `[LiminalObservableField]` を付けた場合、UI / IPC / Scenario の各経路が `IInstanceResolver` を経由せずに値を読めるようになった。組み込み `Time/Scale` のような static utility 用途を VContainer 登録なしで成立させるため。
 - `liminal init` サブコマンド: cwd→Unity プロジェクト検出 / `ProjectSettings/LiminalPalette.json` 状態 / token / `.claude/skills/` の AI Skills / live probe を 1 コマンドで一覧。`--port` / `--runtime-port` を渡すとその場で固定ポートも書き込む。新規プロジェクトの onboarding 用。
 - `ProjectSettings/LiminalPalette.json` の JSON Schema (`Documentation~/schemas/LiminalPalette.schema.json`) を同梱。CLI が書き出すファイルに `$schema` 参照を自動付与するので、VS Code / JetBrains 系 IDE で `port` / `runtimePort` の autocomplete と範囲チェックが効く。`JsonUtility` は未知フィールドを無視するため `ProjectConfig` 側に影響なし (`Tests/Editor/Ipc/ProjectConfigTests.cs:GetPreferredPortAt_TolerantToUnknownFields` で回帰テスト)。
 - `liminal run` がシナリオパスの glob (例: `liminal run 'Battle/*'`) に対応。`/api/v1/scenarios` を引いて `fnmatch` で一致するシナリオを順次実行し、最後にサマリ (`N scenarios, X passed, Y failed`) を表示する。1 つでも失敗すれば exit code 2。
@@ -19,6 +21,7 @@
 - `liminal project show` / `liminal project set-port [--runtime] <N>` / `liminal project unset-port [--runtime]`: cwd 配下のプロジェクト固定ポート設定を表示 / 編集するコマンド。`show` はライブ probe で listener の現在位置も表示する。
 
 ### Changed
+- ランタイム asmdef を `Void2610.LiminalPalette.Player` → `Void2610.LiminalPalette.Runtime` にリネーム (フォルダも `Player/` → `Runtime/`)。サブ asmdef も `Runtime.Ipc` / `Runtime.InputSystem` に追従。Unity Package Manager の標準慣習 (`Runtime/`) に合わせると同時に、利用側ゲームの「プレイヤー (キャラクター)」ドメインと名前衝突を回避するため。**Breaking**: 利用側 asmdef の references で `Void2610.LiminalPalette.Player` を参照していた箇所は `Void2610.LiminalPalette.Runtime` に書き換え必須。
 - CLI コマンド名を `lp` から `liminal` に変更 (`lp` は macOS の line printer ユーティリティと衝突するため)。`Tools~/lp/` → `Tools~/liminal/`、AI Skill 名も `lp-*` → `liminal-*` にリネーム。AISkillsInstaller の Uninstall は legacy `lp-*` ディレクトリも自動的に掃除する。
 
 ### Fixed

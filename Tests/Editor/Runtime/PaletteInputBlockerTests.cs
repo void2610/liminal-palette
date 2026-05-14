@@ -1,10 +1,10 @@
 using NUnit.Framework;
-using Void2610.LiminalPalette.Player;
+using Void2610.LiminalPalette.Runtime;
 
-namespace Void2610.LiminalPalette.Tests.Player
+namespace Void2610.LiminalPalette.Tests.Runtime
 {
     /// <summary>
-    /// PaletteInputBlocker は Player asmdef では薄いフックポイントだけを提供する。
+    /// PaletteInputBlocker は Runtime asmdef では薄いフックポイントだけを提供する。
     /// Engage / Disengage の冪等性 + イベントが想定通り発火することを EditMode で検証する。
     /// </summary>
     public sealed class PaletteInputBlockerTests

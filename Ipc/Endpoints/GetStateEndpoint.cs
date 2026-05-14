@@ -30,8 +30,9 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 {
                     var d = registry.Find(path);
                     if (d == null) return IpcResponse.NotFound($"ObservableField not found: {path}");
-                    var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-                    if (instance == null) return IpcResponse.InternalError(
+                    // IsStatic な field は VContainer 登録不要 (静的 utility 想定)。instance=null で読む。
+                    var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
+                    if (!d.IsStatic && instance == null) return IpcResponse.InternalError(
                         $"Instance not resolved for {d.DeclaringType?.FullName ?? "<unknown>"}.");
                     var value = d.ReadCurrent(instance);
                     w.BeginObject();
@@ -50,14 +51,16 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 for (var i = 0; i < all.Count; i++)
                 {
                     var d = all[i];
-                    var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-                    var value = instance != null ? d.ReadCurrent(instance) : null;
+                    // IsStatic は instance=null でも instanceResolved=true として扱う (VContainer 経路を通らない)。
+                    var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
+                    var resolved = d.IsStatic || instance != null;
+                    var value = resolved ? d.ReadCurrent(instance) : null;
                     w.BeginObject();
                     w.WriteString("path", d.Path);
                     if (value == null) w.WriteNull("value");
                     else w.WriteString("value", TypeConverterRegistry.ToDisplayString(value));
                     w.WriteString("type", d.ValueType?.Name ?? "");
-                    w.WriteBool("instanceResolved", instance != null);
+                    w.WriteBool("instanceResolved", resolved);
                     w.EndObject();
                 }
                 w.EndArray();

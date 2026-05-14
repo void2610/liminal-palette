@@ -265,8 +265,8 @@ AI Agent 側で `/health` スキャンする運用を推奨。
 
 **A**: LiminalPalette の HTTP サーバーは Production ビルドでは **絶対に起動しない**。
 
-- asmdef `Player.Ipc` の `defineConstraints` でコンパイル除外
-- ビルドログに「`Void2610.LiminalPalette.Player.Ipc` skipped」と出る
+- asmdef `Runtime.Ipc` の `defineConstraints` でコンパイル除外
+- ビルドログに「`Void2610.LiminalPalette.Runtime.Ipc` skipped」と出る
 
 `lsof` で何か出る場合、それは LiminalPalette ではない別プロセス (調べる)。
 
@@ -292,7 +292,7 @@ strings Build/MyGame.app/Contents/Resources/Data/Managed/*.dll | grep "LiminalPa
 
 **A**: 利用側 asmdef の references から漏れている。
 
-UI / Editor / Player.InputSystem / Player.Ipc は `autoReferenced: false` または `defineConstraints` 付きなので、必要なら明示参照する:
+UI / Editor / Runtime.InputSystem / Runtime.Ipc は `autoReferenced: false` または `defineConstraints` 付きなので、必要なら明示参照する:
 
 ```json
 "references": [
@@ -308,7 +308,7 @@ UI / Editor / Player.InputSystem / Player.Ipc は `autoReferenced: false` また
 **A**: 起こりえない (asmdef ごとコンパイル除外されているため)。
 
 別の原因:
-- 利用側コードが `Void2610.LiminalPalette.Player.Ipc` を直接参照している → `#if UNITY_EDITOR || DEVELOPMENT_BUILD` で囲む
+- 利用側コードが `Void2610.LiminalPalette.Runtime.Ipc` を直接参照している → `#if UNITY_EDITOR || DEVELOPMENT_BUILD` で囲む
 - Player Settings の Scripting Define Symbols に矛盾がある
 
 ### Q. Runtime ホットキー検出はどの入力経路を使っている？

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// IPaletteInput の生成口。

@@ -11,11 +11,18 @@ namespace Void2610.LiminalPalette
         public string Path { get; }
         public string Description { get; }
 
-        /// <summary>所属型 (= IInstanceResolver.Resolve に渡す型)。</summary>
+        /// <summary>所属型 (= IInstanceResolver.Resolve に渡す型)。IsStatic=true の場合は読み取りに使われない。</summary>
         public Type DeclaringType { get; }
 
         /// <summary>値の型 T (ReactiveProperty&lt;T&gt; / Observable&lt;T&gt; の T)。</summary>
         public Type ValueType { get; }
+
+        /// <summary>
+        /// 静的メンバー (static property / static field) かどうか。
+        /// true なら UI / HTTP は IInstanceResolver を経由せず、ReadCurrent / Subscribe に null を渡せる。
+        /// 用途: 組み込み Time/Scale など、所属クラスが static utility のケースを VContainer 登録なしで扱う。
+        /// </summary>
+        public bool IsStatic { get; }
 
         /// <summary>
         /// インスタンスから現在値を取り出す関数。
@@ -37,7 +44,8 @@ namespace Void2610.LiminalPalette
             Type declaringType,
             Type valueType,
             Func<object, object> readCurrent,
-            Func<object, Action<object>, IDisposable> subscribe)
+            Func<object, Action<object>, IDisposable> subscribe,
+            bool isStatic = false)
         {
             Path = path;
             Description = description ?? "";
@@ -45,6 +53,7 @@ namespace Void2610.LiminalPalette
             ValueType = valueType;
             ReadCurrent = readCurrent;
             Subscribe = subscribe;
+            IsStatic = isStatic;
         }
     }
 }

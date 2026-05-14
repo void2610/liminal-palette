@@ -107,10 +107,17 @@ namespace Void2610.LiminalPalette
         private static bool TryBuildFromProperty(Type declaringType, PropertyInfo prop,
             LiminalObservableFieldAttribute attr, out ObservableFieldDescriptor descriptor, out string error)
         {
+            // 静的プロパティかどうかは getter (= 値を取り出す側) の IsStatic で判定する。
+            // get アクセッサが無い場合は読めないので false 扱い (TryBuildCommon 側で問題にはならない、
+            // 直後の getMember 呼び出しが例外を投げるが、現実的には [LiminalObservableField] が
+            // get 必須のため到達しない経路)。
+            var getter = prop.GetGetMethod(nonPublic: false);
+            var isStatic = getter != null && getter.IsStatic;
             return TryBuildCommon(
                 declaringType, prop.PropertyType, attr,
                 getMember: instance => prop.GetValue(instance),
                 memberName: prop.Name,
+                isStatic: isStatic,
                 outDescriptor: out descriptor,
                 outError: out error);
         }
@@ -122,6 +129,7 @@ namespace Void2610.LiminalPalette
                 declaringType, field.FieldType, attr,
                 getMember: instance => field.GetValue(instance),
                 memberName: field.Name,
+                isStatic: field.IsStatic,
                 outDescriptor: out descriptor,
                 outError: out error);
         }
@@ -130,6 +138,7 @@ namespace Void2610.LiminalPalette
         // それ以外は false を返してスキップさせる。
         private static bool TryBuildCommon(Type declaringType, Type memberType,
             LiminalObservableFieldAttribute attr, Func<object, object> getMember, string memberName,
+            bool isStatic,
             out ObservableFieldDescriptor outDescriptor, out string outError)
         {
             outDescriptor = null;
@@ -186,7 +195,8 @@ namespace Void2610.LiminalPalette
                 declaringType: declaringType,
                 valueType: valueType,
                 readCurrent: readCurrent,
-                subscribe: subscribe);
+                subscribe: subscribe,
+                isStatic: isStatic);
             return true;
         }
 

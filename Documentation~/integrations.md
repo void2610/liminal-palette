@@ -153,7 +153,7 @@ UI の Status 行にも同じメッセージが出る。
 理由:
 - 利用側が R3 + VContainer 慣れている前提なら、抽象を挟むより直接型を使う方が圧倒的に書きやすい (`.AsObservable()` の儀式不要、`SetInstanceResolver` 手書き不要)
 - 本リポジトリは中規模ゲーム開発前提で R3 + VContainer 導入済み
-- 将来 OSS 配布時に必要なら `defineConstraints` で隔離する選択肢を残す (Phase 3 の `Player.InputSystem` パターン)
+- 将来 OSS 配布時に必要なら `defineConstraints` で隔離する選択肢を残す (Phase 3 の `Runtime.InputSystem` パターン)
 
 利用側で R3 / VContainer を使わない選択肢を残したいなら、Phase 4 までの状態 (commit `e081958` 時点) を fork して使う。
 

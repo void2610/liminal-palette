@@ -174,6 +174,15 @@ namespace Void2610.LiminalPalette.UI
                 header.Add(_headerSubmitButton);
             }
 
+            // モバイル (WebGL) のソフトキーボードでは「完了 / Return」が KeyDownEvent や
+            // NavigationSubmitEvent を発火させず、入力欄の blur (= フォーカス解除) のみが起きる
+            // 端末がある。そのため、検索バーの FocusOutEvent を「Enter 押下」相当として拾う。
+            // 別要素 (行 / Submit ボタン) にフォーカスが移ったケースは除外するため次フレームで確認する。
+            if (_searchInput != null)
+            {
+                _searchInput.RegisterCallback<FocusOutEvent>(OnSearchInputFocusOut);
+            }
+
             // Phase 5a: ObservableFieldsView を引数パネルの直前 (上) に挿入。
             // 選択コマンドが変わるたびに ShowFor(path) で再構築。
             _observableFields = new ObservableFieldsView();
@@ -1267,6 +1276,11 @@ namespace Void2610.LiminalPalette.UI
             var ve = editor.Build(param, value => _currentArgValues[paramName] = value);
             _paramFlowEditorHost.Add(ve);
 
+            // モバイル WebGL のソフトキーボード「完了」対応として、エディタ内のフォーカス可能要素 (TextField 等)
+            // が blur したら advance するよう FocusOutEvent をフック。submit ボタンへフォーカスが移ったケースは
+            // OnParamFlowEditorFocusOut 側で除外する。
+            HookFocusOutForParamFlow(ve);
+
             // 次フレームでエディタ内部の入力欄にフォーカスを当てる。
             schedule.Execute(() =>
             {
@@ -1275,30 +1289,56 @@ namespace Void2610.LiminalPalette.UI
             }).ExecuteLater(0);
         }
 
+        // 引数フローエディタの子孫 (TextField の input element など) すべてに FocusOutEvent を仕込む。
+        // VisualElement.Query<VisualElement>().ForEach は子孫を辿るユーティリティだが、最低限の依存で
+        // 済むよう手書きの再帰で巡回する。
+        private void HookFocusOutForParamFlow(VisualElement root)
+        {
+            if (root == null) return;
+            root.RegisterCallback<FocusOutEvent>(OnParamFlowEditorFocusOut);
+            for (var i = 0; i < root.childCount; i++)
+            {
+                HookFocusOutForParamFlow(root[i]);
+            }
+        }
+
+        // 連続発火ガード: 物理 Enter (NavigationSubmit) と blur (FocusOut) が同一操作で
+        // 二度入ってくる可能性があるため、進行中の advance を 1 つに直列化する。
+        private bool _advancing;
+
         // フロー中の Enter ハンドラ。確定 → 次へ / 最終ステップなら実行。
         private async System.Threading.Tasks.Task AdvanceParamFlowAsync()
         {
-            // AutoComplete エディタが先頭候補で確定可能なら拾う (旧 Enter ハンドラと同じ救済)。
-            for (var j = 0; j < _paramFlowEditorHost.childCount; j++)
+            if (_advancing || !_paramFlowActive) return;
+            _advancing = true;
+            try
             {
-                if (_paramFlowEditorHost[j].userData is Func<bool> tryComplete && tryComplete())
-                    break;
+                // AutoComplete エディタが先頭候補で確定可能なら拾う (旧 Enter ハンドラと同じ救済)。
+                for (var j = 0; j < _paramFlowEditorHost.childCount; j++)
+                {
+                    if (_paramFlowEditorHost[j].userData is Func<bool> tryComplete && tryComplete())
+                        break;
+                }
+
+                var cmd = _paramFlowCommand;
+                if (cmd == null) { EndParamFlow(clearArgs: false); return; }
+
+                _paramFlowIndex++;
+                if (_paramFlowIndex >= cmd.Parameters.Count)
+                {
+                    // フロー完了 → 検索 UI に戻してから実行 (結果表示は bottom の ResultView で見せる)。
+                    EndParamFlow(clearArgs: false);
+                    await _controller.ExecuteSelectedAsync(_currentArgValues);
+                    _currentArgValues.Clear();
+                    _boundCommandPath = null;
+                    return;
+                }
+                ShowCurrentParamFlowStep();
             }
-
-            var cmd = _paramFlowCommand;
-            if (cmd == null) { EndParamFlow(clearArgs: false); return; }
-
-            _paramFlowIndex++;
-            if (_paramFlowIndex >= cmd.Parameters.Count)
+            finally
             {
-                // フロー完了 → 検索 UI に戻してから実行 (結果表示は bottom の ResultView で見せる)。
-                EndParamFlow(clearArgs: false);
-                await _controller.ExecuteSelectedAsync(_currentArgValues);
-                _currentArgValues.Clear();
-                _boundCommandPath = null;
-                return;
+                _advancing = false;
             }
-            ShowCurrentParamFlowStep();
         }
 
         // ------------------------------------------------------------
@@ -1308,6 +1348,54 @@ namespace Void2610.LiminalPalette.UI
         // 物理キーボードの Enter, ソフトキーボードの「完了」/ Submit ボタン, ゲームパッドの A 等を
         // すべて受ける汎用ハンドラ。スマホでは KeyDownEvent が来ないため、確定系の操作は
         // 必ずここを通す。
+        // 検索バーがフォーカスを失った瞬間のハンドラ。モバイル WebGL の「完了」キー対応として、
+        // 別の UI 要素にフォーカスが移っていない (= フォーカスが null になった) 場合のみ、
+        // ソフトキーボードの確定操作とみなして ExecuteSelectedAsync を呼ぶ。
+        // - 行をタップ / Submit ボタンをタップ → 対応する要素に focus が移るので何もしない
+        // - 引数フローへの遷移で programmatic に focus 移動 → focus は editor に移るので何もしない
+        // - パレットを閉じた直後 → IsVisible が false なので何もしない
+        private void OnSearchInputFocusOut(FocusOutEvent _)
+        {
+            if (style.display.value != DisplayStyle.Flex) return;
+            if (_paramFlowActive) return;
+            schedule.Execute(() =>
+            {
+                if (style.display.value != DisplayStyle.Flex) return;
+                if (_paramFlowActive) return;
+                var focused = focusController?.focusedElement as VisualElement;
+                if (focused != null) return; // 他の UI 要素にフォーカスが移った → 通常操作
+                // フォーカスがどの UI 要素にも当たっていない = モバイル soft keyboard の「完了」とみなす。
+                var _ = ExecuteSelectedAsync();
+            }).ExecuteLater(0);
+        }
+
+        // 引数フローエディタがフォーカスを失った瞬間のハンドラ。検索バーと同じ理屈で、
+        // フォーカスが引数フローパネル外 (= ソフトキーボード dismiss など) に抜けたら AdvanceParamFlowAsync。
+        // 「次へ」ボタンに移った場合はそちらの click ハンドラが advance するので、ここでは何もしない。
+        private void OnParamFlowEditorFocusOut(FocusOutEvent _)
+        {
+            if (!_paramFlowActive) return;
+            schedule.Execute(() =>
+            {
+                if (!_paramFlowActive) return;
+                var focused = focusController?.focusedElement as VisualElement;
+                // パネル内 (Submit ボタン / 次の editor 等) にフォーカスが残っていれば、こちらでは確定しない。
+                if (focused != null && IsDescendantOf(focused, _paramFlowPanel)) return;
+                var _ = AdvanceParamFlowAsync();
+            }).ExecuteLater(0);
+        }
+
+        private static bool IsDescendantOf(VisualElement el, VisualElement ancestor)
+        {
+            if (ancestor == null) return false;
+            while (el != null)
+            {
+                if (el == ancestor) return true;
+                el = el.parent;
+            }
+            return false;
+        }
+
         private void OnNavigationSubmit(NavigationSubmitEvent evt)
         {
             if (_paramFlowActive)

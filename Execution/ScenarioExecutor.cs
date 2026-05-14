@@ -216,11 +216,10 @@ namespace Void2610.LiminalPalette
             if (d == null)
                 return StepResult.Fail(step, $"ObservableField not found: {step.ObservableFieldPath}");
 
-            // インスタンス解決。static なフィールドは現状の ObservableField スキャナでも対象になり得るが、
-            // ReadCurrent は instance を null で渡しても動くので一旦 null 許容。
-            var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-            // instance が null でも static フィールドなら ReadCurrent(null) で値が取れることがある。
+            // インスタンス解決。IsStatic な field は VContainer 登録不要 (静的 utility 想定) なので
+            // Resolve を経由せず instance=null のまま ReadCurrent に渡す。
             // インスタンスフィールドで instance が null の場合は ReadCurrent 内部で例外になり下の catch で吸い上げる。
+            var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
 
             object actual;
             try

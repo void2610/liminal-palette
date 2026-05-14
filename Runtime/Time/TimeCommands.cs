@@ -19,11 +19,9 @@ namespace Void2610.LiminalPalette.Runtime
 
         [LiminalCommand("Time/SetScale", Description = "Time.timeScale を指定値に設定 (例: 0=停止, 1=等速, 10=10倍速)")]
         public static string SetScale(
-            [LiminalParam(Description = "スケール (0 以上)")] float scale)
+            [LiminalParam(Description = "スケール (0 以上)", Min = 0f)] float scale)
         {
-            // 負値は Unity 仕様で例外こそ起きないが意味が無いので 0 にクランプする。
-            // ここで黙ってクランプするのは「シナリオ側の typo を即クラッシュさせない」配慮。
-            if (scale < 0f) scale = 0f;
+            // 負値バリデーションは ArgumentBinder が Min で行うため、ここに到達した時点で scale >= 0 は保証される。
             Time.timeScale = scale;
             return $"Time.timeScale = {Time.timeScale}";
         }

@@ -37,9 +37,6 @@ namespace Void2610.LiminalPalette.UI
         private Button _runButton;
         private ResultView _resultView;
         private Label _logStackLabel;
-        private Label _columnPath;
-        private Label _columnDescription;
-        private Label _columnCurrent;
 
         private ViewMode _mode = ViewMode.Commands;
         // Logs / History タブ用の最新スナップショット (新しい順)。InvocationStore.Changed のたびに再構築する。
@@ -58,6 +55,20 @@ namespace Void2610.LiminalPalette.UI
 
         // 直前にバインドされたコマンドのパス。SelectedCommand が変わったときだけ引数パネルを再構築する。
         private string _boundCommandPath;
+
+        // VSCode 風の複数ステップ引数入力フロー用の状態。
+        // Enter で 1 つずつパラメータを確定していき、最後の Enter で実行する。
+        // Esc で検索 (results-list) モードに戻す。フロー中は results-list と bottom 引数パネルを隠す。
+        private bool _paramFlowActive;
+        private CommandDescriptor _paramFlowCommand;
+        private int _paramFlowIndex;
+        private VisualElement _paramFlowPanel;
+        private Label _paramFlowCmdLabel;
+        private VisualElement _paramFlowBreadcrumbs;
+        private Label _paramFlowStepInfo;
+        private Label _paramFlowStepDesc;
+        private VisualElement _paramFlowEditorHost;
+        private Label _paramFlowHint;
 
         // Scenario モード用の状態。
         // _scenarioSnapshot は registry から最新を引いたもの (検索クエリで絞り込み済み)。
@@ -173,15 +184,68 @@ namespace Void2610.LiminalPalette.UI
             _logStackLabel.style.display = DisplayStyle.None;
             _bottom.Add(_logStackLabel);
 
-            // 列ヘッダの Label 参照を保持してモードに応じて文言を切り替える。
+            // VSCode 風に description-first の 2 段表示にしたため、テーブル列ヘッダは廃止する。
+            // 互換のため UXML 側の要素は残しているが表示はしない。
             var columnHeader = this.Q<VisualElement>("palette-column-header");
-            _columnPath = columnHeader.Q<Label>(className: "palette-column-header-path");
-            _columnDescription = columnHeader.Q<Label>(className: "palette-column-header-description");
-            _columnCurrent = columnHeader.Q<Label>(className: "palette-column-header-current");
+            if (columnHeader != null) columnHeader.style.display = DisplayStyle.None;
 
+            // 行は title + subtitle の 2 段構造。Runtime の Label metrics が乗っても破綻しない高さに調整。
+            _resultsList.fixedItemHeight = 36;
             _resultsList.makeItem = MakeRow;
             _resultsList.bindItem = BindRow;
             _resultsList.selectionType = SelectionType.Single;
+
+            BuildParamFlowPanel();
+        }
+
+        // VSCode の QuickPick 的な複数ステップ入力 UI。results-list と同じ位置に重ねず、
+        // results-list の直前に挿入してフロー中だけ display:Flex にする。
+        private void BuildParamFlowPanel()
+        {
+            _paramFlowPanel = new VisualElement { name = "palette-param-flow" };
+            _paramFlowPanel.AddToClassList("palette-param-flow");
+            _paramFlowPanel.style.display = DisplayStyle.None;
+            _paramFlowPanel.style.flexDirection = FlexDirection.Column;
+            _paramFlowPanel.style.flexShrink = 0;
+            _paramFlowPanel.style.paddingLeft = 12;
+            _paramFlowPanel.style.paddingRight = 12;
+            _paramFlowPanel.style.paddingTop = 12;
+            _paramFlowPanel.style.paddingBottom = 12;
+
+            _paramFlowCmdLabel = new Label();
+            _paramFlowCmdLabel.AddToClassList("palette-param-flow-cmd");
+            _paramFlowPanel.Add(_paramFlowCmdLabel);
+
+            _paramFlowBreadcrumbs = new VisualElement { name = "palette-param-flow-breadcrumbs" };
+            _paramFlowBreadcrumbs.AddToClassList("palette-param-flow-breadcrumbs");
+            _paramFlowBreadcrumbs.style.flexDirection = FlexDirection.Row;
+            _paramFlowBreadcrumbs.style.flexWrap = Wrap.Wrap;
+            _paramFlowPanel.Add(_paramFlowBreadcrumbs);
+
+            _paramFlowStepInfo = new Label();
+            _paramFlowStepInfo.AddToClassList("palette-param-flow-step");
+            _paramFlowPanel.Add(_paramFlowStepInfo);
+
+            _paramFlowStepDesc = new Label();
+            _paramFlowStepDesc.AddToClassList("palette-param-flow-step-desc");
+            _paramFlowStepDesc.style.whiteSpace = WhiteSpace.Normal;
+            _paramFlowPanel.Add(_paramFlowStepDesc);
+
+            _paramFlowEditorHost = new VisualElement { name = "palette-param-flow-editor" };
+            _paramFlowEditorHost.AddToClassList("palette-param-flow-editor");
+            _paramFlowPanel.Add(_paramFlowEditorHost);
+
+            _paramFlowHint = new Label("Enter で次へ / Esc で戻る");
+            _paramFlowHint.AddToClassList("palette-param-flow-hint");
+            _paramFlowPanel.Add(_paramFlowHint);
+
+            // results-list の直前に差し込む。
+            var root = _resultsList.parent;
+            if (root != null)
+            {
+                var idx = root.IndexOf(_resultsList);
+                root.Insert(idx, _paramFlowPanel);
+            }
         }
 
         // パネルへの attach 時にイベント購読を開始する。重複防止のため一度外してから足す
@@ -273,33 +337,9 @@ namespace Void2610.LiminalPalette.UI
             }
         }
 
-        // モードに応じて列ヘッダの見出しを切り替える。
-        private void UpdateColumnHeaders()
-        {
-            switch (_mode)
-            {
-                case ViewMode.Scenarios:
-                    if (_columnPath != null) _columnPath.text = "Path";
-                    if (_columnDescription != null) _columnDescription.text = "Description";
-                    if (_columnCurrent != null) _columnCurrent.text = "Steps";
-                    break;
-                case ViewMode.Logs:
-                    if (_columnPath != null) _columnPath.text = "Path";
-                    if (_columnDescription != null) _columnDescription.text = "Status";
-                    if (_columnCurrent != null) _columnCurrent.text = "Time";
-                    break;
-                case ViewMode.History:
-                    if (_columnPath != null) _columnPath.text = "Path";
-                    if (_columnDescription != null) _columnDescription.text = "Args";
-                    if (_columnCurrent != null) _columnCurrent.text = "Time";
-                    break;
-                default:
-                    if (_columnPath != null) _columnPath.text = "Name";
-                    if (_columnDescription != null) _columnDescription.text = "Description";
-                    if (_columnCurrent != null) _columnCurrent.text = "Current";
-                    break;
-            }
-        }
+        // 旧テーブル UI の列ヘッダ更新フック。列ヘッダは廃止したため何もしない。
+        // (呼び出し側を一切触らないために空メソッドだけ残してある)
+        private void UpdateColumnHeaders() { }
 
         // ScenarioRegistry から最新の登録一覧を取り直す。検索クエリで Path 部分一致フィルタを適用する。
         // 同時にステップ数キャッシュ (_scenarioStepCounts) も再構築して、bind ループでの
@@ -398,39 +438,7 @@ namespace Void2610.LiminalPalette.UI
                 _searchInput.style.flexShrink = 0;
             }
 
-            var columnHeader = this.Q<VisualElement>("palette-column-header");
-            if (columnHeader != null)
-            {
-                columnHeader.style.flexDirection = FlexDirection.Row;
-                columnHeader.style.alignItems = Align.Center;
-                columnHeader.style.flexShrink = 0;
-
-                // ヘッダ各列の幅を data 行と一致させる (USS class でも書いているがインラインで強制)。
-                var hMark = columnHeader.Q<Label>(className: "palette-column-header-mark");
-                if (hMark != null)
-                {
-                    hMark.style.width = 14;
-                    hMark.style.flexShrink = 0;
-                }
-                var hPath = columnHeader.Q<Label>(className: "palette-column-header-path");
-                if (hPath != null)
-                {
-                    hPath.style.flexGrow = 1;
-                    hPath.style.flexShrink = 1;
-                }
-                var hDesc = columnHeader.Q<Label>(className: "palette-column-header-description");
-                if (hDesc != null)
-                {
-                    hDesc.style.width = 240;
-                    hDesc.style.flexShrink = 0;
-                }
-                var hCurrent = columnHeader.Q<Label>(className: "palette-column-header-current");
-                if (hCurrent != null)
-                {
-                    hCurrent.style.width = 80;
-                    hCurrent.style.flexShrink = 0;
-                }
-            }
+            // 列ヘッダは廃止 (BindElements で display:none)。レイアウト指定は不要。
 
             if (_resultsList != null)
             {
@@ -574,7 +582,9 @@ namespace Void2610.LiminalPalette.UI
         }
 
         // ------------------------------------------------------------
-        // ListView 行 (3 列: マーク / Name / Description / Current)
+        // ListView 行 (VSCode コマンドパレット風: 説明を主、Path を副に表示)
+        //   [• mark] [title (description or path)]                [current]
+        //                [path (subtitle, dim)]
         // ------------------------------------------------------------
 
         private VisualElement MakeRow()
@@ -586,7 +596,6 @@ namespace Void2610.LiminalPalette.UI
             row.style.flexShrink = 0;
             row.style.flexGrow = 1;
 
-            // 列幅は data 行とヘッダで一致させる必要があるため、インラインで明示する。
             var historyMark = new Label("•");
             historyMark.AddToClassList("palette-row-history-mark");
             historyMark.name = "history-mark";
@@ -594,36 +603,46 @@ namespace Void2610.LiminalPalette.UI
             historyMark.style.flexShrink = 0;
             row.Add(historyMark);
 
-            var path = new Label();
-            path.AddToClassList("palette-row-path");
-            path.enableRichText = true;
-            path.name = "row-path";
-            path.style.flexGrow = 1;
-            path.style.flexShrink = 1;
-            path.style.overflow = Overflow.Hidden;
-            path.style.textOverflow = TextOverflow.Ellipsis;
-            path.style.whiteSpace = WhiteSpace.NoWrap;
-            row.Add(path);
+            // 説明 + path を縦積みするコンテナ。
+            var text = new VisualElement();
+            text.name = "row-text";
+            text.AddToClassList("palette-row-text");
+            text.style.flexDirection = FlexDirection.Column;
+            text.style.flexGrow = 1;
+            text.style.flexShrink = 1;
+            text.style.overflow = Overflow.Hidden;
 
-            var description = new Label();
-            description.AddToClassList("palette-row-description");
-            description.name = "row-description";
-            description.style.width = 240;
-            description.style.flexShrink = 0;
-            description.style.whiteSpace = WhiteSpace.NoWrap;
-            description.style.overflow = Overflow.Hidden;
-            description.style.textOverflow = TextOverflow.Ellipsis;
-            row.Add(description);
+            var title = new Label();
+            title.AddToClassList("palette-row-title");
+            title.name = "row-title";
+            title.enableRichText = true;
+            title.style.whiteSpace = WhiteSpace.NoWrap;
+            title.style.overflow = Overflow.Hidden;
+            title.style.textOverflow = TextOverflow.Ellipsis;
+            text.Add(title);
 
-            var current = new Label();
-            current.AddToClassList("palette-row-current");
-            current.name = "row-current";
-            current.style.width = 80;
-            current.style.flexShrink = 0;
-            current.style.whiteSpace = WhiteSpace.NoWrap;
-            current.style.overflow = Overflow.Hidden;
-            current.style.textOverflow = TextOverflow.Ellipsis;
-            row.Add(current);
+            var subtitle = new Label();
+            subtitle.AddToClassList("palette-row-subtitle");
+            subtitle.name = "row-subtitle";
+            subtitle.enableRichText = true;
+            subtitle.style.whiteSpace = WhiteSpace.NoWrap;
+            subtitle.style.overflow = Overflow.Hidden;
+            subtitle.style.textOverflow = TextOverflow.Ellipsis;
+            text.Add(subtitle);
+
+            row.Add(text);
+
+            // 右端のメタ情報 (Current 値 / Time / Steps 数 など)。
+            var meta = new Label();
+            meta.AddToClassList("palette-row-meta");
+            meta.name = "row-meta";
+            meta.style.flexShrink = 0;
+            meta.style.marginLeft = 8;
+            meta.style.whiteSpace = WhiteSpace.NoWrap;
+            meta.style.overflow = Overflow.Hidden;
+            meta.style.textOverflow = TextOverflow.Ellipsis;
+            meta.style.maxWidth = 160;
+            row.Add(meta);
 
             return row;
         }
@@ -652,24 +671,24 @@ namespace Void2610.LiminalPalette.UI
             var historyMark = row.Q<Label>("history-mark");
             historyMark.style.visibility = ranked.FromHistory ? Visibility.Visible : Visibility.Hidden;
 
-            var pathLabel = row.Q<Label>("row-path");
-            pathLabel.text = BuildHighlightedPath(ranked.Descriptor.Path, ranked.MatchedIndices);
-            // Logs/History モードで設定した inline 色が ListView の行リサイクルで残るため、
-            // Commands モードでは USS 既定値に戻す。
-            pathLabel.style.color = StyleKeyword.Null;
+            var title = row.Q<Label>("row-title");
+            var subtitle = row.Q<Label>("row-subtitle");
+            var meta = row.Q<Label>("row-meta");
 
-            var descLabel = row.Q<Label>("row-description");
-            descLabel.text = ranked.Descriptor.Description ?? "";
-            descLabel.style.color = StyleKeyword.Null;
+            // 説明は必須前提。1 行目に Description、2 行目に Path (検索ハイライト付き) を必ず表示する。
+            title.text = ranked.Descriptor.Description ?? "";
+            title.style.color = StyleKeyword.Null;
+            subtitle.text = BuildHighlightedPath(ranked.Descriptor.Path, ranked.MatchedIndices);
+            subtitle.style.color = StyleKeyword.Null;
 
-            var currentLabel = row.Q<Label>("row-current");
-            currentLabel.text = FormatCurrentColumn(ranked.Descriptor);
+            meta.text = FormatCurrentColumn(ranked.Descriptor);
+            meta.style.color = StyleKeyword.Null;
 
             row.RemoveFromClassList("palette-row-selected");
             if (index == _controller.SelectedIndex) row.AddToClassList("palette-row-selected");
         }
 
-        // Scenario タブの 1 行レンダリング。Path / Description / Step 数 を表示。
+        // Scenario タブの 1 行レンダリング。説明を主、Path を副、右端にステップ数。
         private void BindScenarioRow(VisualElement row, int index)
         {
             if (index < 0 || index >= _scenarioSnapshot.Count) return;
@@ -678,27 +697,28 @@ namespace Void2610.LiminalPalette.UI
             var historyMark = row.Q<Label>("history-mark");
             historyMark.style.visibility = Visibility.Hidden;
 
-            var pathLabel = row.Q<Label>("row-path");
-            pathLabel.text = d.Path;
-            pathLabel.style.color = StyleKeyword.Null;
+            var title = row.Q<Label>("row-title");
+            var subtitle = row.Q<Label>("row-subtitle");
+            var meta = row.Q<Label>("row-meta");
 
-            var descLabel = row.Q<Label>("row-description");
-            descLabel.text = d.Description ?? "";
-            descLabel.style.color = StyleKeyword.Null;
+            // 説明は必須前提。1 行目に Description、2 行目に Path を必ず表示する。
+            title.text = d.Description ?? "";
+            title.style.color = StyleKeyword.Null;
+            subtitle.text = d.Path;
+            subtitle.style.color = StyleKeyword.Null;
 
-            var currentLabel = row.Q<Label>("row-current");
-            // RefreshScenarioSnapshot で計算したキャッシュから読み取る。bind ごとに
-            // StepsFactory を起動しないことが目的 (副作用回避 + 仮想化の負荷削減)。
             var count = _scenarioStepCounts.TryGetValue(d.Path, out var c) ? c : -1;
-            currentLabel.text = count < 0 ? "?" : count.ToString(CultureInfo.InvariantCulture);
+            meta.text = count < 0 ? "?" : $"{count.ToString(CultureInfo.InvariantCulture)} steps";
+            meta.style.color = StyleKeyword.Null;
 
             row.RemoveFromClassList("palette-row-selected");
             if (index == _scenarioSelectedIndex) row.AddToClassList("palette-row-selected");
         }
 
         // Logs / History 共通の行レンダリング。
-        // showArgs=false (Logs) → Path / Status / Time
-        // showArgs=true  (History) → Path / Args 要約 / Time
+        // 主: Path (成否で色付け)
+        // 副: showArgs=false (Logs) → Status / showArgs=true (History) → Args 要約
+        // メタ: Time (HH:mm:ss)
         private void BindInvocationRow(VisualElement row, int index, bool showArgs)
         {
             if (index < 0 || index >= _invocationSnapshot.Count) return;
@@ -707,27 +727,29 @@ namespace Void2610.LiminalPalette.UI
             var historyMark = row.Q<Label>("history-mark");
             historyMark.style.visibility = Visibility.Hidden;
 
-            var pathLabel = row.Q<Label>("row-path");
-            pathLabel.text = inv.Path;
-            pathLabel.style.color = inv.Result.Success
-                ? new Color(0.85f, 0.85f, 0.85f, 1f)
+            var title = row.Q<Label>("row-title");
+            var subtitle = row.Q<Label>("row-subtitle");
+            var meta = row.Q<Label>("row-meta");
+
+            title.text = inv.Path;
+            title.style.color = inv.Result.Success
+                ? new Color(0.92f, 0.92f, 0.92f, 1f)
                 : new Color(0.92f, 0.45f, 0.45f, 1f);
 
-            var descLabel = row.Q<Label>("row-description");
-            descLabel.style.color = new Color(0.7f, 0.7f, 0.7f, 1f);
+            subtitle.style.color = new Color(0.6f, 0.6f, 0.6f, 1f);
             if (showArgs)
             {
-                descLabel.text = FormatArgsSummary(inv.Args);
+                subtitle.text = FormatArgsSummary(inv.Args);
             }
             else
             {
-                descLabel.text = inv.Result.Success
+                subtitle.text = inv.Result.Success
                     ? $"OK ({inv.Result.Duration.TotalMilliseconds:F1}ms)"
                     : $"FAIL — {inv.Result.Error}";
             }
 
-            var currentLabel = row.Q<Label>("row-current");
-            currentLabel.text = inv.TimestampUtc.ToLocalTime().ToString("HH:mm:ss");
+            meta.text = inv.TimestampUtc.ToLocalTime().ToString("HH:mm:ss");
+            meta.style.color = new Color(0.55f, 0.55f, 0.55f, 1f);
 
             row.RemoveFromClassList("palette-row-selected");
             if (index == _invocationSelectedIndex) row.AddToClassList("palette-row-selected");
@@ -1032,7 +1054,9 @@ namespace Void2610.LiminalPalette.UI
             // Logs モード用の要素を非表示に戻す。
             _logStackLabel.style.display = DisplayStyle.None;
             _runButton.style.display = DisplayStyle.Flex;
-            _argumentPanel.style.display = DisplayStyle.Flex;
+            // 引数入力は複数ステップフロー (TryBeginParamFlow) に統合したため、
+            // 選択中コマンドのプレビューでは inline 引数パネルを表示しない。
+            _argumentPanel.style.display = DisplayStyle.None;
             _resultView.style.display = DisplayStyle.Flex;
             if (_scenarioResultView != null)
             {
@@ -1114,11 +1138,141 @@ namespace Void2610.LiminalPalette.UI
         }
 
         // ------------------------------------------------------------
+        // VSCode 風の複数ステップ引数入力フロー
+        // ------------------------------------------------------------
+
+        // フロー開始可能か判定し、可能なら開始する。可能だった場合は true。
+        // 引数 0 個のコマンドはフローを使わず即実行扱いとし false を返す。
+        private bool TryBeginParamFlow(CommandDescriptor cmd)
+        {
+            if (cmd == null || cmd.Parameters.Count == 0) return false;
+            _paramFlowActive = true;
+            _paramFlowCommand = cmd;
+            _paramFlowIndex = 0;
+            _currentArgValues.Clear();
+            // 全引数の初期値を埋めておく (途中スキップやデフォルト確定で参照される)。
+            for (var i = 0; i < cmd.Parameters.Count; i++)
+            {
+                var p = cmd.Parameters[i];
+                _currentArgValues[p.Name] = ResolveInitialValue(p);
+            }
+            _resultsList.style.display = DisplayStyle.None;
+            if (_bottom != null) _bottom.style.display = DisplayStyle.None;
+            _paramFlowPanel.style.display = DisplayStyle.Flex;
+            ShowCurrentParamFlowStep();
+            return true;
+        }
+
+        // フローを抜けて検索 UI へ戻す。実行確定で抜ける場合は executeAfterExit=true。
+        private void EndParamFlow(bool clearArgs)
+        {
+            _paramFlowActive = false;
+            _paramFlowCommand = null;
+            _paramFlowIndex = 0;
+            _paramFlowPanel.style.display = DisplayStyle.None;
+            _paramFlowEditorHost.Clear();
+            _paramFlowBreadcrumbs.Clear();
+            _resultsList.style.display = DisplayStyle.Flex;
+            if (_bottom != null) _bottom.style.display = DisplayStyle.Flex;
+            if (clearArgs) _currentArgValues.Clear();
+            // 検索バーに戻す。同フレーム内で focus を再付与しておかないと、Runtime 側の
+            // Esc フォールバックが「パレット内にフォーカス無し」と誤判定して Hide を呼ぶ可能性がある。
+            _searchInput?.Focus();
+            schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
+        }
+
+        // 現在のステップ (cmd.Parameters[_paramFlowIndex]) の編集 UI を構築し、フォーカスする。
+        private void ShowCurrentParamFlowStep()
+        {
+            var cmd = _paramFlowCommand;
+            if (cmd == null) return;
+            var i = _paramFlowIndex;
+            if (i < 0 || i >= cmd.Parameters.Count) return;
+            var param = cmd.Parameters[i];
+
+            _paramFlowCmdLabel.text = $"▸ {cmd.Path}";
+
+            _paramFlowBreadcrumbs.Clear();
+            for (var k = 0; k < i; k++)
+            {
+                var prev = cmd.Parameters[k];
+                var v = _currentArgValues.TryGetValue(prev.Name, out var raw) ? raw : null;
+                var chip = new Label($"{prev.Name}: {FormatArgValue(v)}");
+                chip.AddToClassList("palette-param-flow-chip");
+                _paramFlowBreadcrumbs.Add(chip);
+            }
+
+            _paramFlowStepInfo.text = $"Step {i + 1}/{cmd.Parameters.Count}  —  {param.Name} : {param.Type.Name}";
+            _paramFlowStepDesc.text = string.IsNullOrEmpty(param.Description) ? "" : param.Description;
+            _paramFlowStepDesc.style.display = string.IsNullOrEmpty(param.Description)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
+
+            _paramFlowEditorHost.Clear();
+            var editor = ParameterEditorRegistry.Resolve(param);
+            var paramName = param.Name;
+            var ve = editor.Build(param, value => _currentArgValues[paramName] = value);
+            _paramFlowEditorHost.Add(ve);
+
+            // 次フレームでエディタ内部の入力欄にフォーカスを当てる。
+            schedule.Execute(() =>
+            {
+                var f = FindFocusableDescendant(_paramFlowEditorHost);
+                f?.Focus();
+            }).ExecuteLater(0);
+        }
+
+        // フロー中の Enter ハンドラ。確定 → 次へ / 最終ステップなら実行。
+        private async System.Threading.Tasks.Task AdvanceParamFlowAsync()
+        {
+            // AutoComplete エディタが先頭候補で確定可能なら拾う (旧 Enter ハンドラと同じ救済)。
+            for (var j = 0; j < _paramFlowEditorHost.childCount; j++)
+            {
+                if (_paramFlowEditorHost[j].userData is Func<bool> tryComplete && tryComplete())
+                    break;
+            }
+
+            var cmd = _paramFlowCommand;
+            if (cmd == null) { EndParamFlow(clearArgs: false); return; }
+
+            _paramFlowIndex++;
+            if (_paramFlowIndex >= cmd.Parameters.Count)
+            {
+                // フロー完了 → 検索 UI に戻してから実行 (結果表示は bottom の ResultView で見せる)。
+                EndParamFlow(clearArgs: false);
+                await _controller.ExecuteSelectedAsync(_currentArgValues);
+                _currentArgValues.Clear();
+                _boundCommandPath = null;
+                return;
+            }
+            ShowCurrentParamFlowStep();
+        }
+
+        // ------------------------------------------------------------
         // キーボード
         // ------------------------------------------------------------
 
         private void OnKeyDown(KeyDownEvent evt)
         {
+            // フロー中はナビゲーションを乗っ取る。Up/Down は検索リスト操作ではなく
+            // エディタ内の通常動作に任せる (TextField のキャレット移動など)。
+            if (_paramFlowActive)
+            {
+                switch (evt.keyCode)
+                {
+                    case KeyCode.Return:
+                    case KeyCode.KeypadEnter:
+                        _ = AdvanceParamFlowAsync();
+                        evt.StopImmediatePropagation();
+                        return;
+                    case KeyCode.Escape:
+                        EndParamFlow(clearArgs: true);
+                        evt.StopImmediatePropagation();
+                        return;
+                }
+                return;
+            }
+
             switch (evt.keyCode)
             {
                 case KeyCode.UpArrow:
@@ -1136,9 +1290,6 @@ namespace Void2610.LiminalPalette.UI
                     break;
                 case KeyCode.Return:
                 case KeyCode.KeypadEnter:
-                    // 候補表示中なら先頭候補で確定してから実行
-                    if (IsArgumentFieldFocused())
-                        TryAutoComplete();
                     // Logs モードは閲覧専用のため Enter を無視する (再実行は History モードの責務)。
                     if (_mode != ViewMode.Logs)
                     {
@@ -1151,15 +1302,9 @@ namespace Void2610.LiminalPalette.UI
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Tab:
-                    if (evt.shiftKey)
-                    {
-                        _searchInput.Focus();
-                    }
-                    else if (_argumentPanel.childCount > 0)
-                    {
-                        var firstInput = FindFocusableDescendant(_argumentPanel);
-                        firstInput?.Focus();
-                    }
+                    // フロー UI 導入により、Tab で引数欄に飛ぶ旧導線は不要になった。
+                    // Shift+Tab で検索バーに戻す挙動だけ残す。
+                    if (evt.shiftKey) _searchInput.Focus();
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Alpha1:
@@ -1214,36 +1359,6 @@ namespace Void2610.LiminalPalette.UI
             _resultsList.RefreshItems();
             if (_mode == ViewMode.Logs) UpdateBottomLogs();
             else UpdateBottomHistory();
-        }
-
-        /// <summary>
-        /// 引数パネル内のAutoCompleteEditorの補完を試みる。
-        /// 候補が1件に絞り込まれていれば確定してtrueを返す。
-        /// </summary>
-        private bool TryAutoComplete()
-        {
-            for (var i = 0; i < _argumentPanel.childCount; i++)
-            {
-                var row = _argumentPanel[i];
-                for (var j = 0; j < row.childCount; j++)
-                {
-                    if (row[j].userData is Func<bool> tryComplete && tryComplete())
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        /// <summary>引数パネル内のTextFieldにフォーカスがあるかどうか</summary>
-        private bool IsArgumentFieldFocused()
-        {
-            var focused = focusController?.focusedElement as VisualElement;
-            while (focused != null)
-            {
-                if (focused == _argumentPanel) return true;
-                focused = focused.parent;
-            }
-            return false;
         }
 
         private static VisualElement FindFocusableDescendant(VisualElement root)
@@ -1307,10 +1422,15 @@ namespace Void2610.LiminalPalette.UI
                 await _controller.ReplayAsync(inv);
                 return;
             }
-            if (_controller.SelectedCommand == null) return;
+            var selected = _controller.SelectedCommand;
+            if (selected == null) return;
+
+            // 引数があるコマンドは VSCode 風の複数ステップ入力フローへ遷移する。
+            // 引数 0 個ならそのまま即時実行 (従来動作)。
+            if (TryBeginParamFlow(selected)) return;
+
             await _controller.ExecuteSelectedAsync(_currentArgValues);
-            // 実行後にパラメータパネルをリビルドして入力をクリア
-            RebuildArgumentPanel(_controller.SelectedCommand);
+            RebuildArgumentPanel(selected);
         }
 
         // ------------------------------------------------------------

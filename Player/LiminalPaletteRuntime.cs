@@ -198,7 +198,33 @@ namespace Void2610.LiminalPalette.Player
             // KeyDownEvent が拾うのでここまで届かないことが多いが、フォーカス外でも Escape で閉じられるよう保険として用意。
             // ↑↓ Enter Tab 等の UI ナビは UIDocument 側で完結するためここでは扱わない。
             if (!IsVisible) return;
-            if (_input.ConsumeCancel()) Hide();
+            if (_input.ConsumeCancel())
+            {
+                // パレット内部のいずれかの要素にフォーカスが当たっているなら、Esc は PaletteView.OnKeyDown が
+                // 処理する (引数フロー離脱 or 検索キャンセル)。ここでは Hide しないことで、IMGUI 経由の
+                // Esc と UIToolkit 経由の Esc が同フレームで二重発火するレースを排除する。
+                // フォーカスが UIDocument 外 (ゲーム画面など) にある場合だけ、保険として Hide する。
+                if (IsFocusWithinPalette()) return;
+                Hide();
+            }
+        }
+
+        // panel の focusController を辿って、現在のフォーカス要素が PaletteView のサブツリーに含まれるかを判定する。
+        // 引数フロー中は editor 内 TextField にフォーカスが当たっているため、必ず true を返す。
+        // フォーカスが一時的に null (display 切替直後など) のときも「パレット内」とみなして
+        // 二重発火による意図しない Hide を防ぐ。
+        private bool IsFocusWithinPalette()
+        {
+            if (_view == null) return false;
+            var fc = _document?.rootVisualElement?.focusController;
+            var focused = fc?.focusedElement as VisualElement;
+            if (focused == null) return true;
+            while (focused != null)
+            {
+                if (focused == _view) return true;
+                focused = focused.parent;
+            }
+            return false;
         }
 
         // EventPaletteInput は IMGUI 経由で KeyDown を拾う設計のため、ここで Event.current を流し込む。

@@ -35,6 +35,10 @@ namespace Void2610.LiminalPalette.UI
         // Phase 5a: 選択コマンドの prefix と一致する [LiminalObservableField] を表示するセクション。
         private ObservableFieldsView _observableFields;
         private Button _runButton;
+        // 検索ヘッダ右端に常時置く Submit ボタン。物理 Enter / NavigationSubmit に加えて、
+        // モバイル (WebGL) ソフトキーボードのように Enter 系イベントを発火しない環境向けの
+        // 確定手段として用意する。タップで Enter 押下と同等の動作 (引数フロー開始 or 実行) を行う。
+        private Button _headerSubmitButton;
         private ResultView _resultView;
         private Label _logStackLabel;
 
@@ -66,6 +70,9 @@ namespace Void2610.LiminalPalette.UI
         private Label _paramFlowCmdLabel;
         private VisualElement _paramFlowBreadcrumbs;
         private Label _paramFlowStepInfo;
+        // 引数フローパネル内に置く確定ボタン。最終ステップでは「実行」、それ以外は「次へ」。
+        // モバイル (WebGL) でソフトキーボードの Enter が効かない場合の確定手段として常時表示する。
+        private Button _paramFlowSubmitButton;
         private Label _paramFlowStepDesc;
         private VisualElement _paramFlowEditorHost;
         private Label _paramFlowHint;
@@ -154,6 +161,19 @@ namespace Void2610.LiminalPalette.UI
             _argumentPanel = this.Q<VisualElement>("argument-panel");
             _runButton = this.Q<Button>("run-button");
 
+            // 検索ヘッダ右端に Submit ボタンを差し込む。モバイル WebGL のソフトキーボードでは
+            // Enter / NavigationSubmit が発火しない端末があるため、タップで確定できる導線を
+            // UI 上に常時用意しておく。Editor / 物理キーボード環境でも同じボタンが見えるが、
+            // 機能は同じなので害はない。
+            var header = this.Q<VisualElement>("palette-header");
+            if (header != null && _searchInput != null)
+            {
+                _headerSubmitButton = new Button { name = "header-submit-button", text = "▶" };
+                _headerSubmitButton.AddToClassList("palette-header-submit");
+                _headerSubmitButton.clicked += () => { var _ = ExecuteSelectedAsync(); };
+                header.Add(_headerSubmitButton);
+            }
+
             // Phase 5a: ObservableFieldsView を引数パネルの直前 (上) に挿入。
             // 選択コマンドが変わるたびに ShowFor(path) で再構築。
             _observableFields = new ObservableFieldsView();
@@ -235,7 +255,14 @@ namespace Void2610.LiminalPalette.UI
             _paramFlowEditorHost.AddToClassList("palette-param-flow-editor");
             _paramFlowPanel.Add(_paramFlowEditorHost);
 
-            _paramFlowHint = new Label("Enter で次へ / Esc で戻る");
+            // 次へ / 実行ボタン。ShowCurrentParamFlowStep でラベルを最終ステップなら「実行」へ切り替える。
+            // モバイル WebGL ではこのタップが Enter の代替手段になる。
+            _paramFlowSubmitButton = new Button { name = "palette-param-flow-submit", text = "次へ ▶" };
+            _paramFlowSubmitButton.AddToClassList("palette-param-flow-submit");
+            _paramFlowSubmitButton.clicked += () => { var _ = AdvanceParamFlowAsync(); };
+            _paramFlowPanel.Add(_paramFlowSubmitButton);
+
+            _paramFlowHint = new Label("Enter または「次へ」で確定 / Esc で戻る");
             _paramFlowHint.AddToClassList("palette-param-flow-hint");
             _paramFlowPanel.Add(_paramFlowHint);
 
@@ -431,11 +458,25 @@ namespace Void2610.LiminalPalette.UI
             }
 
             var header = this.Q<VisualElement>("palette-header");
-            if (header != null) header.style.flexShrink = 0;
+            if (header != null)
+            {
+                header.style.flexShrink = 0;
+                header.style.flexDirection = FlexDirection.Row;
+                header.style.alignItems = Align.Center;
+            }
             if (_searchInput != null)
             {
                 _searchInput.style.minHeight = 24;
-                _searchInput.style.flexShrink = 0;
+                _searchInput.style.flexGrow = 1;
+                _searchInput.style.flexShrink = 1;
+            }
+            if (_headerSubmitButton != null)
+            {
+                // モバイル想定のタップターゲットなので高さ・余白は広めにとる。
+                _headerSubmitButton.style.flexShrink = 0;
+                _headerSubmitButton.style.minHeight = 28;
+                _headerSubmitButton.style.minWidth = 40;
+                _headerSubmitButton.style.marginLeft = 6;
             }
 
             // 列ヘッダは廃止 (BindElements で display:none)。レイアウト指定は不要。
@@ -1214,6 +1255,11 @@ namespace Void2610.LiminalPalette.UI
             _paramFlowStepDesc.style.display = string.IsNullOrEmpty(param.Description)
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
+
+            // 最終ステップなら「実行」、それ以外は「次へ」を表示。
+            var isLastStep = i + 1 >= cmd.Parameters.Count;
+            if (_paramFlowSubmitButton != null)
+                _paramFlowSubmitButton.text = isLastStep ? "▶ 実行" : "次へ ▶";
 
             _paramFlowEditorHost.Clear();
             var editor = ParameterEditorRegistry.Resolve(param);

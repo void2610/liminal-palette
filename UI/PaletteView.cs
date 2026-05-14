@@ -566,6 +566,13 @@ namespace Void2610.LiminalPalette.UI
 
             RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
+            // モバイルのソフトキーボードや UIToolkit の汎用ナビゲーションでは KeyDownEvent が
+            // 発火しないため、Enter / Esc 相当の操作は NavigationSubmit / NavigationCancel で受ける。
+            // (物理キーボードでは KeyDown と Navigation の両方が走るが、Return / Escape は
+            //  OnKeyDown 側で扱わないようにして二重発火を避ける。)
+            RegisterCallback<NavigationSubmitEvent>(OnNavigationSubmit, TrickleDown.TrickleDown);
+            RegisterCallback<NavigationCancelEvent>(OnNavigationCancel, TrickleDown.TrickleDown);
+
             // 矢印キーは OnKeyDown が責任を持って MoveSelection するので、
             // ListView 組み込みの NavigationMove (Up/Down) は捕まえてここで握りつぶす。
             // 放置すると KeyDown を StopImmediatePropagation してもナビゲーション系統が
@@ -1249,29 +1256,47 @@ namespace Void2610.LiminalPalette.UI
         }
 
         // ------------------------------------------------------------
-        // キーボード
+        // キーボード / ナビゲーション
         // ------------------------------------------------------------
+
+        // 物理キーボードの Enter, ソフトキーボードの「完了」/ Submit ボタン, ゲームパッドの A 等を
+        // すべて受ける汎用ハンドラ。スマホでは KeyDownEvent が来ないため、確定系の操作は
+        // 必ずここを通す。
+        private void OnNavigationSubmit(NavigationSubmitEvent evt)
+        {
+            if (_paramFlowActive)
+            {
+                _ = AdvanceParamFlowAsync();
+                evt.StopImmediatePropagation();
+                return;
+            }
+            // Logs モードは閲覧専用のため Submit を無視する (再実行は History モードの責務)。
+            if (_mode != ViewMode.Logs)
+            {
+                _ = ExecuteSelectedAsync();
+            }
+            evt.StopImmediatePropagation();
+        }
+
+        // 物理キーボードの Esc, モバイルの戻る操作, ゲームパッドの B 等を受ける汎用ハンドラ。
+        private void OnNavigationCancel(NavigationCancelEvent evt)
+        {
+            if (_paramFlowActive)
+            {
+                EndParamFlow(clearArgs: true);
+                evt.StopImmediatePropagation();
+                return;
+            }
+            CloseRequested?.Invoke();
+            evt.StopImmediatePropagation();
+        }
 
         private void OnKeyDown(KeyDownEvent evt)
         {
-            // フロー中はナビゲーションを乗っ取る。Up/Down は検索リスト操作ではなく
-            // エディタ内の通常動作に任せる (TextField のキャレット移動など)。
-            if (_paramFlowActive)
-            {
-                switch (evt.keyCode)
-                {
-                    case KeyCode.Return:
-                    case KeyCode.KeypadEnter:
-                        _ = AdvanceParamFlowAsync();
-                        evt.StopImmediatePropagation();
-                        return;
-                    case KeyCode.Escape:
-                        EndParamFlow(clearArgs: true);
-                        evt.StopImmediatePropagation();
-                        return;
-                }
-                return;
-            }
+            // フロー中は Up/Down も含めて KeyDown は素通しする (TextField のキャレット移動等に委ねる)。
+            // Return / Escape は OnNavigationSubmit / OnNavigationCancel が拾うのでここでは扱わない
+            // (スマホのソフトキーボードでは KeyDownEvent が発火しないため)。
+            if (_paramFlowActive) return;
 
             switch (evt.keyCode)
             {
@@ -1286,19 +1311,6 @@ namespace Void2610.LiminalPalette.UI
                 case KeyCode.DownArrow:
                     MoveSelectionForCurrentMode(+1);
                     schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
-                    evt.StopImmediatePropagation();
-                    break;
-                case KeyCode.Return:
-                case KeyCode.KeypadEnter:
-                    // Logs モードは閲覧専用のため Enter を無視する (再実行は History モードの責務)。
-                    if (_mode != ViewMode.Logs)
-                    {
-                        _ = ExecuteSelectedAsync();
-                    }
-                    evt.StopImmediatePropagation();
-                    break;
-                case KeyCode.Escape:
-                    CloseRequested?.Invoke();
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Tab:

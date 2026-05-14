@@ -1,3 +1,4 @@
+using System.Globalization;
 using R3;
 using UnityEngine;
 
@@ -39,7 +40,8 @@ namespace Void2610.LiminalPalette.Runtime
         {
             // 負値バリデーションは ArgumentBinder が Min で行うため、ここに到達した時点で scale >= 0 は保証される。
             ApplyScale(scale);
-            return $"Time.timeScale = {Time.timeScale}";
+            // ロケールで小数点が変わらないよう Invariant で文字列化 (fr-FR では "," になる)。
+            return "Time.timeScale = " + Time.timeScale.ToString(CultureInfo.InvariantCulture);
         }
 
         [LiminalCommand("Time/Reset", Description = "Time.timeScale を 1 (等速) に戻す")]

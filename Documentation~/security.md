@@ -100,13 +100,14 @@ LiminalPalette は **Development build 限定** の機能として設計され�
 `Void2610.LiminalPalette.Runtime.Ipc.asmdef`:
 ```json
 "defineConstraints": [
-    "UNITY_EDITOR || DEVELOPMENT_BUILD"
+    "UNITY_EDITOR || DEVELOPMENT_BUILD || LIMINAL_PALETTE_FORCE_ENABLE"
 ]
 ```
 
 - Production ビルドでは asmdef 自体がコンパイル対象外
 - `RuntimeIpcBootstrap` / `IpcRuntimeTicker` のシンボルが Player に存在しない
 - ビルドログに「`Void2610.LiminalPalette.Runtime.Ipc` がスキップされた」旨が出る
+- `LIMINAL_PALETTE_FORCE_ENABLE` は利用側の明示的オプトイン用 (QA ビルド等で Production でもパレットを残したい場合に Scripting Define Symbols に追加する)。デフォルトでは未定義なので Production 除外の効力は変わらない。
 
 ### 2. `ProductionGuard`
 

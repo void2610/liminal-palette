@@ -50,7 +50,7 @@ LiminalPalette は **9 つの asmdef** で構成される。Production ビルド
 | 4 | `Void2610.LiminalPalette.Runtime` | Core, UI | ✅ | 全て | — |
 | 5 | `Void2610.LiminalPalette.Runtime.InputSystem` | Runtime, Unity.InputSystem | ✅ | 全て | `LIMINAL_PALETTE_INPUTSYSTEM` |
 | 6 | `Void2610.LiminalPalette.Ipc` | Core, UI | ❌ | 全て | — |
-| 7 | `Void2610.LiminalPalette.Runtime.Ipc` | Core, UI, Runtime, Ipc | ✅ | 全て | `UNITY_EDITOR \|\| DEVELOPMENT_BUILD` |
+| 7 | `Void2610.LiminalPalette.Runtime.Ipc` | Core, UI, Runtime, Ipc | ✅ | 全て | `UNITY_EDITOR \|\| DEVELOPMENT_BUILD \|\| LIMINAL_PALETTE_FORCE_ENABLE` |
 | 8 | **`Void2610.LiminalPalette.Integration.VContainer`** | Core, **VContainer** | ✅ | 全て | — |
 | 9 | `Void2610.LiminalPalette.Tests` | 1〜8 + TestRunner + R3.Unity + VContainer | ❌ | Editor | `UNITY_INCLUDE_TESTS` |
 
@@ -126,8 +126,8 @@ UnityEditor 非依存。`HttpListener` (System.Net) を使うが Player でも E
 
 `RuntimeIpcBootstrap` / `IpcRuntimeTicker` (MonoBehaviour)。
 
-`defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD"]`:
-- **Production ビルドでは asmdef ごとコンパイル対象外**
+`defineConstraints: ["UNITY_EDITOR || DEVELOPMENT_BUILD || LIMINAL_PALETTE_FORCE_ENABLE"]`:
+- **Production ビルドでは asmdef ごとコンパイル対象外** (オプトインのため利用側が `LIMINAL_PALETTE_FORCE_ENABLE` を Scripting Define Symbols に追加した場合のみ復活する)
 - これにより HTTP サーバー機構が Player ビルドに混入しない
 
 `autoReferenced: true`: 利用側が何もしなくても Runtime IPC が起動する (Development build のみ)。
@@ -192,9 +192,11 @@ EditMode テスト一式 (Phase 5a 完了時点で 230 件)。`Editor` プラッ
 **Runtime.Ipc asmdef の `defineConstraints`** で要求:
 ```json
 "defineConstraints": [
-    "UNITY_EDITOR || DEVELOPMENT_BUILD"
+    "UNITY_EDITOR || DEVELOPMENT_BUILD || LIMINAL_PALETTE_FORCE_ENABLE"
 ]
 ```
+
+`LIMINAL_PALETTE_FORCE_ENABLE` は利用側の **明示的オプトイン** 用 (例: Production build でもパレットを残したい QA ビルド)。Scripting Define Symbols に追加しない限り Development ビルドと Editor 以外では asmdef がコンパイル対象外になる。
 
 Production ビルド (Development build フラグ無し) では:
 - asmdef 自体がコンパイル対象外
@@ -222,7 +224,7 @@ Tests asmdef は `UNITY_INCLUDE_TESTS` を要求するため、Test Runner が�
 
 ## Production 除外の三重防御
 
-1. **asmdef defineConstraints** (`Runtime.Ipc` で `UNITY_EDITOR || DEVELOPMENT_BUILD`)
+1. **asmdef defineConstraints** (`Runtime.Ipc` で `UNITY_EDITOR || DEVELOPMENT_BUILD || LIMINAL_PALETTE_FORCE_ENABLE`)
    - 最も強い: コンパイル対象外
 2. **`ProductionGuard.ShouldDisableInRuntime`** (Runtime のコード内チェック)
    - `PaletteRuntimeSettings.DisableInProductionBuilds` + `Debug.isDebugBuild` で判定

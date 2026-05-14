@@ -1,10 +1,10 @@
 {
-    "name": "Void2610.LiminalPalette.Player.Ipc",
-    "rootNamespace": "Void2610.LiminalPalette.Player.Ipc",
+    "name": "Void2610.LiminalPalette.Runtime.Ipc",
+    "rootNamespace": "Void2610.LiminalPalette.Runtime.Ipc",
     "references": [
         "Void2610.LiminalPalette",
         "Void2610.LiminalPalette.UI",
-        "Void2610.LiminalPalette.Player",
+        "Void2610.LiminalPalette.Runtime",
         "Void2610.LiminalPalette.Ipc"
     ],
     "includePlatforms": [],

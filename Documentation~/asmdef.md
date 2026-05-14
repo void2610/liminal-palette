@@ -17,7 +17,7 @@ LiminalPalette は **9 つの asmdef** で構成される。Production ビルド
                 │                     │                     │
                 │                     │                     │
         ┌───────┴────────┐    ┌───────┴────────┐    ┌──────┴────────┐
-        │ .UI            │    │ .Player        │    │ .Ipc          │
+        │ .UI            │    │ .Runtime       │    │ .Ipc          │
         │ (autoRef=false)│    │ (autoRef=true) │    │ (autoRef=false)│
         │ 全プラットフォーム │    │ 全プラットフォーム │    │ 全プラットフォーム │
         └───────┬────────┘    └───────┬────────┘    └──────┬────────┘
@@ -26,7 +26,7 @@ LiminalPalette は **9 つの asmdef** で構成される。Production ビルド
         │       │     │       │       │     │       │           │
         ↑       ↑     ↑       ↑       ↑     ↑       ↑           ↑
    ┌────┴───┐  │  ┌──┴──┐  ┌──┴──┐    │  ┌──┴──┐  ┌─┴────────┐  │
-   │.Editor │  │  │     │  │.Player.    │  │.Player.       │  │
+   │.Editor │  │  │     │  │.Runtime.   │  │.Runtime.      │  │
    │(Editor)│  │  │     │  │ InputSystem│  │ Ipc           │  │
    │        │  │  │     │  │ (constraint│  │ (constraint   │  │
    │        │  │  │     │  │ INPUTSYSTEM│  │ EDITOR \|\|     │  │
@@ -47,10 +47,10 @@ LiminalPalette は **9 つの asmdef** で構成される。Production ビルド
 | 1 | `Void2610.LiminalPalette` | **R3.Unity** | ✅ | 全て | — |
 | 2 | `Void2610.LiminalPalette.UI` | Core | ❌ | 全て | — |
 | 3 | `Void2610.LiminalPalette.Editor` | Core, UI, Ipc | ❌ | Editor | — |
-| 4 | `Void2610.LiminalPalette.Player` | Core, UI | ✅ | 全て | — |
-| 5 | `Void2610.LiminalPalette.Player.InputSystem` | Player, Unity.InputSystem | ✅ | 全て | `LIMINAL_PALETTE_INPUTSYSTEM` |
+| 4 | `Void2610.LiminalPalette.Runtime` | Core, UI | ✅ | 全て | — |
+| 5 | `Void2610.LiminalPalette.Runtime.InputSystem` | Runtime, Unity.InputSystem | ✅ | 全て | `LIMINAL_PALETTE_INPUTSYSTEM` |
 | 6 | `Void2610.LiminalPalette.Ipc` | Core, UI | ❌ | 全て | — |
-| 7 | `Void2610.LiminalPalette.Player.Ipc` | Core, UI, Player, Ipc | ✅ | 全て | `UNITY_EDITOR \|\| DEVELOPMENT_BUILD` |
+| 7 | `Void2610.LiminalPalette.Runtime.Ipc` | Core, UI, Runtime, Ipc | ✅ | 全て | `UNITY_EDITOR \|\| DEVELOPMENT_BUILD` |
 | 8 | **`Void2610.LiminalPalette.Integration.VContainer`** | Core, **VContainer** | ✅ | 全て | — |
 | 9 | `Void2610.LiminalPalette.Tests` | 1〜8 + TestRunner + R3.Unity + VContainer | ❌ | Editor | `UNITY_INCLUDE_TESTS` |
 
@@ -80,13 +80,13 @@ UnityEditor 非依存 (Runtime でも動く UI Toolkit のみ使用)。
 
 UnityEditor.* に依存するためこの asmdef に閉じ込める。Editor プラットフォーム限定。
 
-### 4. `Void2610.LiminalPalette.Player`
+### 4. `Void2610.LiminalPalette.Runtime`
 
 `LiminalPaletteRuntime` (DontDestroyOnLoad シングルトン) / `RuntimeBootstrap` / `PaletteRuntimeSettings` / `IPaletteInput` 抽象 / `EventPaletteInput` (IMGUI 実装、現行のデフォルト) / `LegacyPaletteInput` / `NoOpPaletteInput` / `PaletteInputBlocker` / `ProductionGuard`。
 
 `autoReferenced: true`: 利用側が何もせずに Runtime ブートストラップが走る。
 
-UnityEngine.InputSystem は **直接参照しない** (= Player asmdef だけでは InputSystem 有り無しに関わらず動く)。
+UnityEngine.InputSystem は **直接参照しない** (= Runtime asmdef だけでは InputSystem 有り無しに関わらず動く)。
 
 #### Runtime ホットキー検出に InputSystem を使わない理由
 
@@ -100,12 +100,12 @@ Runtime のパレット toggle (Cmd+K / Ctrl+K) は **必ず IMGUI (`UnityEngine
 
 このため `PaletteInputFactory` は分岐を持たず、常に `EventPaletteInput` を返す。`LiminalPaletteRuntime.OnGUI` で `Event.current` を `EventPaletteInput.HandleEvent` に流し込み、`Update` から `ConsumeXxx` で読み取り消費する。
 
-### 5. `Void2610.LiminalPalette.Player.InputSystem`
+### 5. `Void2610.LiminalPalette.Runtime.InputSystem`
 
 `InputSystemBootstrap` のみ。
 
 `defineConstraints: ["LIMINAL_PALETTE_INPUTSYSTEM"]`:
-- このシンボルは Player asmdef の `versionDefines` で `com.unity.inputsystem >= 1.0.0` のときに立つ
+- このシンボルは Runtime asmdef の `versionDefines` で `com.unity.inputsystem >= 1.0.0` のときに立つ
 - → InputSystem 未導入プロジェクトでは asmdef 自体がコンパイル対象外
 
 責務: パレット表示中だけゲーム側の InputSystem `ActionMap` を一括停止／復元する。`InputSystemBootstrap.Hook` が `[RuntimeInitializeOnLoadMethod(BeforeSplashScreen)]` で:
@@ -122,7 +122,7 @@ UnityEditor 非依存。`HttpListener` (System.Net) を使うが Player でも E
 
 `autoReferenced: false`: HTTP API を使わないプロジェクトに巻き込まれないため。
 
-### 7. `Void2610.LiminalPalette.Player.Ipc`
+### 7. `Void2610.LiminalPalette.Runtime.Ipc`
 
 `RuntimeIpcBootstrap` / `IpcRuntimeTicker` (MonoBehaviour)。
 
@@ -153,13 +153,13 @@ EditMode テスト一式 (Phase 5a 完了時点で 230 件)。`Editor` プラッ
 ## 依存方向の原則
 
 - **Core (Void2610.LiminalPalette) は何にも依存しない**
-- UI / Editor / Player / Ipc が Core を参照する (一方向)
+- UI / Editor / Runtime / Ipc が Core を参照する (一方向)
 - Editor は UI と Ipc を参照する (UI 側エディタ + IPC ブートストラップ)
-- Player.InputSystem は Player を参照 (Hook 登録のため)
-- Player.Ipc は Player と Ipc 両方を参照 (Bootstrap が両者を使う)
+- Runtime.InputSystem は Runtime を参照 (Hook 登録のため)
+- Runtime.Ipc は Runtime と Ipc 両方を参照 (Bootstrap が両者を使う)
 - Tests は全部参照する (検証のため)
 
-逆方向の依存 (例: UI → Editor、Player → UI 内部) は **絶対に作らない**。
+逆方向の依存 (例: UI → Editor、Runtime → UI 内部) は **絶対に作らない**。
 
 ---
 
@@ -167,7 +167,7 @@ EditMode テスト一式 (Phase 5a 完了時点で 230 件)。`Editor` プラッ
 
 ### `LIMINAL_PALETTE_INPUTSYSTEM`
 
-**Player asmdef の `versionDefines`** で定義:
+**Runtime asmdef の `versionDefines`** で定義:
 ```json
 "versionDefines": [
     {
@@ -178,18 +178,18 @@ EditMode テスト一式 (Phase 5a 完了時点で 230 件)。`Editor` プラッ
 ]
 ```
 
-**Player.InputSystem asmdef の `defineConstraints`** で要求:
+**Runtime.InputSystem asmdef の `defineConstraints`** で要求:
 ```json
 "defineConstraints": [
     "LIMINAL_PALETTE_INPUTSYSTEM"
 ]
 ```
 
-これで InputSystem 未導入プロジェクトでは Player.InputSystem asmdef がリンクされず、ActionMap の自動停止が走らないだけになる (パレット自体は IMGUI ベースの `EventPaletteInput` で問題なく開閉する)。
+これで InputSystem 未導入プロジェクトでは Runtime.InputSystem asmdef がリンクされず、ActionMap の自動停止が走らないだけになる (パレット自体は IMGUI ベースの `EventPaletteInput` で問題なく開閉する)。
 
 ### `UNITY_EDITOR || DEVELOPMENT_BUILD`
 
-**Player.Ipc asmdef の `defineConstraints`** で要求:
+**Runtime.Ipc asmdef の `defineConstraints`** で要求:
 ```json
 "defineConstraints": [
     "UNITY_EDITOR || DEVELOPMENT_BUILD"
@@ -211,7 +211,7 @@ Tests asmdef は `UNITY_INCLUDE_TESTS` を要求するため、Test Runner が�
 
 ## autoReferenced の選び方
 
-- ✅ `true`: Core / Player / Player.InputSystem / Player.Ipc
+- ✅ `true`: Core / Runtime / Runtime.InputSystem / Runtime.Ipc
   - 利用側がコードを書かなくても自動起動して欲しいもの
   - `Bootstrap` 系 (`[RuntimeInitializeOnLoadMethod]`) が走るために必須
 - ❌ `false`: UI / Editor / Ipc / Tests
@@ -222,7 +222,7 @@ Tests asmdef は `UNITY_INCLUDE_TESTS` を要求するため、Test Runner が�
 
 ## Production 除外の三重防御
 
-1. **asmdef defineConstraints** (`Player.Ipc` で `UNITY_EDITOR || DEVELOPMENT_BUILD`)
+1. **asmdef defineConstraints** (`Runtime.Ipc` で `UNITY_EDITOR || DEVELOPMENT_BUILD`)
    - 最も強い: コンパイル対象外
 2. **`ProductionGuard.ShouldDisableInRuntime`** (Runtime のコード内チェック)
    - `PaletteRuntimeSettings.DisableInProductionBuilds` + `Debug.isDebugBuild` で判定
@@ -248,7 +248,7 @@ Tests asmdef は `UNITY_INCLUDE_TESTS` を要求するため、Test Runner が�
 
 ### Editor / Runtime UI も使う (一般的)
 
-何もしなくて良い。Core / Player / Player.InputSystem / Player.Ipc は `autoReferenced: true` なので自動的に巻き込まれる。
+何もしなくて良い。Core / Runtime / Runtime.InputSystem / Runtime.Ipc は `autoReferenced: true` なので自動的に巻き込まれる。
 
 ### IParameterEditor / 動的コマンドを書きたい
 
@@ -274,5 +274,5 @@ UI asmdef を明示参照:
 ## 関連ドキュメント
 
 - [security.md](security.md) — defineConstraints による Production 除外の詳細
-- [ipc.md](ipc.md) — Player.Ipc が起動する条件
+- [ipc.md](ipc.md) — Runtime.Ipc が起動する条件
 - [extensibility.md](extensibility.md) — どの asmdef に拡張コードを書くべきか

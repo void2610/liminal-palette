@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Void2610.LiminalPalette.Player.InputSystemImpl
+namespace Void2610.LiminalPalette.Runtime.InputSystemImpl
 {
     /// <summary>
     /// パレット表示中だけゲーム側 InputSystem ActionMap を一括停止／復元するブートストラップ。

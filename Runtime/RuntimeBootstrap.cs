@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEditor;
 #endif
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// Runtime 起動時にパレットの DontDestroyOnLoad シングルトンを生成するブートストラップ。

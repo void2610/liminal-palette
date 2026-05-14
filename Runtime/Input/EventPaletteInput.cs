@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// IMGUI (UnityEngine.Event) を使う Runtime 入力実装。

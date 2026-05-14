@@ -1,7 +1,7 @@
 #if !ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
 using UnityEngine;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// Legacy Input Manager (UnityEngine.Input) を使う実装。

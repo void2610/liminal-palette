@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// Runtime パレットの設定値。利用側は Resources/PaletteRuntimeSettings.asset を作って上書きできる。

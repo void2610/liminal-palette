@@ -548,4 +548,4 @@ liminal logs --limit 10 --json | jq '.invocations[].path'
 
 - [security.md](security.md) — トークン管理 / Production 除外 / 攻撃面の評価
 - [troubleshooting.md](troubleshooting.md) — 401 が返る / ポート占有 / DomainReload で listener が残る等
-- [asmdef.md](asmdef.md) — `Player.Ipc` の `defineConstraints` 設計
+- [asmdef.md](asmdef.md) — `Runtime.Ipc` の `defineConstraints` 設計

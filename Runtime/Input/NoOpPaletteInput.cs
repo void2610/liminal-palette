@@ -1,4 +1,4 @@
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// すべて false を返す入力実装。ヘッドレス環境やテスト、入力モジュールが利用できないシーン用。

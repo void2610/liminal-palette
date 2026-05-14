@@ -1,10 +1,10 @@
 using System;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// パレット表示中にゲーム側の入力を一時的に止めるベストエフォート機構。
-    /// 実際の停止 / 復元処理は OnEngage / OnDisengage の購読側 (Player.InputSystem asmdef 等) が行う。
+    /// 実際の停止 / 復元処理は OnEngage / OnDisengage の購読側 (Runtime.InputSystem asmdef 等) が行う。
     /// 本 asmdef では Unity.InputSystem を直接参照しないため、フックの提供にとどめる。
     /// </summary>
     public sealed class PaletteInputBlocker

@@ -1,9 +1,9 @@
 {
-    "name": "Void2610.LiminalPalette.Player",
-    "rootNamespace": "Void2610.LiminalPalette.Player",
+    "name": "Void2610.LiminalPalette.Runtime.InputSystem",
+    "rootNamespace": "Void2610.LiminalPalette.Runtime",
     "references": [
-        "Void2610.LiminalPalette",
-        "Void2610.LiminalPalette.UI"
+        "Void2610.LiminalPalette.Runtime",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -11,7 +11,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "LIMINAL_PALETTE_INPUTSYSTEM"
+    ],
     "versionDefines": [
         {
             "name": "com.unity.inputsystem",

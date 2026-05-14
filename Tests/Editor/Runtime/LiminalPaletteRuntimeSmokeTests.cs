@@ -1,9 +1,9 @@
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UIElements;
-using Void2610.LiminalPalette.Player;
+using Void2610.LiminalPalette.Runtime;
 
-namespace Void2610.LiminalPalette.Tests.Player
+namespace Void2610.LiminalPalette.Tests.Runtime
 {
     /// <summary>
     /// LiminalPaletteRuntime の最低限のスモークテスト。EditMode では [RuntimeInitializeOnLoadMethod] は走らないので、

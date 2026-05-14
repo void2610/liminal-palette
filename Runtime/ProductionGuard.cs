@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// Runtime パレットを起動するか否かを判定するゲート。

@@ -8,7 +8,7 @@ using Void2610.LiminalPalette.Ipc.Endpoints;
 using Void2610.LiminalPalette.Ipc.Server;
 using Void2610.LiminalPalette.Ipc.Threading;
 
-namespace Void2610.LiminalPalette.Player.Ipc
+namespace Void2610.LiminalPalette.Runtime.Ipc
 {
     /// <summary>
     /// Runtime (Player ビルド / Play Mode) で IPC HTTP サーバーを立てるブートストラップ。

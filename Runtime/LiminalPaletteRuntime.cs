@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Void2610.LiminalPalette.UI;
 
-namespace Void2610.LiminalPalette.Player
+namespace Void2610.LiminalPalette.Runtime
 {
     /// <summary>
     /// Runtime (Player ビルド / Play Mode) でパレットをホストする DontDestroyOnLoad シングルトン。

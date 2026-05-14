@@ -5,7 +5,8 @@
 ## [Unreleased]
 
 ### Added
-- 組み込みランタイムコマンド `Time/SetScale` / `Time/Reset` / `Time/Pause` / `Time/Resume` / `Time/Get` を追加 (`Runtime/Time/TimeCommands.cs`)。`Editor/` prefix ではないので Editor / PlayMode / Player ビルドの 3 経路すべてから呼べる。シナリオで AI の状態遷移待ちを高速化したり、UI 確認のためにゲームを一時停止する用途。
+- 組み込みランタイムコマンド `Time/SetScale` / `Time/Reset` / `Time/Pause` / `Time/Resume` + 観測フィールド `Time/Scale` (静的 `ReactiveProperty<float>`) を追加 (`Runtime/Time/TimeCommands.cs`)。`Editor/` prefix ではないので Editor / PlayMode / Player ビルドの 3 経路すべてから呼べる。`AssertEquals("Time/Scale", 5f)` でシナリオから検証可能。`Time.timeScale` 変更通知 API が無いため、`TimeScalePoller` (HideAndDontSave な常駐 GameObject) で 1 フレームごとにポーリングして外部書き換えも追従させる。
+- `ObservableFieldDescriptor.IsStatic` を追加: `static` プロパティ / フィールドに `[LiminalObservableField]` を付けた場合、UI / IPC / Scenario の各経路が `IInstanceResolver` を経由せずに値を読めるようになった。組み込み `Time/Scale` のような static utility 用途を VContainer 登録なしで成立させるため。
 - `liminal init` サブコマンド: cwd→Unity プロジェクト検出 / `ProjectSettings/LiminalPalette.json` 状態 / token / `.claude/skills/` の AI Skills / live probe を 1 コマンドで一覧。`--port` / `--runtime-port` を渡すとその場で固定ポートも書き込む。新規プロジェクトの onboarding 用。
 - `ProjectSettings/LiminalPalette.json` の JSON Schema (`Documentation~/schemas/LiminalPalette.schema.json`) を同梱。CLI が書き出すファイルに `$schema` 参照を自動付与するので、VS Code / JetBrains 系 IDE で `port` / `runtimePort` の autocomplete と範囲チェックが効く。`JsonUtility` は未知フィールドを無視するため `ProjectConfig` 側に影響なし (`Tests/Editor/Ipc/ProjectConfigTests.cs:GetPreferredPortAt_TolerantToUnknownFields` で回帰テスト)。
 - `liminal run` がシナリオパスの glob (例: `liminal run 'Battle/*'`) に対応。`/api/v1/scenarios` を引いて `fnmatch` で一致するシナリオを順次実行し、最後にサマリ (`N scenarios, X passed, Y failed`) を表示する。1 つでも失敗すれば exit code 2。

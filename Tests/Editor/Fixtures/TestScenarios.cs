@@ -50,5 +50,12 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         public static int BadReturnType() => 0;
+
+        // 正しい no-op シグネチャ。Scene 属性のテストなどで「shape は正しいが何もしない」シナリオが
+        // 必要なときに使う。属性は付けないので Scanner.ScanAll では拾われない。
+        public static IEnumerable<ScenarioStep> NoOpSteps()
+        {
+            yield break;
+        }
     }
 }

@@ -73,5 +73,22 @@ namespace Void2610.LiminalPalette.Tests
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.WaitSeconds(-1f));
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.WaitFrames(-1));
         }
+
+        [Test]
+        public void LoadScene_BuildsLoadSceneStep()
+        {
+            var step = ScenarioStep.LoadScene("TestScene", "to test scene");
+            Assert.AreEqual(ScenarioStepKind.LoadScene, step.Kind);
+            Assert.AreEqual("to test scene", step.Description);
+            var ls = (LoadSceneStep)step;
+            Assert.AreEqual("TestScene", ls.SceneName);
+        }
+
+        [Test]
+        public void LoadScene_RejectsEmptyName()
+        {
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.LoadScene(""));
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.LoadScene(null));
+        }
     }
 }

@@ -25,6 +25,13 @@ namespace Void2610.LiminalPalette
         public bool IsStatic { get; }
 
         /// <summary>
+        /// 任意のシーン名。空でなければ ScenarioExecutor がシナリオ本体ステップの前に
+        /// LoadScene ステップを自動で差し込む (PlayMode のみ有効)。詳細は
+        /// <see cref="LiminalScenarioAttribute.Scene"/> 参照。
+        /// </summary>
+        public string Scene { get; }
+
+        /// <summary>
         /// インスタンス (static の場合は null) を受け取って ScenarioStep の列を返すファクトリ。
         /// 列挙のたびに新しい列が作られるため、シナリオを連続実行しても各回で副作用が発火する仕様。
         /// </summary>
@@ -36,13 +43,15 @@ namespace Void2610.LiminalPalette
             Type declaringType,
             MethodInfo method,
             bool isStatic,
-            Func<object, IEnumerable<ScenarioStep>> stepsFactory)
+            Func<object, IEnumerable<ScenarioStep>> stepsFactory,
+            string scene = "")
         {
             Path = path;
             Description = description ?? "";
             DeclaringType = declaringType;
             Method = method;
             IsStatic = isStatic;
+            Scene = scene ?? "";
             StepsFactory = stepsFactory ?? throw new ArgumentNullException(nameof(stepsFactory));
         }
     }

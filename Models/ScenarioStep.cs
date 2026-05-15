@@ -11,6 +11,7 @@ namespace Void2610.LiminalPalette
         WaitFrames,
         AssertEquals,
         AssertNotEquals,
+        LoadScene,
     }
 
     /// <summary>
@@ -78,6 +79,19 @@ namespace Void2610.LiminalPalette
                 throw new ArgumentException("observableFieldPath must not be null or empty", nameof(observableFieldPath));
             return new AssertStep(ScenarioStepKind.AssertNotEquals, observableFieldPath, unexpected, description);
         }
+
+        /// <summary>
+        /// 指定シーンを Single モードで非同期ロードするステップ。完了 (op.isDone) まで待機する。
+        /// シーン切替で VContainer のスコープが再構築されるため、後続コマンドは自動的に
+        /// 新シーンに登録された instance に解決される。
+        /// PlayMode 専用 (Edit Mode では `Application.isPlaying == false` のためステップが失敗する)。
+        /// </summary>
+        public static ScenarioStep LoadScene(string sceneName, string description = null)
+        {
+            if (string.IsNullOrEmpty(sceneName))
+                throw new ArgumentException("sceneName must not be null or empty", nameof(sceneName));
+            return new LoadSceneStep(sceneName, description);
+        }
     }
 
     /// <summary>コマンドを呼び出すステップ。</summary>
@@ -120,6 +134,18 @@ namespace Void2610.LiminalPalette
         {
             ObservableFieldPath = observableFieldPath;
             Expected = expected;
+        }
+    }
+
+    /// <summary>シーンを Single モードでロードするステップ。PlayMode 専用。</summary>
+    internal sealed class LoadSceneStep : ScenarioStep
+    {
+        public string SceneName { get; }
+
+        public LoadSceneStep(string sceneName, string description)
+            : base(ScenarioStepKind.LoadScene, description)
+        {
+            SceneName = sceneName;
         }
     }
 }

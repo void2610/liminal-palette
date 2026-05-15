@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- `ScenarioStep.LoadScene(sceneName)` を first-class ステップ種別として追加 (新 `ScenarioStepKind.LoadScene` + 内部 `LoadSceneStep`)。`SceneManager.LoadSceneAsync(name, Single)` を呼んで完了まで `Task.Yield` で待機。PlayMode 専用 (Edit Mode では `Application.isPlaying=false` で fail 扱い)。
+- `[LiminalScenario(Scene = "TestScene")]` 宣言的属性を追加。指定するとシナリオ本体ステップの前に `LoadScene` ステップを `ScenarioExecutor` が自動で 1 つ前置きする。「各テストを専用シーンで実行したい」「テスト間で状態を漏らさない」用途のボイラープレートが 1 行で済む。復帰 (元シーンへ戻す) はしない仕様 — 最後にロードされたシーンが残る。`ScenarioDescriptor.Scene` プロパティと `GET /api/v1/scenarios` の JSON `scene` フィールドにも露出。
 - 組み込みランタイムコマンド `Time/SetScale` / `Time/Reset` / `Time/Pause` / `Time/Resume` + 観測フィールド `Time/Scale` (静的 `ReactiveProperty<float>`) を追加 (`Runtime/Time/TimeCommands.cs`)。`Editor/` prefix ではないので Editor / PlayMode / Player ビルドの 3 経路すべてから呼べる。`AssertEquals("Time/Scale", 5f)` でシナリオから検証可能。`Time.timeScale` 変更通知 API が無いため、`TimeScalePoller` (HideAndDontSave な常駐 GameObject) で 1 フレームごとにポーリングして外部書き換えも追従させる。
 - `ObservableFieldDescriptor.IsStatic` を追加: `static` プロパティ / フィールドに `[LiminalObservableField]` を付けた場合、UI / IPC / Scenario の各経路が `IInstanceResolver` を経由せずに値を読めるようになった。組み込み `Time/Scale` のような static utility 用途を VContainer 登録なしで成立させるため。
 - `liminal init` サブコマンド: cwd→Unity プロジェクト検出 / `ProjectSettings/LiminalPalette.json` 状態 / token / `.claude/skills/` の AI Skills / live probe を 1 コマンドで一覧。`--port` / `--runtime-port` を渡すとその場で固定ポートも書き込む。新規プロジェクトの onboarding 用。

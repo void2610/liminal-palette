@@ -241,8 +241,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 | `wait_frames` | `frames` (integer) | `description` |
 | `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `description` |
 | `assert_not_equals` | `path` (string), `expected` | `description` |
+| `load_scene` | `sceneName` (string) | `description` |
 
 `path` と `steps` は **排他**。両方 / どちらも未指定は 400 BadRequest。
+`load_scene` ステップは PlayMode 専用 (Edit Mode では fail)。シーン名は Build Settings に登録済みである必要がある。
 
 ### レスポンス
 

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Void2610.LiminalPalette
 {
@@ -106,6 +108,13 @@ namespace Void2610.LiminalPalette
                 try
                 {
                     stepList = new List<ScenarioStep>();
+                    // [LiminalScenario(Scene=...)] が付いていれば、本体ステップの前に LoadScene を差し込む。
+                    // 利用側は EnterTestScene のような毎シナリオの定型コードを書かなくて済む。
+                    // 復帰 (元シーンへ戻す) はしない仕様 — 最後にロードされたシーンがそのまま残る。
+                    if (!string.IsNullOrEmpty(descriptor.Scene))
+                    {
+                        stepList.Add(ScenarioStep.LoadScene(descriptor.Scene, $"auto: load {descriptor.Scene}"));
+                    }
                     foreach (var s in descriptor.StepsFactory(instance))
                     {
                         if (s == null) continue;
@@ -165,6 +174,9 @@ namespace Void2610.LiminalPalette
                         case ScenarioStepKind.AssertNotEquals:
                             sr = RunAssertStep((AssertStep)step, equals: false);
                             break;
+                        case ScenarioStepKind.LoadScene:
+                            sr = await RunLoadSceneStep((LoadSceneStep)step, ct);
+                            break;
                         default:
                             sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
                             break;
@@ -200,6 +212,39 @@ namespace Void2610.LiminalPalette
             if (step.Seconds > 0f)
             {
                 await Task.Delay(TimeSpan.FromSeconds(step.Seconds), ct);
+            }
+            return StepResult.Ok(step);
+        }
+
+        // 指定シーンを Single モードで非同期ロード。完了 (op.isDone) まで Task.Yield で待つ。
+        // PlayMode 専用 (Edit Mode では Application.isPlaying=false なので Fail にする)。
+        // Single モードで現シーンを置換するので、利用側 VContainer のスコープは作り直され、
+        // 後続コマンドは自動的に新シーンの instance に解決される。
+        private async Task<StepResult> RunLoadSceneStep(LoadSceneStep step, CancellationToken ct)
+        {
+            // 既にキャンセル要求が来ている場合は LoadSceneAsync を呼ばずに伝搬する。
+            // 呼んでしまうと「キャンセル後に意図しないシーン切替が発生」する問題を防ぐ。
+            ct.ThrowIfCancellationRequested();
+
+            if (!Application.isPlaying)
+                return StepResult.Fail(step, "LoadScene step is only supported in PlayMode");
+
+            AsyncOperation op;
+            try
+            {
+                op = SceneManager.LoadSceneAsync(step.SceneName, LoadSceneMode.Single);
+            }
+            catch (Exception ex)
+            {
+                return StepResult.Fail(step, $"LoadSceneAsync threw: {ex.Message}");
+            }
+            if (op == null)
+                return StepResult.Fail(step, $"LoadSceneAsync returned null for '{step.SceneName}' (Build Settings に登録されているか確認)");
+
+            while (!op.isDone)
+            {
+                ct.ThrowIfCancellationRequested();
+                await Task.Yield();
             }
             return StepResult.Ok(step);
         }

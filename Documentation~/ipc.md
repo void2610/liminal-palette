@@ -314,6 +314,7 @@ GET /api/v1/state
 | `wait_frames` | `frames` (integer) | `description` |
 | `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `description` |
 | `assert_not_equals` | `path` (string), `expected` | `description` |
+| `load_scene` | `sceneName` (string) | `description` |
 
 **Response 200**:
 ```json

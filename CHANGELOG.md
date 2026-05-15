@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- `Void2610.LiminalPalette.TestSupport` asmdef を新設し、`LiminalPaletteTestRunner` ヘルパを提供 (`TestSupport/LiminalPaletteTestRunner.cs`)。`GetScenariosWithPrefix(prefix)` で Registry から prefix 一致シナリオを列挙し、`RunScenario(path)` が `[UnityTest]` 互換の `IEnumerator` を返す。利用側は `[UnityTest] IEnumerator Run([ValueSource(nameof(Paths))] string path) => LiminalPaletteTestRunner.RunScenario(path)` の 1 メソッドで全シナリオを parametrized test 化でき、シナリオ毎に `[UnityTest]` を書くボイラープレートが消える。NUnit 依存のため `UNITY_INCLUDE_TESTS` 制約付き、`autoReferenced=false` で利用側 test asmdef が明示参照する形。
 - 組み込みランタイムコマンド `Scene/Current` / `Scene/Load(sceneName)` を追加 (`Runtime/Scene/SceneCommands.cs`)。`Time/*` と同じ流儀で ad-hoc CLI (`liminal exec Scene/Load sceneName=Foo`) から即時シーン切替・現在シーン取得が可能。シナリオから使う場合は `ScenarioStep.LoadScene` / `[LiminalScenario(Scene=...)]` が引き続き推奨。
 - `ScenarioStep.LoadScene(sceneName)` を first-class ステップ種別として追加 (新 `ScenarioStepKind.LoadScene` + 内部 `LoadSceneStep`)。`SceneManager.LoadSceneAsync(name, Single)` を呼んで完了まで `Task.Yield` で待機。PlayMode 専用 (Edit Mode では `Application.isPlaying=false` で fail 扱い)。
 - `[LiminalScenario(Scene = "TestScene")]` 宣言的属性を追加。指定するとシナリオ本体ステップの前に `LoadScene` ステップを `ScenarioExecutor` が自動で 1 つ前置きする。「各テストを専用シーンで実行したい」「テスト間で状態を漏らさない」用途のボイラープレートが 1 行で済む。復帰 (元シーンへ戻す) はしない仕様 — 最後にロードされたシーンが残る。`ScenarioDescriptor.Scene` プロパティと `GET /api/v1/scenarios` の JSON `scene` フィールドにも露出。

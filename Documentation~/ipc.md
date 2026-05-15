@@ -315,6 +315,7 @@ GET /api/v1/state
 | `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `description` |
 | `assert_not_equals` | `path` (string), `expected` | `description` |
 | `load_scene` | `sceneName` (string) | `description` |
+| `assert_command_returns` | `path` (string) | `args` (object), `expected` (string\|number\|bool\|null), `description` |
 
 **Response 200**:
 ```json

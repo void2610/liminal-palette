@@ -242,9 +242,11 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 | `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `description` |
 | `assert_not_equals` | `path` (string), `expected` | `description` |
 | `load_scene` | `sceneName` (string) | `description` |
+| `assert_command_returns` | `path` (string) | `args` (object), `expected` (string\|number\|bool\|null), `description` |
 
 `path` と `steps` は **排他**。両方 / どちらも未指定は 400 BadRequest。
 `load_scene` ステップは PlayMode 専用 (Edit Mode では fail)。シーン名は Build Settings に登録済みである必要がある。
+`assert_command_returns` ステップは指定パスのコマンドを実行し、戻り値文字列を `expected` と ordinal 比較する。`expected` を省略すると「コマンド成功すれば OK」モード (戻り値内容を問わない)。
 
 ### レスポンス
 

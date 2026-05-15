@@ -285,6 +285,16 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                     if (string.IsNullOrEmpty(sceneName)) { err = "load_scene requires 'sceneName'"; return false; }
                     step = ScenarioStep.LoadScene(sceneName, description);
                     return true;
+                case "assert_command_returns":
+                    if (string.IsNullOrEmpty(commandPath)) { err = "assert_command_returns requires 'path'"; return false; }
+                    // expected は明示的に省略 (= 戻り値内容を問わずコマンド成功だけ確かめる) も許容するため、
+                    // expectedSet=false なら null を渡す。string 以外を expected に渡すと parser 段で
+                    // string に正規化されるので、ここでは expected を ToString() してから渡す。
+                    step = ScenarioStep.AssertCommandReturns(
+                        commandPath, args,
+                        expected: expectedSet ? expected?.ToString() : null,
+                        description: description);
+                    return true;
                 default:
                     err = $"unknown step type: {type}";
                     return false;

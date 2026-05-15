@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- `ScenarioStep.AssertCommandReturns(commandPath, args, expected)` を first-class ステップ種別として追加 (新 `ScenarioStepKind.AssertCommandReturns` + internal `AssertCommandReturnsStep`)。内部でコマンドを実行して戻り値文字列が `expected` と ordinal 一致するかを検証する。`expected=null` の場合は「コマンドが成功すれば OK」モード。ad-hoc IPC からは `"type": "assert_command_returns"` で利用可能 (`path` / `args` / `expected`)。これにより利用側が `Foo/Assert/*` のような domain-specific Assert コマンドを書く必要が無くなり、観測コマンド (戻り値が string) + 本 step で済む。
 - `Void2610.LiminalPalette.TestSupport` asmdef を新設し、`LiminalPaletteTestRunner` ヘルパを提供 (`TestSupport/LiminalPaletteTestRunner.cs`)。`GetScenariosWithPrefix(prefix)` で Registry から prefix 一致シナリオを列挙し、`RunScenario(path)` が `[UnityTest]` 互換の `IEnumerator` を返す。利用側は `[UnityTest] IEnumerator Run([ValueSource(nameof(Paths))] string path) => LiminalPaletteTestRunner.RunScenario(path)` の 1 メソッドで全シナリオを parametrized test 化でき、シナリオ毎に `[UnityTest]` を書くボイラープレートが消える。NUnit 依存のため `UNITY_INCLUDE_TESTS` 制約付き、`autoReferenced=false` で利用側 test asmdef が明示参照する形。
 - 組み込みランタイムコマンド `Scene/Current` / `Scene/Load(sceneName)` を追加 (`Runtime/Scene/SceneCommands.cs`)。`Time/*` と同じ流儀で ad-hoc CLI (`liminal exec Scene/Load sceneName=Foo`) から即時シーン切替・現在シーン取得が可能。シナリオから使う場合は `ScenarioStep.LoadScene` / `[LiminalScenario(Scene=...)]` が引き続き推奨。
 - `ScenarioStep.LoadScene(sceneName)` を first-class ステップ種別として追加 (新 `ScenarioStepKind.LoadScene` + 内部 `LoadSceneStep`)。`SceneManager.LoadSceneAsync(name, Single)` を呼んで完了まで `Task.Yield` で待機。PlayMode 専用 (Edit Mode では `Application.isPlaying=false` で fail 扱い)。

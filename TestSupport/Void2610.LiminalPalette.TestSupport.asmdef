@@ -1,0 +1,20 @@
+{
+    "name": "Void2610.LiminalPalette.TestSupport",
+    "rootNamespace": "Void2610.LiminalPalette.TestSupport",
+    "references": [
+        "Void2610.LiminalPalette"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

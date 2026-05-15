@@ -142,5 +142,25 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             Assert.AreEqual(ScenarioStepKind.WaitFrames, steps[1].Kind);
             Assert.AreEqual(ScenarioStepKind.AssertEquals, steps[2].Kind);
         }
+
+        [Test]
+        public void TryParseBody_ParsesLoadSceneStep()
+        {
+            var body = "{\"steps\":[{\"type\":\"load_scene\",\"sceneName\":\"TestScene\"}]}";
+            var ok = RunScenarioEndpoint.TryParseBody(body, out _, out var steps, out var err);
+            Assert.IsTrue(ok, err);
+            Assert.AreEqual(1, steps.Count);
+            Assert.AreEqual(ScenarioStepKind.LoadScene, steps[0].Kind);
+            Assert.AreEqual("TestScene", ((LoadSceneStep)steps[0]).SceneName);
+        }
+
+        [Test]
+        public void TryParseBody_LoadSceneWithoutSceneName_Fails()
+        {
+            var body = "{\"steps\":[{\"type\":\"load_scene\"}]}";
+            var ok = RunScenarioEndpoint.TryParseBody(body, out _, out _, out var err);
+            Assert.IsFalse(ok);
+            StringAssert.Contains("sceneName", err);
+        }
     }
 }

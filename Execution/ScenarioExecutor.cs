@@ -222,6 +222,10 @@ namespace Void2610.LiminalPalette
         // 後続コマンドは自動的に新シーンの instance に解決される。
         private async Task<StepResult> RunLoadSceneStep(LoadSceneStep step, CancellationToken ct)
         {
+            // 既にキャンセル要求が来ている場合は LoadSceneAsync を呼ばずに伝搬する。
+            // 呼んでしまうと「キャンセル後に意図しないシーン切替が発生」する問題を防ぐ。
+            ct.ThrowIfCancellationRequested();
+
             if (!Application.isPlaying)
                 return StepResult.Fail(step, "LoadScene step is only supported in PlayMode");
 

@@ -236,6 +236,20 @@ namespace Void2610.LiminalPalette.Ipc.Json
             {
                 w.WriteString("sceneName", lss.SceneName);
             }
+            else if (s.Step is AssertCommandReturnsStep acrs)
+            {
+                w.WriteString("commandPath", acrs.CommandPath);
+                w.BeginObject("args");
+                if (acrs.Args != null)
+                {
+                    foreach (var kv in acrs.Args)
+                    {
+                        w.WriteString(kv.Key, kv.Value == null ? null : TypeConverterRegistry.ToDisplayString(kv.Value));
+                    }
+                }
+                w.EndObject();
+                w.WriteString("expected", acrs.Expected);
+            }
 
             // CommandResult (Command ステップのみ)。
             if (s.CommandResult != null)

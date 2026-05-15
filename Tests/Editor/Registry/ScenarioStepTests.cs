@@ -90,5 +90,38 @@ namespace Void2610.LiminalPalette.Tests
             Assert.Throws<System.ArgumentException>(() => ScenarioStep.LoadScene(""));
             Assert.Throws<System.ArgumentException>(() => ScenarioStep.LoadScene(null));
         }
+
+        [Test]
+        public void AssertCommandReturns_BuildsStep()
+        {
+            var step = ScenarioStep.AssertCommandReturns(
+                "Foo/Bar",
+                new Dictionary<string, object> { ["x"] = 1 },
+                expected: "ok",
+                description: "test");
+            Assert.AreEqual(ScenarioStepKind.AssertCommandReturns, step.Kind);
+            Assert.AreEqual("test", step.Description);
+            var s = (AssertCommandReturnsStep)step;
+            Assert.AreEqual("Foo/Bar", s.CommandPath);
+            Assert.AreEqual("ok", s.Expected);
+            Assert.AreEqual(1, s.Args["x"]);
+        }
+
+        [Test]
+        public void AssertCommandReturns_NullExpected_Allowed()
+        {
+            // expected=null は「コマンド成功すれば OK」モードとして許可されている。
+            var step = (AssertCommandReturnsStep)ScenarioStep.AssertCommandReturns("Foo/Bar");
+            Assert.IsNull(step.Expected);
+            Assert.IsNotNull(step.Args);
+            Assert.AreEqual(0, step.Args.Count);
+        }
+
+        [Test]
+        public void AssertCommandReturns_RejectsEmptyPath()
+        {
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertCommandReturns(""));
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertCommandReturns(null));
+        }
     }
 }

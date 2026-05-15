@@ -162,5 +162,28 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             Assert.IsFalse(ok);
             StringAssert.Contains("sceneName", err);
         }
+
+        [Test]
+        public void TryParseBody_ParsesAssertCommandReturnsStep()
+        {
+            var body = "{\"steps\":[{\"type\":\"assert_command_returns\",\"path\":\"Foo/Bar\",\"args\":{\"x\":\"1\"},\"expected\":\"ok\"}]}";
+            var ok = RunScenarioEndpoint.TryParseBody(body, out _, out var steps, out var err);
+            Assert.IsTrue(ok, err);
+            Assert.AreEqual(1, steps.Count);
+            Assert.AreEqual(ScenarioStepKind.AssertCommandReturns, steps[0].Kind);
+            var s = (AssertCommandReturnsStep)steps[0];
+            Assert.AreEqual("Foo/Bar", s.CommandPath);
+            Assert.AreEqual("ok", s.Expected);
+            Assert.AreEqual("1", s.Args["x"]);
+        }
+
+        [Test]
+        public void TryParseBody_AssertCommandReturnsWithoutPath_Fails()
+        {
+            var body = "{\"steps\":[{\"type\":\"assert_command_returns\",\"expected\":\"ok\"}]}";
+            var ok = RunScenarioEndpoint.TryParseBody(body, out _, out _, out var err);
+            Assert.IsFalse(ok);
+            StringAssert.Contains("path", err);
+        }
     }
 }

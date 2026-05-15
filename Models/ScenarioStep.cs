@@ -12,6 +12,7 @@ namespace Void2610.LiminalPalette
         AssertEquals,
         AssertNotEquals,
         LoadScene,
+        AssertCommandReturns,
     }
 
     /// <summary>
@@ -81,6 +82,25 @@ namespace Void2610.LiminalPalette
         }
 
         /// <summary>
+        /// 指定コマンドを実行し、戻り値の文字列が expected と一致することを検証するステップ。
+        /// `AssertEquals` (ObservableField の現在値検証) との使い分け:
+        ///   - ObservableField の値 → `AssertEquals`
+        ///   - コマンドが返す文字列 (観測コマンド等) → `AssertCommandReturns`
+        /// args は `Run` と同じく名前→値の辞書。expected との比較は ordinal な string 一致。
+        /// expected を null にすると「コマンドが成功すれば OK (戻り値は問わない)」のチェックになる。
+        /// </summary>
+        public static ScenarioStep AssertCommandReturns(
+            string commandPath,
+            IReadOnlyDictionary<string, object> args = null,
+            string expected = null,
+            string description = null)
+        {
+            if (string.IsNullOrEmpty(commandPath))
+                throw new ArgumentException("commandPath must not be null or empty", nameof(commandPath));
+            return new AssertCommandReturnsStep(commandPath, args, expected, description);
+        }
+
+        /// <summary>
         /// 指定シーンを Single モードで非同期ロードするステップ。完了 (op.isDone) まで待機する。
         /// シーン切替で VContainer のスコープが再構築されるため、後続コマンドは自動的に
         /// 新シーンに登録された instance に解決される。
@@ -133,6 +153,28 @@ namespace Void2610.LiminalPalette
             : base(kind, description)
         {
             ObservableFieldPath = observableFieldPath;
+            Expected = expected;
+        }
+    }
+
+    /// <summary>コマンドを実行し、戻り値文字列が expected と一致するかを検証するステップ。</summary>
+    internal sealed class AssertCommandReturnsStep : ScenarioStep
+    {
+        public string CommandPath { get; }
+        public IReadOnlyDictionary<string, object> Args { get; }
+
+        /// <summary>期待する戻り値文字列。null の場合は「成功すれば OK」(戻り値内容は問わない)。</summary>
+        public string Expected { get; }
+
+        public AssertCommandReturnsStep(
+            string commandPath,
+            IReadOnlyDictionary<string, object> args,
+            string expected,
+            string description)
+            : base(ScenarioStepKind.AssertCommandReturns, description)
+        {
+            CommandPath = commandPath;
+            Args = args ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             Expected = expected;
         }
     }

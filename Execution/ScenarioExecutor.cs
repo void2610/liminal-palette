@@ -177,6 +177,9 @@ namespace Void2610.LiminalPalette
                         case ScenarioStepKind.LoadScene:
                             sr = await RunLoadSceneStep((LoadSceneStep)step, ct);
                             break;
+                        case ScenarioStepKind.AssertCommandReturns:
+                            sr = await RunAssertCommandReturnsStep((AssertCommandReturnsStep)step, ct);
+                            break;
                         default:
                             sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
                             break;
@@ -205,6 +208,40 @@ namespace Void2610.LiminalPalette
         {
             var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
             return new StepResult(step, result.Success, result.Error, result, null, TimeSpan.Zero);
+        }
+
+        // AssertCommandReturns: 内部でコマンドを実行し、戻り値文字列が expected と一致するか検証する。
+        // 失敗パターンは 2 通り:
+        //   1) コマンド実行自体が失敗 (success=false) → そのまま fail
+        //   2) コマンドは成功したが戻り値が expected と不一致 → fail (ordinal 比較)
+        // expected==null は「コマンドが成功すれば OK」モード。
+        private async Task<StepResult> RunAssertCommandReturnsStep(AssertCommandReturnsStep step, CancellationToken ct)
+        {
+            var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
+            if (!result.Success)
+            {
+                var sr = new StepResult(step, success: false,
+                    error: $"command '{step.CommandPath}' failed: {result.Error ?? "<no error>"}",
+                    commandResult: result, actualValue: null, duration: TimeSpan.Zero);
+                return sr;
+            }
+
+            // expected が null の場合は戻り値内容を問わず成功扱い (コマンドの実行可否だけ確かめたいケース)。
+            if (step.Expected == null)
+            {
+                return new StepResult(step, success: true, error: null,
+                    commandResult: result, actualValue: result.Value, duration: TimeSpan.Zero);
+            }
+
+            var actual = result.Value == null ? "" : TypeConverterRegistry.ToDisplayString(result.Value);
+            if (string.Equals(actual, step.Expected, StringComparison.Ordinal))
+            {
+                return new StepResult(step, success: true, error: null,
+                    commandResult: result, actualValue: actual, duration: TimeSpan.Zero);
+            }
+            return new StepResult(step, success: false,
+                error: $"command '{step.CommandPath}' returned '{actual}', expected '{step.Expected}'",
+                commandResult: result, actualValue: actual, duration: TimeSpan.Zero);
         }
 
         private async Task<StepResult> RunWaitSecondsStep(WaitStep step, CancellationToken ct)

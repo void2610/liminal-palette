@@ -53,5 +53,28 @@ namespace Void2610.LiminalPalette.Tests
             Assert.AreEqual(1, steps.Count);
             Assert.AreEqual(ScenarioStepKind.Command, steps[0].Kind);
         }
+
+        [Test]
+        public void TryBuildDescriptor_PropagatesSceneFromAttribute()
+        {
+            var method = typeof(InvalidScenarioShapes)
+                .GetMethod(nameof(InvalidScenarioShapes.NoOpSteps), BindingFlags.Public | BindingFlags.Static);
+            Assert.IsNotNull(method, "NoOpSteps メソッドが見つからない (test fixture を確認)");
+            var attr = new LiminalScenarioAttribute("TestScenario/WithScene") { Scene = "MyTestScene" };
+            var ok = ScenarioScanner.TryBuildDescriptor(method, attr, out var descriptor, out var error);
+            Assert.IsTrue(ok, error);
+            Assert.AreEqual("MyTestScene", descriptor.Scene);
+        }
+
+        [Test]
+        public void TryBuildDescriptor_DefaultsSceneToEmpty()
+        {
+            var method = typeof(InvalidScenarioShapes)
+                .GetMethod(nameof(InvalidScenarioShapes.NoOpSteps), BindingFlags.Public | BindingFlags.Static);
+            var attr = new LiminalScenarioAttribute("TestScenario/NoScene");
+            var ok = ScenarioScanner.TryBuildDescriptor(method, attr, out var descriptor, out var error);
+            Assert.IsTrue(ok, error);
+            Assert.AreEqual("", descriptor.Scene);
+        }
     }
 }

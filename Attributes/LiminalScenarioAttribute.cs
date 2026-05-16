@@ -18,6 +18,14 @@ namespace Void2610.LiminalPalette
         /// <summary>UI / API 表示用の説明文。</summary>
         public string Description { get; set; } = "";
 
+        /// <summary>
+        /// 任意。指定するとシナリオ実行直前に SceneManager.LoadSceneAsync(Scene, Single) が自動で走り、
+        /// 完了後にステップ本体に進む。「テストごとに専用シーンで実行したい」「テスト間で状態を漏らさない」
+        /// 用途。PlayMode 専用 (Edit Mode では LoadScene ステップが失敗してシナリオごと fail)。
+        /// シナリオ完了後のシーン復帰は行わない (= 最後にロードされたシーンが残る)。
+        /// </summary>
+        public string Scene { get; set; } = "";
+
         public LiminalScenarioAttribute(string path) => Path = path;
     }
 }

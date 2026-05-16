@@ -5,6 +5,13 @@
 ## [Unreleased]
 
 ### Added
+- `ScenarioStep.AssertCommandReturns(commandPath, args, expected)` を first-class ステップ種別として追加 (新 `ScenarioStepKind.AssertCommandReturns` + internal `AssertCommandReturnsStep`)。内部でコマンドを実行して戻り値文字列が `expected` と ordinal 一致するかを検証する。`expected=null` の場合は「コマンドが成功すれば OK」モード。ad-hoc IPC からは `"type": "assert_command_returns"` で利用可能 (`path` / `args` / `expected`)。これにより利用側が `Foo/Assert/*` のような domain-specific Assert コマンドを書く必要が無くなり、観測コマンド (戻り値が string) + 本 step で済む。
+- `Void2610.LiminalPalette.TestSupport` asmdef を新設し、`LiminalPaletteTestRunner` ヘルパを提供 (`TestSupport/LiminalPaletteTestRunner.cs`)。`GetScenariosWithPrefix(prefix)` で Registry から prefix 一致シナリオを列挙し、`RunScenario(path)` が `[UnityTest]` 互換の `IEnumerator` を返す。利用側は `[UnityTest] IEnumerator Run([ValueSource(nameof(Paths))] string path) => LiminalPaletteTestRunner.RunScenario(path)` の 1 メソッドで全シナリオを parametrized test 化でき、シナリオ毎に `[UnityTest]` を書くボイラープレートが消える。NUnit 依存のため `UNITY_INCLUDE_TESTS` 制約付き、`autoReferenced=false` で利用側 test asmdef が明示参照する形。
+- 組み込みランタイムコマンド `Scene/Current` / `Scene/Load(sceneName)` を追加 (`Runtime/Scene/SceneCommands.cs`)。`Time/*` と同じ流儀で ad-hoc CLI (`liminal exec Scene/Load sceneName=Foo`) から即時シーン切替・現在シーン取得が可能。シナリオから使う場合は `ScenarioStep.LoadScene` / `[LiminalScenario(Scene=...)]` が引き続き推奨。
+- `ScenarioStep.LoadScene(sceneName)` を first-class ステップ種別として追加 (新 `ScenarioStepKind.LoadScene` + 内部 `LoadSceneStep`)。`SceneManager.LoadSceneAsync(name, Single)` を呼んで完了まで `Task.Yield` で待機。PlayMode 専用 (Edit Mode では `Application.isPlaying=false` で fail 扱い)。
+- `[LiminalScenario(Scene = "TestScene")]` 宣言的属性を追加。指定するとシナリオ本体ステップの前に `LoadScene` ステップを `ScenarioExecutor` が自動で 1 つ前置きする。「各テストを専用シーンで実行したい」「テスト間で状態を漏らさない」用途のボイラープレートが 1 行で済む。復帰 (元シーンへ戻す) はしない仕様 — 最後にロードされたシーンが残る。`ScenarioDescriptor.Scene` プロパティと `GET /api/v1/scenarios` の JSON `scene` フィールドにも露出。
+- 組み込みランタイムコマンド `Time/SetScale` / `Time/Reset` / `Time/Pause` / `Time/Resume` + 観測フィールド `Time/Scale` (静的 `ReactiveProperty<float>`) を追加 (`Runtime/Time/TimeCommands.cs`)。`Editor/` prefix ではないので Editor / PlayMode / Player ビルドの 3 経路すべてから呼べる。`AssertEquals("Time/Scale", 5f)` でシナリオから検証可能。`Time.timeScale` 変更通知 API が無いため、`TimeScalePoller` (HideAndDontSave な常駐 GameObject) で 1 フレームごとにポーリングして外部書き換えも追従させる。
+- `ObservableFieldDescriptor.IsStatic` を追加: `static` プロパティ / フィールドに `[LiminalObservableField]` を付けた場合、UI / IPC / Scenario の各経路が `IInstanceResolver` を経由せずに値を読めるようになった。組み込み `Time/Scale` のような static utility 用途を VContainer 登録なしで成立させるため。
 - `liminal init` サブコマンド: cwd→Unity プロジェクト検出 / `ProjectSettings/LiminalPalette.json` 状態 / token / `.claude/skills/` の AI Skills / live probe を 1 コマンドで一覧。`--port` / `--runtime-port` を渡すとその場で固定ポートも書き込む。新規プロジェクトの onboarding 用。
 - `ProjectSettings/LiminalPalette.json` の JSON Schema (`Documentation~/schemas/LiminalPalette.schema.json`) を同梱。CLI が書き出すファイルに `$schema` 参照を自動付与するので、VS Code / JetBrains 系 IDE で `port` / `runtimePort` の autocomplete と範囲チェックが効く。`JsonUtility` は未知フィールドを無視するため `ProjectConfig` 側に影響なし (`Tests/Editor/Ipc/ProjectConfigTests.cs:GetPreferredPortAt_TolerantToUnknownFields` で回帰テスト)。
 - `liminal run` がシナリオパスの glob (例: `liminal run 'Battle/*'`) に対応。`/api/v1/scenarios` を引いて `fnmatch` で一致するシナリオを順次実行し、最後にサマリ (`N scenarios, X passed, Y failed`) を表示する。1 つでも失敗すれば exit code 2。
@@ -19,6 +26,7 @@
 - `liminal project show` / `liminal project set-port [--runtime] <N>` / `liminal project unset-port [--runtime]`: cwd 配下のプロジェクト固定ポート設定を表示 / 編集するコマンド。`show` はライブ probe で listener の現在位置も表示する。
 
 ### Changed
+- ランタイム asmdef を `Void2610.LiminalPalette.Player` → `Void2610.LiminalPalette.Runtime` にリネーム (フォルダも `Player/` → `Runtime/`)。サブ asmdef も `Runtime.Ipc` / `Runtime.InputSystem` に追従。Unity Package Manager の標準慣習 (`Runtime/`) に合わせると同時に、利用側ゲームの「プレイヤー (キャラクター)」ドメインと名前衝突を回避するため。**Breaking**: 利用側 asmdef の references で `Void2610.LiminalPalette.Player` を参照していた箇所は `Void2610.LiminalPalette.Runtime` に書き換え必須。
 - CLI コマンド名を `lp` から `liminal` に変更 (`lp` は macOS の line printer ユーティリティと衝突するため)。`Tools~/lp/` → `Tools~/liminal/`、AI Skill 名も `lp-*` → `liminal-*` にリネーム。AISkillsInstaller の Uninstall は legacy `lp-*` ディレクトリも自動的に掃除する。
 
 ### Fixed

@@ -1,0 +1,25 @@
+{
+    "name": "Void2610.LiminalPalette.Runtime.InputSystem",
+    "rootNamespace": "Void2610.LiminalPalette.Runtime",
+    "references": [
+        "Void2610.LiminalPalette.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LIMINAL_PALETTE_INPUTSYSTEM"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "LIMINAL_PALETTE_INPUTSYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}

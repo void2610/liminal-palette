@@ -4,7 +4,7 @@
     "references": [
         "Void2610.LiminalPalette",
         "Void2610.LiminalPalette.UI",
-        "Void2610.LiminalPalette.Player",
+        "Void2610.LiminalPalette.Runtime",
         "Void2610.LiminalPalette.Ipc"
     ],
     "includePlatforms": [

@@ -79,13 +79,18 @@ namespace Void2610.LiminalPalette.UI
                 row.Add(label);
                 Add(row);
 
-                // インスタンス解決
-                var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-                if (instance == null)
+                // インスタンス解決。IsStatic な field は所属クラスが static utility 想定で
+                // VContainer 登録を要求しないため、Resolve をスキップして null を instance として扱う。
+                object instance = null;
+                if (!d.IsStatic)
                 {
-                    // 未解決時は "(not resolved)" 表示にとどめる。利用者が VContainer 設定漏れに気付ける。
-                    label.text = $"{d.Path}: (instance not resolved)";
-                    continue;
+                    instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
+                    if (instance == null)
+                    {
+                        // 未解決時は "(not resolved)" 表示にとどめる。利用者が VContainer 設定漏れに気付ける。
+                        label.text = $"{d.Path}: (instance not resolved)";
+                        continue;
+                    }
                 }
 
                 // 初期表示: ReadCurrent で現在値を一度読み、Subscribe より前にラベルを埋める。

@@ -181,7 +181,8 @@ namespace Void2610.LiminalPalette
                 declaringType: declaringType,
                 method: method,
                 isStatic: isStatic,
-                stepsFactory: factory);
+                stepsFactory: factory,
+                scene: attr.Scene);
             return true;
         }
 

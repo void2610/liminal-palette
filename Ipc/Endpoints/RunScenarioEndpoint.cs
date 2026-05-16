@@ -171,6 +171,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
             string description = null;
             string commandPath = null;
             string observableFieldPath = null;
+            string sceneName = null;
             object expected = null;
             bool expectedSet = false;
             float seconds = 0f;
@@ -245,6 +246,10 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                         if (v != JsonToken.Number) { err = "step.frames must be number"; return false; }
                         frames = (int)r.NumberValue;
                         break;
+                    case "sceneName":
+                        if (v != JsonToken.String) { err = "step.sceneName must be string"; return false; }
+                        sceneName = r.StringValue;
+                        break;
                     default:
                         SkipValue(r, v);
                         break;
@@ -275,6 +280,20 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                     if (string.IsNullOrEmpty(observableFieldPath)) { err = "assert_not_equals requires 'path'"; return false; }
                     if (!expectedSet) { err = "assert_not_equals requires 'expected'"; return false; }
                     step = ScenarioStep.AssertNotEquals(observableFieldPath, expected, description);
+                    return true;
+                case "load_scene":
+                    if (string.IsNullOrEmpty(sceneName)) { err = "load_scene requires 'sceneName'"; return false; }
+                    step = ScenarioStep.LoadScene(sceneName, description);
+                    return true;
+                case "assert_command_returns":
+                    if (string.IsNullOrEmpty(commandPath)) { err = "assert_command_returns requires 'path'"; return false; }
+                    // expected は明示的に省略 (= 戻り値内容を問わずコマンド成功だけ確かめる) も許容するため、
+                    // expectedSet=false なら null を渡す。string 以外を expected に渡すと parser 段で
+                    // string に正規化されるので、ここでは expected を ToString() してから渡す。
+                    step = ScenarioStep.AssertCommandReturns(
+                        commandPath, args,
+                        expected: expectedSet ? expected?.ToString() : null,
+                        description: description);
                     return true;
                 default:
                     err = $"unknown step type: {type}";

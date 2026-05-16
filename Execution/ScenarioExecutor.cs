@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Void2610.LiminalPalette
 {
@@ -106,6 +108,13 @@ namespace Void2610.LiminalPalette
                 try
                 {
                     stepList = new List<ScenarioStep>();
+                    // [LiminalScenario(Scene=...)] が付いていれば、本体ステップの前に LoadScene を差し込む。
+                    // 利用側は EnterTestScene のような毎シナリオの定型コードを書かなくて済む。
+                    // 復帰 (元シーンへ戻す) はしない仕様 — 最後にロードされたシーンがそのまま残る。
+                    if (!string.IsNullOrEmpty(descriptor.Scene))
+                    {
+                        stepList.Add(ScenarioStep.LoadScene(descriptor.Scene, $"auto: load {descriptor.Scene}"));
+                    }
                     foreach (var s in descriptor.StepsFactory(instance))
                     {
                         if (s == null) continue;
@@ -165,6 +174,12 @@ namespace Void2610.LiminalPalette
                         case ScenarioStepKind.AssertNotEquals:
                             sr = RunAssertStep((AssertStep)step, equals: false);
                             break;
+                        case ScenarioStepKind.LoadScene:
+                            sr = await RunLoadSceneStep((LoadSceneStep)step, ct);
+                            break;
+                        case ScenarioStepKind.AssertCommandReturns:
+                            sr = await RunAssertCommandReturnsStep((AssertCommandReturnsStep)step, ct);
+                            break;
                         default:
                             sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
                             break;
@@ -195,11 +210,78 @@ namespace Void2610.LiminalPalette
             return new StepResult(step, result.Success, result.Error, result, null, TimeSpan.Zero);
         }
 
+        // AssertCommandReturns: 内部でコマンドを実行し、戻り値文字列が expected と一致するか検証する。
+        // 失敗パターンは 2 通り:
+        //   1) コマンド実行自体が失敗 (success=false) → そのまま fail
+        //   2) コマンドは成功したが戻り値が expected と不一致 → fail (ordinal 比較)
+        // expected==null は「コマンドが成功すれば OK」モード。
+        private async Task<StepResult> RunAssertCommandReturnsStep(AssertCommandReturnsStep step, CancellationToken ct)
+        {
+            var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
+            if (!result.Success)
+            {
+                var sr = new StepResult(step, success: false,
+                    error: $"command '{step.CommandPath}' failed: {result.Error ?? "<no error>"}",
+                    commandResult: result, actualValue: null, duration: TimeSpan.Zero);
+                return sr;
+            }
+
+            // expected が null の場合は戻り値内容を問わず成功扱い (コマンドの実行可否だけ確かめたいケース)。
+            if (step.Expected == null)
+            {
+                return new StepResult(step, success: true, error: null,
+                    commandResult: result, actualValue: result.Value, duration: TimeSpan.Zero);
+            }
+
+            var actual = result.Value == null ? "" : TypeConverterRegistry.ToDisplayString(result.Value);
+            if (string.Equals(actual, step.Expected, StringComparison.Ordinal))
+            {
+                return new StepResult(step, success: true, error: null,
+                    commandResult: result, actualValue: actual, duration: TimeSpan.Zero);
+            }
+            return new StepResult(step, success: false,
+                error: $"command '{step.CommandPath}' returned '{actual}', expected '{step.Expected}'",
+                commandResult: result, actualValue: actual, duration: TimeSpan.Zero);
+        }
+
         private async Task<StepResult> RunWaitSecondsStep(WaitStep step, CancellationToken ct)
         {
             if (step.Seconds > 0f)
             {
                 await Task.Delay(TimeSpan.FromSeconds(step.Seconds), ct);
+            }
+            return StepResult.Ok(step);
+        }
+
+        // 指定シーンを Single モードで非同期ロード。完了 (op.isDone) まで Task.Yield で待つ。
+        // PlayMode 専用 (Edit Mode では Application.isPlaying=false なので Fail にする)。
+        // Single モードで現シーンを置換するので、利用側 VContainer のスコープは作り直され、
+        // 後続コマンドは自動的に新シーンの instance に解決される。
+        private async Task<StepResult> RunLoadSceneStep(LoadSceneStep step, CancellationToken ct)
+        {
+            // 既にキャンセル要求が来ている場合は LoadSceneAsync を呼ばずに伝搬する。
+            // 呼んでしまうと「キャンセル後に意図しないシーン切替が発生」する問題を防ぐ。
+            ct.ThrowIfCancellationRequested();
+
+            if (!Application.isPlaying)
+                return StepResult.Fail(step, "LoadScene step is only supported in PlayMode");
+
+            AsyncOperation op;
+            try
+            {
+                op = SceneManager.LoadSceneAsync(step.SceneName, LoadSceneMode.Single);
+            }
+            catch (Exception ex)
+            {
+                return StepResult.Fail(step, $"LoadSceneAsync threw: {ex.Message}");
+            }
+            if (op == null)
+                return StepResult.Fail(step, $"LoadSceneAsync returned null for '{step.SceneName}' (Build Settings に登録されているか確認)");
+
+            while (!op.isDone)
+            {
+                ct.ThrowIfCancellationRequested();
+                await Task.Yield();
             }
             return StepResult.Ok(step);
         }
@@ -216,11 +298,10 @@ namespace Void2610.LiminalPalette
             if (d == null)
                 return StepResult.Fail(step, $"ObservableField not found: {step.ObservableFieldPath}");
 
-            // インスタンス解決。static なフィールドは現状の ObservableField スキャナでも対象になり得るが、
-            // ReadCurrent は instance を null で渡しても動くので一旦 null 許容。
-            var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-            // instance が null でも static フィールドなら ReadCurrent(null) で値が取れることがある。
+            // インスタンス解決。IsStatic な field は VContainer 登録不要 (静的 utility 想定) なので
+            // Resolve を経由せず instance=null のまま ReadCurrent に渡す。
             // インスタンスフィールドで instance が null の場合は ReadCurrent 内部で例外になり下の catch で吸い上げる。
+            var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
 
             object actual;
             try

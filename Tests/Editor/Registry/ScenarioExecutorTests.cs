@@ -207,5 +207,120 @@ namespace Void2610.LiminalPalette.Tests
             Assert.IsFalse(result.Success);
             StringAssert.Contains("not found", result.Steps[0].Error);
         }
+
+        // ------------------------------------------------------------
+        // LoadScene ステップ
+        // ------------------------------------------------------------
+
+        [Test]
+        public async Task Execute_LoadScene_FailsInEditMode()
+        {
+            // EditMode (Application.isPlaying=false) では LoadScene は明示的に失敗させる仕様。
+            // PlayMode 内での実シーン読込検証は別途 PlayMode テストで担保する。
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.LoadScene("NoSuchScene") },
+                null, CancellationToken.None);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("PlayMode", result.Steps[0].Error);
+        }
+
+        // ------------------------------------------------------------
+        // AssertCommandReturns ステップ
+        // ------------------------------------------------------------
+
+        // FakeCommandExecutor を継承して任意の戻り値文字列を返す版。
+        private sealed class FakeCommandExecutorWithValue : ICommandExecutor
+        {
+            public string ReturnValue;
+            public bool ShouldFail;
+            public Task<CommandResult> ExecuteAsync(string p, IReadOnlyDictionary<string, string> a, CancellationToken ct = default)
+                => Task.FromResult(Build());
+            public Task<CommandResult> ExecuteAsync(string p, IReadOnlyList<string> a, CancellationToken ct = default)
+                => Task.FromResult(Build());
+            public Task<CommandResult> ExecuteWithTypedArgsAsync(string p, IReadOnlyDictionary<string, object> a, CancellationToken ct = default)
+                => Task.FromResult(Build());
+            private CommandResult Build()
+                => ShouldFail
+                    ? CommandResult.Fail("simulated", null, System.Array.Empty<LogEntry>(), System.TimeSpan.Zero)
+                    : CommandResult.Ok(ReturnValue, System.Array.Empty<LogEntry>(), System.TimeSpan.Zero);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandReturns_ExpectedMatches_Passes()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "ok" };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandReturns("Foo/Bar", expected: "ok") },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandReturns_ExpectedMismatch_Fails()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "actual_value" };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandReturns("Foo/Bar", expected: "expected_value") },
+                null, CancellationToken.None);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("actual_value", result.Steps[0].Error);
+            StringAssert.Contains("expected_value", result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandReturns_NullExpected_PassesWhenSucceeds()
+        {
+            // expected=null モード: 戻り値内容を問わず実行成功なら pass。
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "whatever" };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandReturns("Foo/Bar", expected: null) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandReturns_CommandFails_StepFails()
+        {
+            var ce = new FakeCommandExecutorWithValue { ShouldFail = true };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandReturns("Foo/Bar", expected: "ok") },
+                null, CancellationToken.None);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("command", result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task ExecuteByPath_AutoPrependsLoadSceneWhenAttributeHasScene()
+        {
+            // [LiminalScenario(Scene="...")] が付いていれば、ScenarioExecutor が本体ステップの前に
+            // LoadScene ステップを自動で 1 つ差し込む。EditMode では LoadScene 自体が失敗するので
+            // 「最初のステップが LoadScene で、それが PlayMode 専用エラーで fail」を観測することで
+            // 前置きが行われた事実を確認する。
+            var registry = new ScenarioRegistry();
+            var descriptor = new ScenarioDescriptor(
+                path: "TestScenario/WithScene",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                scene: "MyScene");
+            registry.Register(descriptor);
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithScene", CancellationToken.None);
+
+            Assert.IsFalse(result.Success, "EditMode で LoadScene は失敗するのでシナリオも失敗");
+            Assert.AreEqual(0, result.FailedAtStep, "失敗位置は先頭 (= 自動前置きされた LoadScene)");
+            Assert.AreEqual(ScenarioStepKind.LoadScene, result.Steps[0].Step.Kind);
+            Assert.AreEqual(0, ce.CallCount, "LoadScene 失敗で本体 Run は呼ばれない");
+        }
     }
 }

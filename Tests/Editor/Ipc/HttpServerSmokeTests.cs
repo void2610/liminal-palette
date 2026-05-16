@@ -28,6 +28,8 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             // メインスレッドをテスト実行スレッドに合わせて MainThreadDispatcher.RunAsync が即時実行されるように。
             MainThreadDispatcher.RegisterMainThread(Thread.CurrentThread.ManagedThreadId);
             MainThreadDispatcher.ClearForTest();
+            // Test/Int 等のフィクスチャを Registry に登録 (Bootstrap は .Tests アセンブリ除外のため)。
+            EndpointsTests.EnsureTestCommandFixturesRegistered();
 
             var router = new IpcRouter(new TokenAuthenticator("smoke-token"));
             router.Register("GET", "/api/v1/health", new HealthEndpoint("editor", "", ""));

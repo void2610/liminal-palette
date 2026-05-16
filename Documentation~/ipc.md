@@ -314,6 +314,8 @@ GET /api/v1/state
 | `wait_frames` | `frames` (integer) | `description` |
 | `assert_equals` | `path` (string), `expected` (string\|number\|bool\|null) | `description` |
 | `assert_not_equals` | `path` (string), `expected` | `description` |
+| `load_scene` | `sceneName` (string) | `description` |
+| `assert_command_returns` | `path` (string) | `args` (object), `expected` (string\|number\|bool\|null), `description` |
 
 **Response 200**:
 ```json
@@ -548,4 +550,4 @@ liminal logs --limit 10 --json | jq '.invocations[].path'
 
 - [security.md](security.md) — トークン管理 / Production 除外 / 攻撃面の評価
 - [troubleshooting.md](troubleshooting.md) — 401 が返る / ポート占有 / DomainReload で listener が残る等
-- [asmdef.md](asmdef.md) — `Player.Ipc` の `defineConstraints` 設計
+- [asmdef.md](asmdef.md) — `Runtime.Ipc` の `defineConstraints` 設計

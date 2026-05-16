@@ -172,6 +172,9 @@ namespace Void2610.LiminalPalette.Ipc.Json
             w.WriteString("path", s.Path);
             w.WriteString("description", s.Description ?? "");
             w.WriteNumber("stepCount", stepCount);
+            // [LiminalScenario(Scene=...)] が指定されていればここに名前を出力。未指定なら "" を返す。
+            // クライアント (liminal CLI 等) がシナリオの事前ロードシーン情報を見たい場合に使える。
+            w.WriteString("scene", s.Scene ?? "");
             w.EndObject();
         }
 
@@ -228,6 +231,24 @@ namespace Void2610.LiminalPalette.Ipc.Json
             {
                 w.WriteString("observableFieldPath", asr.ObservableFieldPath);
                 w.WriteString("expected", asr.Expected == null ? null : TypeConverterRegistry.ToDisplayString(asr.Expected));
+            }
+            else if (s.Step is LoadSceneStep lss)
+            {
+                w.WriteString("sceneName", lss.SceneName);
+            }
+            else if (s.Step is AssertCommandReturnsStep acrs)
+            {
+                w.WriteString("commandPath", acrs.CommandPath);
+                w.BeginObject("args");
+                if (acrs.Args != null)
+                {
+                    foreach (var kv in acrs.Args)
+                    {
+                        w.WriteString(kv.Key, kv.Value == null ? null : TypeConverterRegistry.ToDisplayString(kv.Value));
+                    }
+                }
+                w.EndObject();
+                w.WriteString("expected", acrs.Expected);
             }
 
             // CommandResult (Command ステップのみ)。

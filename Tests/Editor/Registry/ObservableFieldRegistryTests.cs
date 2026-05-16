@@ -17,6 +17,16 @@ namespace Void2610.LiminalPalette.Tests.Registry
             public Observable<int> Stream => Hp;
         }
 
+        // 静的フィールドを公開するユーティリティ。組み込み Time/Scale のような static utility が
+        // ObservableField として動くこと (IsStatic 判定、ReadCurrent(null) で値が取れる) を検証する。
+        private static class StaticFakeHolder
+        {
+            public static readonly ReactiveProperty<int> SharedCounter = new ReactiveProperty<int>(7);
+
+            [LiminalObservableField("Test/Static/Counter")]
+            public static ReactiveProperty<int> Counter => SharedCounter;
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -82,6 +92,36 @@ namespace Void2610.LiminalPalette.Tests.Registry
         {
             var matches = ObservableFieldRegistry.Default.FindByPathPrefix("Nonexistent/");
             Assert.AreEqual(0, matches.Count);
+        }
+
+        // ---- 静的フィールド対応 ----
+
+        [Test]
+        public void Scanner_FlagsStaticPropertyAsIsStatic()
+        {
+            var d = ObservableFieldRegistry.Default.Find("Test/Static/Counter");
+            Assert.IsNotNull(d, "static ReactiveProperty<int> プロパティが登録されるべき");
+            Assert.IsTrue(d.IsStatic, "static プロパティは IsStatic=true でフラグされるべき");
+            Assert.AreEqual(typeof(int), d.ValueType);
+        }
+
+        [Test]
+        public void Scanner_FlagsInstancePropertyAsNonStatic()
+        {
+            var d = ObservableFieldRegistry.Default.Find("Test/Hp");
+            Assert.IsNotNull(d);
+            Assert.IsFalse(d.IsStatic, "instance プロパティは IsStatic=false であるべき");
+        }
+
+        [Test]
+        public void ReadCurrent_OnStaticField_AcceptsNullInstance()
+        {
+            // 静的 ObservableField は instance=null で ReadCurrent しても値が取れるべき
+            // (UI / IPC / Scenario の static 経路はこの前提で IInstanceResolver をスキップする)。
+            var d = ObservableFieldRegistry.Default.Find("Test/Static/Counter");
+            StaticFakeHolder.SharedCounter.Value = 42;
+            var current = d.ReadCurrent(null);
+            Assert.AreEqual(42, current);
         }
     }
 }

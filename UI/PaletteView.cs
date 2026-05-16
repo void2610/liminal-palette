@@ -857,8 +857,9 @@ namespace Void2610.LiminalPalette.UI
                         // 同 prefix に複数 Field がある場合は先頭を採用 (列が 1 つしかないため)。
                         // 利用側が衝突を避けたければ Path 命名で区別する想定。
                         var d = matches[0];
-                        var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-                        if (instance != null)
+                        // IsStatic な field は VContainer 登録不要 (静的 utility 想定)。instance=null で読む。
+                        var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
+                        if (d.IsStatic || instance != null)
                         {
                             try
                             {
@@ -908,8 +909,9 @@ namespace Void2610.LiminalPalette.UI
                 {
                     var d = matches[mi];
                     if (!seen.Add(d.Path)) continue;
-                    var instance = LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-                    if (instance == null) continue;
+                    // IsStatic な field は instance=null で Subscribe する (VContainer 登録不要)。
+                    var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
+                    if (!d.IsStatic && instance == null) continue;
                     try
                     {
                         // 値変更時は ListView 行を再 Bind させる。RefreshItems は可視範囲のみ

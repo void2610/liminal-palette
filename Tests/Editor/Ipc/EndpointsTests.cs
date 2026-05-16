@@ -20,6 +20,18 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         {
             MainThreadDispatcher.RegisterMainThread(Thread.CurrentThread.ManagedThreadId);
             MainThreadDispatcher.ClearForTest();
+            EnsureTestCommandFixturesRegistered();
+        }
+
+        // テストフィクスチャ (Test/Int / Test/NoArg 等) を CommandRegistry に登録する。
+        // Bootstrap は ".Tests" アセンブリを除外するため、テスト側で明示的に登録しないと
+        // Test/Int を Execute する系のテストが test 実行順に依存して fail する。
+        // ScenariosEndpointsTests.SetUp と同じパターン。
+        internal static void EnsureTestCommandFixturesRegistered()
+        {
+            if (CommandRegistry.Default.Find("Test/Int") != null) return;
+            var cmds = AttributeScanner.Scan(new[] { typeof(TestCommands).Assembly });
+            foreach (var c in cmds) CommandRegistry.Default.Register(c);
         }
 
         private static IpcRequest Get(string path, IReadOnlyDictionary<string, string> query = null)

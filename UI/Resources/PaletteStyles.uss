@@ -261,6 +261,49 @@
     -unity-text-align: middle-left;
 }
 
+/* モバイル WebGL のソフトキーボードで Enter が拾えない場合の確定手段。
+   検索ヘッダ右端と引数フローパネルにタップ可能な大きめボタンを常時置く。 */
+.palette-header-submit {
+    background-color: rgb(64, 152, 64);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    border-width: 0;
+    border-radius: 3px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    font-size: 13px;
+    min-height: 28px;
+    min-width: 40px;
+    margin-left: 6px;
+}
+
+.palette-header-submit:hover {
+    background-color: rgb(92, 188, 92);
+}
+
+.palette-param-flow-submit {
+    background-color: rgb(64, 152, 64);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    border-width: 0;
+    border-radius: 3px;
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 13px;
+    min-height: 32px;
+    margin-top: 4px;
+    margin-bottom: 6px;
+    align-self: flex-start;
+}
+
+.palette-param-flow-submit:hover {
+    background-color: rgb(92, 188, 92);
+}
+
 /* ============================================================
    Bottom panel (画面下に常時表示する固定パネル)
    ============================================================ */

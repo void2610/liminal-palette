@@ -35,6 +35,10 @@ namespace Void2610.LiminalPalette.UI
         // Phase 5a: 選択コマンドの prefix と一致する [LiminalObservableField] を表示するセクション。
         private ObservableFieldsView _observableFields;
         private Button _runButton;
+        // 検索ヘッダ右端に常時置く Submit ボタン。物理 Enter / NavigationSubmit に加えて、
+        // モバイル (WebGL) ソフトキーボードのように Enter 系イベントを発火しない環境向けの
+        // 確定手段として用意する。タップで Enter 押下と同等の動作 (引数フロー開始 or 実行) を行う。
+        private Button _headerSubmitButton;
         private ResultView _resultView;
         private Label _logStackLabel;
 
@@ -66,6 +70,9 @@ namespace Void2610.LiminalPalette.UI
         private Label _paramFlowCmdLabel;
         private VisualElement _paramFlowBreadcrumbs;
         private Label _paramFlowStepInfo;
+        // 引数フローパネル内に置く確定ボタン。最終ステップでは「実行」、それ以外は「次へ」。
+        // モバイル (WebGL) でソフトキーボードの Enter が効かない場合の確定手段として常時表示する。
+        private Button _paramFlowSubmitButton;
         private Label _paramFlowStepDesc;
         private VisualElement _paramFlowEditorHost;
         private Label _paramFlowHint;
@@ -133,6 +140,12 @@ namespace Void2610.LiminalPalette.UI
 
         public new void Focus()
         {
+            // パレットを開く操作 (トグルキー / ボタンタップ) は新鮮なユーザージェスチャ内で
+            // 走るため、モバイルブラウザも programmatic Focus に追従して soft keyboard を
+            // 開いてくれる (ユーザー要望: パレットを開いたら即座に入力開始したい)。
+            // 「貼り付き」問題が出るのは soft keyboard が既に開いていた状態から
+            // dismiss → 別要素を Focus、というシナリオ (Enter→param flow など) なので、
+            // ここでは IsTouchDevice 判定をしない。
             // Runtime UIDocument の初回 Show 直後はレイアウトが完了していないことがあり、
             // 同期的に Focus() を呼んでも当たらないケースがある。schedule で次フレーム以降に
             // 確実にフォーカスを当てるよう遅延させる。Editor 側でも害はない (1 フレ遅れるだけ)。
@@ -153,6 +166,28 @@ namespace Void2610.LiminalPalette.UI
             _bottomStatus = this.Q<Label>("bottom-status");
             _argumentPanel = this.Q<VisualElement>("argument-panel");
             _runButton = this.Q<Button>("run-button");
+
+            // 検索ヘッダ右端に Submit ボタンを差し込む。モバイル WebGL のソフトキーボードでは
+            // Enter / NavigationSubmit が発火しない端末があるため、タップで確定できる導線を
+            // UI 上に常時用意しておく。Editor / 物理キーボード環境でも同じボタンが見えるが、
+            // 機能は同じなので害はない。
+            var header = this.Q<VisualElement>("palette-header");
+            if (header != null && _searchInput != null)
+            {
+                _headerSubmitButton = new Button { name = "header-submit-button", text = "▶" };
+                _headerSubmitButton.AddToClassList("palette-header-submit");
+                _headerSubmitButton.clicked += () => { var _ = ExecuteSelectedAsync(); };
+                header.Add(_headerSubmitButton);
+            }
+
+            // モバイル (WebGL) のソフトキーボードでは「完了 / Return」が KeyDownEvent や
+            // NavigationSubmitEvent を発火させず、入力欄の blur (= フォーカス解除) のみが起きる
+            // 端末がある。そのため、検索バーの FocusOutEvent を「Enter 押下」相当として拾う。
+            // 別要素 (行 / Submit ボタン) にフォーカスが移ったケースは除外するため次フレームで確認する。
+            if (_searchInput != null)
+            {
+                _searchInput.RegisterCallback<FocusOutEvent>(OnSearchInputFocusOut);
+            }
 
             // Phase 5a: ObservableFieldsView を引数パネルの直前 (上) に挿入。
             // 選択コマンドが変わるたびに ShowFor(path) で再構築。
@@ -235,7 +270,14 @@ namespace Void2610.LiminalPalette.UI
             _paramFlowEditorHost.AddToClassList("palette-param-flow-editor");
             _paramFlowPanel.Add(_paramFlowEditorHost);
 
-            _paramFlowHint = new Label("Enter で次へ / Esc で戻る");
+            // 次へ / 実行ボタン。ShowCurrentParamFlowStep でラベルを最終ステップなら「実行」へ切り替える。
+            // モバイル WebGL ではこのタップが Enter の代替手段になる。
+            _paramFlowSubmitButton = new Button { name = "palette-param-flow-submit", text = "次へ ▶" };
+            _paramFlowSubmitButton.AddToClassList("palette-param-flow-submit");
+            _paramFlowSubmitButton.clicked += () => { var _ = AdvanceParamFlowAsync(); };
+            _paramFlowPanel.Add(_paramFlowSubmitButton);
+
+            _paramFlowHint = new Label("Enter または「次へ」で確定 / Esc で戻る");
             _paramFlowHint.AddToClassList("palette-param-flow-hint");
             _paramFlowPanel.Add(_paramFlowHint);
 
@@ -431,11 +473,25 @@ namespace Void2610.LiminalPalette.UI
             }
 
             var header = this.Q<VisualElement>("palette-header");
-            if (header != null) header.style.flexShrink = 0;
+            if (header != null)
+            {
+                header.style.flexShrink = 0;
+                header.style.flexDirection = FlexDirection.Row;
+                header.style.alignItems = Align.Center;
+            }
             if (_searchInput != null)
             {
                 _searchInput.style.minHeight = 24;
-                _searchInput.style.flexShrink = 0;
+                _searchInput.style.flexGrow = 1;
+                _searchInput.style.flexShrink = 1;
+            }
+            if (_headerSubmitButton != null)
+            {
+                // モバイル想定のタップターゲットなので高さ・余白は広めにとる。
+                _headerSubmitButton.style.flexShrink = 0;
+                _headerSubmitButton.style.minHeight = 28;
+                _headerSubmitButton.style.minWidth = 40;
+                _headerSubmitButton.style.marginLeft = 6;
             }
 
             // 列ヘッダは廃止 (BindElements で display:none)。レイアウト指定は不要。
@@ -565,6 +621,13 @@ namespace Void2610.LiminalPalette.UI
             };
 
             RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+
+            // モバイルのソフトキーボードや UIToolkit の汎用ナビゲーションでは KeyDownEvent が
+            // 発火しないため、Enter / Esc 相当の操作は NavigationSubmit / NavigationCancel で受ける。
+            // (物理キーボードでは KeyDown と Navigation の両方が走るが、Return / Escape は
+            //  OnKeyDown 側で扱わないようにして二重発火を避ける。)
+            RegisterCallback<NavigationSubmitEvent>(OnNavigationSubmit, TrickleDown.TrickleDown);
+            RegisterCallback<NavigationCancelEvent>(OnNavigationCancel, TrickleDown.TrickleDown);
 
             // 矢印キーは OnKeyDown が責任を持って MoveSelection するので、
             // ListView 組み込みの NavigationMove (Up/Down) は捕まえてここで握りつぶす。
@@ -1179,8 +1242,12 @@ namespace Void2610.LiminalPalette.UI
             if (clearArgs) _currentArgValues.Clear();
             // 検索バーに戻す。同フレーム内で focus を再付与しておかないと、Runtime 側の
             // Esc フォールバックが「パレット内にフォーカス無し」と誤判定して Hide を呼ぶ可能性がある。
-            _searchInput?.Focus();
-            schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
+            // ただしモバイルでは programmatic Focus() が「貼り付き」を起こすため、auto-focus を見送る。
+            if (!IsTouchDevice())
+            {
+                _searchInput?.Focus();
+                schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
+            }
         }
 
         // 現在のステップ (cmd.Parameters[_paramFlowIndex]) の編集 UI を構築し、フォーカスする。
@@ -1210,70 +1277,189 @@ namespace Void2610.LiminalPalette.UI
                 ? DisplayStyle.None
                 : DisplayStyle.Flex;
 
+            // 最終ステップなら「実行」、それ以外は「次へ」を表示。
+            var isLastStep = i + 1 >= cmd.Parameters.Count;
+            if (_paramFlowSubmitButton != null)
+                _paramFlowSubmitButton.text = isLastStep ? "▶ 実行" : "次へ ▶";
+
             _paramFlowEditorHost.Clear();
             var editor = ParameterEditorRegistry.Resolve(param);
             var paramName = param.Name;
             var ve = editor.Build(param, value => _currentArgValues[paramName] = value);
             _paramFlowEditorHost.Add(ve);
 
-            // 次フレームでエディタ内部の入力欄にフォーカスを当てる。
-            schedule.Execute(() =>
+            // モバイル WebGL のソフトキーボード「完了」対応として、エディタ内のフォーカス可能要素 (TextField 等)
+            // が blur したら advance するよう FocusOutEvent をフック。submit ボタンへフォーカスが移ったケースは
+            // OnParamFlowEditorFocusOut 側で除外する。
+            HookFocusOutForParamFlow(ve);
+
+            // モバイル WebGL ではプログラム的な Focus() ではソフトキーボードが開かず、
+            // しかも UIToolkit 上は「focus 済」と判定されるためユーザーが再タップしても
+            // キーボードが立ち上がらない閉塞状態になる。タッチデバイスでは auto-focus を
+            // 行わず、ユーザーがエディタを直接タップして focus + キーボード起動するに任せる。
+            if (!IsTouchDevice())
             {
-                var f = FindFocusableDescendant(_paramFlowEditorHost);
-                f?.Focus();
-            }).ExecuteLater(0);
+                // 次フレームでエディタ内部の入力欄にフォーカスを当てる (PC / Editor 用)。
+                schedule.Execute(() =>
+                {
+                    var f = FindFocusableDescendant(_paramFlowEditorHost);
+                    f?.Focus();
+                }).ExecuteLater(0);
+            }
         }
+
+        // タッチデバイス (= スマホ / タブレット, 含む WebGL on mobile) 判定。
+        // プログラム的 Focus() でソフトキーボードが立ち上がらず、focus 状態が「貼り付く」挙動を避けるため、
+        // モバイルでは auto-focus 系の処理をスキップする目印として使う。
+        private static bool IsTouchDevice()
+        {
+            return UnityEngine.SystemInfo.deviceType == UnityEngine.DeviceType.Handheld
+                || UnityEngine.Application.isMobilePlatform
+                || UnityEngine.Input.touchSupported;
+        }
+
+        // 引数フローエディタの子孫 (TextField の input element など) すべてに FocusOutEvent を仕込む。
+        // VisualElement.Query<VisualElement>().ForEach は子孫を辿るユーティリティだが、最低限の依存で
+        // 済むよう手書きの再帰で巡回する。
+        private void HookFocusOutForParamFlow(VisualElement root)
+        {
+            if (root == null) return;
+            root.RegisterCallback<FocusOutEvent>(OnParamFlowEditorFocusOut);
+            for (var i = 0; i < root.childCount; i++)
+            {
+                HookFocusOutForParamFlow(root[i]);
+            }
+        }
+
+        // 連続発火ガード: 物理 Enter (NavigationSubmit) と blur (FocusOut) が同一操作で
+        // 二度入ってくる可能性があるため、進行中の advance を 1 つに直列化する。
+        private bool _advancing;
 
         // フロー中の Enter ハンドラ。確定 → 次へ / 最終ステップなら実行。
         private async System.Threading.Tasks.Task AdvanceParamFlowAsync()
         {
-            // AutoComplete エディタが先頭候補で確定可能なら拾う (旧 Enter ハンドラと同じ救済)。
-            for (var j = 0; j < _paramFlowEditorHost.childCount; j++)
+            if (_advancing || !_paramFlowActive) return;
+            _advancing = true;
+            try
             {
-                if (_paramFlowEditorHost[j].userData is Func<bool> tryComplete && tryComplete())
-                    break;
+                // AutoComplete エディタが先頭候補で確定可能なら拾う (旧 Enter ハンドラと同じ救済)。
+                for (var j = 0; j < _paramFlowEditorHost.childCount; j++)
+                {
+                    if (_paramFlowEditorHost[j].userData is Func<bool> tryComplete && tryComplete())
+                        break;
+                }
+
+                var cmd = _paramFlowCommand;
+                if (cmd == null) { EndParamFlow(clearArgs: false); return; }
+
+                _paramFlowIndex++;
+                if (_paramFlowIndex >= cmd.Parameters.Count)
+                {
+                    // フロー完了 → 検索 UI に戻してから実行 (結果表示は bottom の ResultView で見せる)。
+                    EndParamFlow(clearArgs: false);
+                    await _controller.ExecuteSelectedAsync(_currentArgValues);
+                    _currentArgValues.Clear();
+                    _boundCommandPath = null;
+                    return;
+                }
+                ShowCurrentParamFlowStep();
             }
-
-            var cmd = _paramFlowCommand;
-            if (cmd == null) { EndParamFlow(clearArgs: false); return; }
-
-            _paramFlowIndex++;
-            if (_paramFlowIndex >= cmd.Parameters.Count)
+            finally
             {
-                // フロー完了 → 検索 UI に戻してから実行 (結果表示は bottom の ResultView で見せる)。
-                EndParamFlow(clearArgs: false);
-                await _controller.ExecuteSelectedAsync(_currentArgValues);
-                _currentArgValues.Clear();
-                _boundCommandPath = null;
-                return;
+                _advancing = false;
             }
-            ShowCurrentParamFlowStep();
         }
 
         // ------------------------------------------------------------
-        // キーボード
+        // キーボード / ナビゲーション
         // ------------------------------------------------------------
+
+        // 物理キーボードの Enter, ソフトキーボードの「完了」/ Submit ボタン, ゲームパッドの A 等を
+        // すべて受ける汎用ハンドラ。スマホでは KeyDownEvent が来ないため、確定系の操作は
+        // 必ずここを通す。
+        // 検索バーがフォーカスを失った瞬間のハンドラ。モバイル WebGL の「完了」キー対応として、
+        // 別の UI 要素にフォーカスが移っていない (= フォーカスが null になった) 場合のみ、
+        // ソフトキーボードの確定操作とみなして ExecuteSelectedAsync を呼ぶ。
+        // - 行をタップ / Submit ボタンをタップ → 対応する要素に focus が移るので何もしない
+        // - 引数フローへの遷移で programmatic に focus 移動 → focus は editor に移るので何もしない
+        // - パレットを閉じた直後 → IsVisible が false なので何もしない
+        private void OnSearchInputFocusOut(FocusOutEvent _)
+        {
+            if (style.display.value != DisplayStyle.Flex) return;
+            if (_paramFlowActive) return;
+            schedule.Execute(() =>
+            {
+                if (style.display.value != DisplayStyle.Flex) return;
+                if (_paramFlowActive) return;
+                var focused = focusController?.focusedElement as VisualElement;
+                if (focused != null) return; // 他の UI 要素にフォーカスが移った → 通常操作
+                // フォーカスがどの UI 要素にも当たっていない = モバイル soft keyboard の「完了」とみなす。
+                var _ = ExecuteSelectedAsync();
+            }).ExecuteLater(0);
+        }
+
+        // 引数フローエディタがフォーカスを失った瞬間のハンドラ。検索バーと同じ理屈で、
+        // フォーカスが引数フローパネル外 (= ソフトキーボード dismiss など) に抜けたら AdvanceParamFlowAsync。
+        // 「次へ」ボタンに移った場合はそちらの click ハンドラが advance するので、ここでは何もしない。
+        private void OnParamFlowEditorFocusOut(FocusOutEvent _)
+        {
+            if (!_paramFlowActive) return;
+            schedule.Execute(() =>
+            {
+                if (!_paramFlowActive) return;
+                var focused = focusController?.focusedElement as VisualElement;
+                // パネル内 (Submit ボタン / 次の editor 等) にフォーカスが残っていれば、こちらでは確定しない。
+                if (focused != null && IsDescendantOf(focused, _paramFlowPanel)) return;
+                var _ = AdvanceParamFlowAsync();
+            }).ExecuteLater(0);
+        }
+
+        private static bool IsDescendantOf(VisualElement el, VisualElement ancestor)
+        {
+            if (ancestor == null) return false;
+            while (el != null)
+            {
+                if (el == ancestor) return true;
+                el = el.parent;
+            }
+            return false;
+        }
+
+        private void OnNavigationSubmit(NavigationSubmitEvent evt)
+        {
+            if (_paramFlowActive)
+            {
+                _ = AdvanceParamFlowAsync();
+                evt.StopImmediatePropagation();
+                return;
+            }
+            // Logs モードは閲覧専用のため Submit を無視する (再実行は History モードの責務)。
+            if (_mode != ViewMode.Logs)
+            {
+                _ = ExecuteSelectedAsync();
+            }
+            evt.StopImmediatePropagation();
+        }
+
+        // 物理キーボードの Esc, モバイルの戻る操作, ゲームパッドの B 等を受ける汎用ハンドラ。
+        private void OnNavigationCancel(NavigationCancelEvent evt)
+        {
+            if (_paramFlowActive)
+            {
+                EndParamFlow(clearArgs: true);
+                evt.StopImmediatePropagation();
+                return;
+            }
+            CloseRequested?.Invoke();
+            evt.StopImmediatePropagation();
+        }
 
         private void OnKeyDown(KeyDownEvent evt)
         {
-            // フロー中はナビゲーションを乗っ取る。Up/Down は検索リスト操作ではなく
-            // エディタ内の通常動作に任せる (TextField のキャレット移動など)。
-            if (_paramFlowActive)
-            {
-                switch (evt.keyCode)
-                {
-                    case KeyCode.Return:
-                    case KeyCode.KeypadEnter:
-                        _ = AdvanceParamFlowAsync();
-                        evt.StopImmediatePropagation();
-                        return;
-                    case KeyCode.Escape:
-                        EndParamFlow(clearArgs: true);
-                        evt.StopImmediatePropagation();
-                        return;
-                }
-                return;
-            }
+            // フロー中は Up/Down も含めて KeyDown は素通しする (TextField のキャレット移動等に委ねる)。
+            // Return / Escape は OnNavigationSubmit / OnNavigationCancel が拾うのでここでは扱わない
+            // (スマホのソフトキーボードでは KeyDownEvent が発火しないため)。
+            if (_paramFlowActive) return;
 
             switch (evt.keyCode)
             {
@@ -1288,19 +1474,6 @@ namespace Void2610.LiminalPalette.UI
                 case KeyCode.DownArrow:
                     MoveSelectionForCurrentMode(+1);
                     schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
-                    evt.StopImmediatePropagation();
-                    break;
-                case KeyCode.Return:
-                case KeyCode.KeypadEnter:
-                    // Logs モードは閲覧専用のため Enter を無視する (再実行は History モードの責務)。
-                    if (_mode != ViewMode.Logs)
-                    {
-                        _ = ExecuteSelectedAsync();
-                    }
-                    evt.StopImmediatePropagation();
-                    break;
-                case KeyCode.Escape:
-                    CloseRequested?.Invoke();
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Tab:

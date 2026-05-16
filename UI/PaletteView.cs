@@ -187,6 +187,10 @@ namespace Void2610.LiminalPalette.UI
             if (_searchInput != null)
             {
                 _searchInput.RegisterCallback<FocusOutEvent>(OnSearchInputFocusOut);
+                // モバイル (含む WebGL) では、デフォルトの HTML overlay 方式だと
+                // overlay がタップを吸い込んで TextField 上のタップが反応しなくなる
+                // ケースがある。hideMobileInput=true で TouchScreenKeyboard 経路に切り替える。
+                _searchInput.hideMobileInput = true;
             }
 
             // Phase 5a: ObservableFieldsView を引数パネルの直前 (上) に挿入。
@@ -1293,6 +1297,11 @@ namespace Void2610.LiminalPalette.UI
             // OnParamFlowEditorFocusOut 側で除外する。
             HookFocusOutForParamFlow(ve);
 
+            // モバイル (含む WebGL) で HTML overlay がタップを吸い込んで TextField が反応しなくなる
+            // 問題を回避するため、TextInputBaseField 系 (TextField / IntegerField / FloatField 等) には
+            // hideMobileInput=true を立てて TouchScreenKeyboard 経路に切り替える。
+            SetHideMobileInputRecursive(ve);
+
             // 同期的に Focus() を試す。これが本ステップへの遷移が「ユーザージェスチャ chain
             // (Submit ボタン click / NavigationSubmit / 検索バー FocusOut 等)」の中で
             // 呼ばれている場合、ブラウザはこの focus に追従してソフトキーボードを開く
@@ -1417,6 +1426,29 @@ namespace Void2610.LiminalPalette.UI
             var related = evt.relatedTarget as VisualElement;
             if (related != null && IsDescendantOf(related, _paramFlowPanel)) return;
             var _ = AdvanceParamFlowAsync();
+        }
+
+        // 引数フローエディタの子孫にある TextInputBaseField 系 (TextField / IntegerField / FloatField /
+        // LongField / DoubleField) すべてに hideMobileInput=true を設定する。モバイルで
+        // HTML overlay 方式の TextField がタップを吸い込んで反応しなくなる問題を回避するため、
+        // TouchScreenKeyboard 経路に切り替える。
+        // 非該当の VisualElement や、TextInputBaseField を継承していない自前エディタ要素は
+        // パターンマッチで弾かれ素通しになる。
+        private static void SetHideMobileInputRecursive(VisualElement root)
+        {
+            if (root == null) return;
+            switch (root)
+            {
+                case TextField tf: tf.hideMobileInput = true; break;
+                case IntegerField intF: intF.hideMobileInput = true; break;
+                case LongField lf: lf.hideMobileInput = true; break;
+                case FloatField ff: ff.hideMobileInput = true; break;
+                case DoubleField df: df.hideMobileInput = true; break;
+            }
+            for (var i = 0; i < root.childCount; i++)
+            {
+                SetHideMobileInputRecursive(root[i]);
+            }
         }
 
         private static bool IsDescendantOf(VisualElement el, VisualElement ancestor)

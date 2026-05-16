@@ -140,6 +140,11 @@ namespace Void2610.LiminalPalette.UI
 
         public new void Focus()
         {
+            // モバイルでは programmatic Focus() がキーボードを開かない上に、focus 状態が貼り付いて
+            // 再タップでも focus イベントが再発火せずキーボードが開かない閉塞を生む。
+            // タッチデバイスでは初回 auto-focus を見送り、ユーザーが自分で検索バーをタップして
+            // 通常のフォーカス + ソフトキーボード起動の流れに任せる。
+            if (IsTouchDevice()) return;
             // Runtime UIDocument の初回 Show 直後はレイアウトが完了していないことがあり、
             // 同期的に Focus() を呼んでも当たらないケースがある。schedule で次フレーム以降に
             // 確実にフォーカスを当てるよう遅延させる。Editor 側でも害はない (1 フレ遅れるだけ)。
@@ -1236,8 +1241,12 @@ namespace Void2610.LiminalPalette.UI
             if (clearArgs) _currentArgValues.Clear();
             // 検索バーに戻す。同フレーム内で focus を再付与しておかないと、Runtime 側の
             // Esc フォールバックが「パレット内にフォーカス無し」と誤判定して Hide を呼ぶ可能性がある。
-            _searchInput?.Focus();
-            schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
+            // ただしモバイルでは programmatic Focus() が「貼り付き」を起こすため、auto-focus を見送る。
+            if (!IsTouchDevice())
+            {
+                _searchInput?.Focus();
+                schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
+            }
         }
 
         // 現在のステップ (cmd.Parameters[_paramFlowIndex]) の編集 UI を構築し、フォーカスする。
@@ -1283,12 +1292,29 @@ namespace Void2610.LiminalPalette.UI
             // OnParamFlowEditorFocusOut 側で除外する。
             HookFocusOutForParamFlow(ve);
 
-            // 次フレームでエディタ内部の入力欄にフォーカスを当てる。
-            schedule.Execute(() =>
+            // モバイル WebGL ではプログラム的な Focus() ではソフトキーボードが開かず、
+            // しかも UIToolkit 上は「focus 済」と判定されるためユーザーが再タップしても
+            // キーボードが立ち上がらない閉塞状態になる。タッチデバイスでは auto-focus を
+            // 行わず、ユーザーがエディタを直接タップして focus + キーボード起動するに任せる。
+            if (!IsTouchDevice())
             {
-                var f = FindFocusableDescendant(_paramFlowEditorHost);
-                f?.Focus();
-            }).ExecuteLater(0);
+                // 次フレームでエディタ内部の入力欄にフォーカスを当てる (PC / Editor 用)。
+                schedule.Execute(() =>
+                {
+                    var f = FindFocusableDescendant(_paramFlowEditorHost);
+                    f?.Focus();
+                }).ExecuteLater(0);
+            }
+        }
+
+        // タッチデバイス (= スマホ / タブレット, 含む WebGL on mobile) 判定。
+        // プログラム的 Focus() でソフトキーボードが立ち上がらず、focus 状態が「貼り付く」挙動を避けるため、
+        // モバイルでは auto-focus 系の処理をスキップする目印として使う。
+        private static bool IsTouchDevice()
+        {
+            return UnityEngine.SystemInfo.deviceType == UnityEngine.DeviceType.Handheld
+                || UnityEngine.Application.isMobilePlatform
+                || UnityEngine.Input.touchSupported;
         }
 
         // 引数フローエディタの子孫 (TextField の input element など) すべてに FocusOutEvent を仕込む。

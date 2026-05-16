@@ -140,11 +140,12 @@ namespace Void2610.LiminalPalette.UI
 
         public new void Focus()
         {
-            // モバイルでは programmatic Focus() がキーボードを開かない上に、focus 状態が貼り付いて
-            // 再タップでも focus イベントが再発火せずキーボードが開かない閉塞を生む。
-            // タッチデバイスでは初回 auto-focus を見送り、ユーザーが自分で検索バーをタップして
-            // 通常のフォーカス + ソフトキーボード起動の流れに任せる。
-            if (IsTouchDevice()) return;
+            // パレットを開く操作 (トグルキー / ボタンタップ) は新鮮なユーザージェスチャ内で
+            // 走るため、モバイルブラウザも programmatic Focus に追従して soft keyboard を
+            // 開いてくれる (ユーザー要望: パレットを開いたら即座に入力開始したい)。
+            // 「貼り付き」問題が出るのは soft keyboard が既に開いていた状態から
+            // dismiss → 別要素を Focus、というシナリオ (Enter→param flow など) なので、
+            // ここでは IsTouchDevice 判定をしない。
             // Runtime UIDocument の初回 Show 直後はレイアウトが完了していないことがあり、
             // 同期的に Focus() を呼んでも当たらないケースがある。schedule で次フレーム以降に
             // 確実にフォーカスを当てるよう遅延させる。Editor 側でも害はない (1 フレ遅れるだけ)。

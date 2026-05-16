@@ -1293,13 +1293,22 @@ namespace Void2610.LiminalPalette.UI
             // OnParamFlowEditorFocusOut 側で除外する。
             HookFocusOutForParamFlow(ve);
 
-            // モバイル WebGL ではプログラム的な Focus() ではソフトキーボードが開かず、
-            // しかも UIToolkit 上は「focus 済」と判定されるためユーザーが再タップしても
-            // キーボードが立ち上がらない閉塞状態になる。タッチデバイスでは auto-focus を
-            // 行わず、ユーザーがエディタを直接タップして focus + キーボード起動するに任せる。
+            // 同期的に Focus() を試す。これが本ステップへの遷移が「ユーザージェスチャ chain
+            // (Submit ボタン click / NavigationSubmit / 検索バー FocusOut 等)」の中で
+            // 呼ばれている場合、ブラウザはこの focus に追従してソフトキーボードを開く
+            // 余地が残る (= 初回パレット起動時にキーボードが開くのと同じ機構)。
+            // 注意: schedule.Execute で 1 フレームでも遅延させると、ブラウザの user
+            // activation window を抜けてしまい、モバイルでキーボードが開かなくなる。
+            var firstFocus = FindFocusableDescendant(_paramFlowEditorHost);
+            firstFocus?.Focus();
+
+            // PC / Editor 向けの保険: 同期 Focus がレイアウト未完了などで当たらなかった
+            // ケースに備えて次フレームでも再 Focus を試みる。
+            // タッチデバイスでは「同期 Focus が当たらなかった = ジェスチャ chain も切れている」
+            // ことを意味し、ここで遅延 Focus してもキーボードは開かず、しかも UIToolkit 上は
+            // 「focus 済」と判定されて「貼り付き」を起こす。そのためタッチではスキップ。
             if (!IsTouchDevice())
             {
-                // 次フレームでエディタ内部の入力欄にフォーカスを当てる (PC / Editor 用)。
                 schedule.Execute(() =>
                 {
                     var f = FindFocusableDescendant(_paramFlowEditorHost);
@@ -1383,35 +1392,31 @@ namespace Void2610.LiminalPalette.UI
         // - 行をタップ / Submit ボタンをタップ → 対応する要素に focus が移るので何もしない
         // - 引数フローへの遷移で programmatic に focus 移動 → focus は editor に移るので何もしない
         // - パレットを閉じた直後 → IsVisible が false なので何もしない
-        private void OnSearchInputFocusOut(FocusOutEvent _)
+        // 検索バーがフォーカスを失った瞬間のハンドラ。モバイル WebGL の「完了」キー対応として、
+        // 別の UI 要素にフォーカスが移っていない (= relatedTarget == null) ケースを soft keyboard の
+        // dismiss とみなして同期的に ExecuteSelectedAsync を走らせる。
+        // - 行をタップ / Submit ボタンをタップ → relatedTarget にその要素が入る → 何もしない
+        // - 引数フローへの programmatic 遷移 → 既に _paramFlowActive なので何もしない
+        // - パレットを閉じた直後 → IsVisible が false なので何もしない
+        // 同期実行することがポイント。schedule.Execute で遅延するとブラウザのユーザー
+        // ジェスチャ chain が切れ、続く Focus() が soft keyboard を開けなくなる。
+        private void OnSearchInputFocusOut(FocusOutEvent evt)
         {
             if (style.display.value != DisplayStyle.Flex) return;
             if (_paramFlowActive) return;
-            schedule.Execute(() =>
-            {
-                if (style.display.value != DisplayStyle.Flex) return;
-                if (_paramFlowActive) return;
-                var focused = focusController?.focusedElement as VisualElement;
-                if (focused != null) return; // 他の UI 要素にフォーカスが移った → 通常操作
-                // フォーカスがどの UI 要素にも当たっていない = モバイル soft keyboard の「完了」とみなす。
-                var _ = ExecuteSelectedAsync();
-            }).ExecuteLater(0);
+            if (evt.relatedTarget != null) return; // 他の UI 要素にフォーカスが移った → 通常操作
+            var _ = ExecuteSelectedAsync();
         }
 
-        // 引数フローエディタがフォーカスを失った瞬間のハンドラ。検索バーと同じ理屈で、
-        // フォーカスが引数フローパネル外 (= ソフトキーボード dismiss など) に抜けたら AdvanceParamFlowAsync。
-        // 「次へ」ボタンに移った場合はそちらの click ハンドラが advance するので、ここでは何もしない。
-        private void OnParamFlowEditorFocusOut(FocusOutEvent _)
+        // 引数フローエディタがフォーカスを失った瞬間のハンドラ。同じ理屈で、relatedTarget が
+        // パネル外 (= ソフトキーボード dismiss) なら同期的に AdvanceParamFlowAsync。
+        // パネル内 (Submit ボタン / 次の editor) にフォーカスが移った場合はそちらに任せる。
+        private void OnParamFlowEditorFocusOut(FocusOutEvent evt)
         {
             if (!_paramFlowActive) return;
-            schedule.Execute(() =>
-            {
-                if (!_paramFlowActive) return;
-                var focused = focusController?.focusedElement as VisualElement;
-                // パネル内 (Submit ボタン / 次の editor 等) にフォーカスが残っていれば、こちらでは確定しない。
-                if (focused != null && IsDescendantOf(focused, _paramFlowPanel)) return;
-                var _ = AdvanceParamFlowAsync();
-            }).ExecuteLater(0);
+            var related = evt.relatedTarget as VisualElement;
+            if (related != null && IsDescendantOf(related, _paramFlowPanel)) return;
+            var _ = AdvanceParamFlowAsync();
         }
 
         private static bool IsDescendantOf(VisualElement el, VisualElement ancestor)

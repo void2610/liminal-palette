@@ -156,10 +156,12 @@ builder.RegisterEntryPoint<LiminalPaletteEntryPoint>();
 |---|---|
 | `↑` / `↓` | 結果リストの選択を移動 |
 | `Enter` | 選択コマンドを実行 (Run Command と同じ) |
-| `Tab` / `Shift+Tab` | 引数フィールド間の移動 |
+| `Tab` / `Shift+Tab` | タブを次 / 前に巡回 (Command → Scenario → Log → History → Command) |
 | `Esc` | パレットを閉じる |
 
-検索ボックスは開いた瞬間にフォーカスされる。
+検索ボックスは開いた瞬間にフォーカスされる。タブ切替後も検索バーへフォーカスが戻り、続けて文字入力できる。
+
+> 引数フロー中 (コマンドを選択して引数入力欄が開いている状態) は `Tab` / `Shift+Tab` が引数フィールド間の移動に切り替わる。タブ切替したい場合は一度 `Esc` で引数欄を閉じる。
 
 ---
 

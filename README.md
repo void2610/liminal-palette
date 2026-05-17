@@ -9,9 +9,9 @@ VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグ�
 ## できること
 
 - **ファジー検索付きコマンドパレット** (Editor / Runtime 両対応、UI Toolkit 製)
-- **3 タブ構成**: Command (新規実行) / Log (起動履歴の詳細閲覧) / History (再実行特化)
+- **4 タブ構成**: Command (新規実行) / Scenario (コマンドチェイン実行) / Log (起動履歴の詳細閲覧) / History (再実行特化)。`Tab` / `Shift+Tab` でタブ巡回
 - **型解決済み引数 UI**: `int` / `float` / `string` / `bool` / `enum` / `Vector2/3/4` / `Color` / `[Flags] enum` / `UnityEngine.Object` 派生
-- **HTTP API**: ローカル localhost で `/api/v1/{health, commands, execute, logs}` を提供。Bearer トークン認証 + レートリミット
+- **HTTP API**: ローカル localhost で `/api/v1/{health, commands, execute, logs, state, scenarios, scenarios/run}` を提供。Bearer トークン認証 + レートリミット
 - **Production ビルド除外**: `defineConstraints` の三重防御で Player ビルドにシンボル混入なし
 - **拡張点**: `ITypeConverter` / `IParameterEditor` / `ICommandHistory` で利用側が拡張可能
 

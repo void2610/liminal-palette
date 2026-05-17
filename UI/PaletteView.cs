@@ -51,8 +51,7 @@ namespace Void2610.LiminalPalette.UI
         private string _invocationQuery = "";
 
         // タブ。ボタンと filter のペア。
-        private readonly List<(Button button, string label, Func<CommandDescriptor, bool> filter)> _tabs
-            = new List<(Button, string, Func<CommandDescriptor, bool>)>();
+        private readonly List<Button> _tabs = new List<Button>();
 
         // 引数の現在値。各 IParameterEditor の onChanged で更新される。
         private readonly Dictionary<string, object> _currentArgValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -320,19 +319,18 @@ namespace Void2610.LiminalPalette.UI
         //   Scenario: 登録シナリオの一覧 (Run でステップ列を順次実行)
         //   Log:      起動履歴の詳細閲覧 (引数 / Debug.Log / スタックトレース)
         //   History:  起動履歴の再実行特化 (同じ引数で Run)
-        // タブ自体には filter は持たせず、ActivateTab 内で ViewMode を切り替える。
         private void BuildTabs()
         {
             _tabs.Clear();
             _tabsBar.Clear();
-            AddTab("Command", null);
-            AddTab("Scenario", null);
-            AddTab("Log", null);
-            AddTab("History", null);
+            AddTab("Command");
+            AddTab("Scenario");
+            AddTab("Log");
+            AddTab("History");
             ActivateTab(0);
         }
 
-        private void AddTab(string label, Func<CommandDescriptor, bool> filter)
+        private void AddTab(string label)
         {
             var btn = new Button { text = label };
             btn.AddToClassList("palette-tab");
@@ -340,7 +338,7 @@ namespace Void2610.LiminalPalette.UI
             var index = _tabs.Count;
             btn.clicked += () => ActivateTab(index);
             _tabsBar.Add(btn);
-            _tabs.Add((btn, label, filter));
+            _tabs.Add(btn);
         }
 
         private void ActivateTab(int index)
@@ -348,8 +346,8 @@ namespace Void2610.LiminalPalette.UI
             if (index < 0 || index >= _tabs.Count) return;
             for (var i = 0; i < _tabs.Count; i++)
             {
-                if (i == index) _tabs[i].button.AddToClassList("palette-tab-active");
-                else _tabs[i].button.RemoveFromClassList("palette-tab-active");
+                if (i == index) _tabs[i].AddToClassList("palette-tab-active");
+                else _tabs[i].RemoveFromClassList("palette-tab-active");
             }
             ViewMode newMode;
             switch (index)
@@ -360,7 +358,6 @@ namespace Void2610.LiminalPalette.UI
                 default: newMode = ViewMode.Commands; break;
             }
             _mode = newMode;
-            UpdateColumnHeaders();
             if (newMode == ViewMode.Commands)
             {
                 // SetFilter が StateChanged を発火し OnStateChanged → UpdateView へ繋がるので、
@@ -378,10 +375,6 @@ namespace Void2610.LiminalPalette.UI
                 UpdateView();
             }
         }
-
-        // 旧テーブル UI の列ヘッダ更新フック。列ヘッダは廃止したため何もしない。
-        // (呼び出し側を一切触らないために空メソッドだけ残してある)
-        private void UpdateColumnHeaders() { }
 
         // ScenarioRegistry から最新の登録一覧を取り直す。検索クエリで Path 部分一致フィルタを適用する。
         // 同時にステップ数キャッシュ (_scenarioStepCounts) も再構築して、bind ループでの
@@ -1477,29 +1470,17 @@ namespace Void2610.LiminalPalette.UI
                     evt.StopImmediatePropagation();
                     break;
                 case KeyCode.Tab:
-                    // フロー UI 導入により、Tab で引数欄に飛ぶ旧導線は不要になった。
-                    // Shift+Tab で検索バーに戻す挙動だけ残す。
-                    if (evt.shiftKey) _searchInput.Focus();
-                    evt.StopImmediatePropagation();
-                    break;
-                case KeyCode.Alpha1:
-                case KeyCode.Alpha2:
-                case KeyCode.Alpha3:
-                case KeyCode.Alpha4:
-                case KeyCode.Alpha5:
-                case KeyCode.Alpha6:
-                case KeyCode.Alpha7:
-                case KeyCode.Alpha8:
-                case KeyCode.Alpha9:
-                    if (evt.actionKey)
+                    if (_tabs.Count > 0)
                     {
-                        var index = evt.keyCode - KeyCode.Alpha1;
-                        if (index < _tabs.Count)
-                        {
-                            ActivateTab(index);
-                            evt.StopImmediatePropagation();
-                        }
+                        var current = (int)_mode;
+                        var delta = evt.shiftKey ? -1 : 1;
+                        var next = ((current + delta) % _tabs.Count + _tabs.Count) % _tabs.Count;
+                        ActivateTab(next);
+                        // UIToolkit のデフォルト Tab フォーカス移動で検索バーから抜けないよう、
+                        // 矢印キーと同様に次フレームで明示的にフォーカスを戻す。
+                        schedule.Execute(() => _searchInput?.Focus()).ExecuteLater(0);
                     }
+                    evt.StopImmediatePropagation();
                     break;
             }
         }

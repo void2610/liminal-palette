@@ -9,11 +9,53 @@ using UnityEngine.SceneManagement;
 namespace Void2610.LiminalPalette
 {
     /// <summary>
+    /// シナリオ実行中の進捗スナップショット。オーバーレイ UI などのリアルタイム表示用。
+    /// StepIndex が -1 のときは「これから 1 ステップ目に入る」開始通知を表す。
+    /// </summary>
+    public readonly struct ScenarioProgress
+    {
+        public string Path { get; }
+        public int StepIndex { get; }
+        public int TotalSteps { get; }
+        public ScenarioStep CurrentStep { get; }
+
+        public ScenarioProgress(string path, int stepIndex, int totalSteps, ScenarioStep currentStep)
+        {
+            Path = path;
+            StepIndex = stepIndex;
+            TotalSteps = totalSteps;
+            CurrentStep = currentStep;
+        }
+    }
+
+    /// <summary>
     /// シナリオステップ列を順次実行して ScenarioResult を返す責務。
     /// fail-fast: 最初に失敗したステップで打ち切る。
     /// </summary>
     public sealed class ScenarioExecutor
     {
+        // --- 進捗イベント (オーバーレイ UI など、シナリオ実行をリアルタイム追跡したい購読者向け) ---
+        // AlreadyRunning で弾かれた呼び出しと、ステップ列構築前に失敗した呼び出しでは発火しない
+        // (= 実際に 1 ステップでも回ったケースだけ Started/Finished が対になる)。
+        // DomainReload 跨ぎの subscriber 残留対策として ResetStatics で null クリアする。
+
+        /// <summary>シナリオ実行が開始された (最初のステップ実行直前)。StepIndex=-1。</summary>
+        public static event Action<ScenarioProgress> ScenarioRunStarted;
+
+        /// <summary>各ステップを実行する直前に発火。StepIndex は 0..TotalSteps-1。</summary>
+        public static event Action<ScenarioProgress> ScenarioRunStepChanged;
+
+        /// <summary>シナリオ実行が終了 (成功 / 失敗 / キャンセル)。キャンセル時は result=null。</summary>
+        public static event Action<ScenarioResult> ScenarioRunFinished;
+
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            ScenarioRunStarted = null;
+            ScenarioRunStepChanged = null;
+            ScenarioRunFinished = null;
+        }
+
         private readonly ICommandExecutor _commandExecutor;
         private readonly IObservableFieldRegistry _fieldRegistry;
         private readonly IFrameWaiter _frameWaiter;
@@ -148,60 +190,80 @@ namespace Void2610.LiminalPalette
             var results = new List<StepResult>(steps.Count);
             var sw = Stopwatch.StartNew();
             var failedIndex = -1;
+            ScenarioResult finalResult = null;
 
-            for (var i = 0; i < steps.Count; i++)
+            // 開始通知。StepIndex=-1 はオーバーレイ側で「シナリオ起動直後」を表す。
+            try { ScenarioRunStarted?.Invoke(new ScenarioProgress(path, -1, steps.Count, null)); }
+            catch (Exception ex) { UnityEngine.Debug.LogWarning($"[LiminalPalette] ScenarioRunStarted handler threw: {ex}"); }
+
+            try
             {
-                ct.ThrowIfCancellationRequested();
-                var step = steps[i];
-                var stepSw = Stopwatch.StartNew();
-                StepResult sr;
-                try
+                for (var i = 0; i < steps.Count; i++)
                 {
-                    switch (step.Kind)
+                    ct.ThrowIfCancellationRequested();
+                    var step = steps[i];
+                    // 各ステップ実行直前にも進捗を通知。オーバーレイは「現在 N/M」を更新する用途。
+                    try { ScenarioRunStepChanged?.Invoke(new ScenarioProgress(path, i, steps.Count, step)); }
+                    catch (Exception ex) { UnityEngine.Debug.LogWarning($"[LiminalPalette] ScenarioRunStepChanged handler threw: {ex}"); }
+                    var stepSw = Stopwatch.StartNew();
+                    StepResult sr;
+                    try
                     {
-                        case ScenarioStepKind.Command:
-                            sr = await RunCommandStep((CommandStep)step, ct);
-                            break;
-                        case ScenarioStepKind.WaitSeconds:
-                            sr = await RunWaitSecondsStep((WaitStep)step, ct);
-                            break;
-                        case ScenarioStepKind.WaitFrames:
-                            sr = await RunWaitFramesStep((WaitStep)step, ct);
-                            break;
-                        case ScenarioStepKind.AssertEquals:
-                            sr = RunAssertStep((AssertStep)step, equals: true);
-                            break;
-                        case ScenarioStepKind.AssertNotEquals:
-                            sr = RunAssertStep((AssertStep)step, equals: false);
-                            break;
-                        case ScenarioStepKind.LoadScene:
-                            sr = await RunLoadSceneStep((LoadSceneStep)step, ct);
-                            break;
-                        case ScenarioStepKind.AssertCommandReturns:
-                            sr = await RunAssertCommandReturnsStep((AssertCommandReturnsStep)step, ct);
-                            break;
-                        default:
-                            sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
-                            break;
+                        switch (step.Kind)
+                        {
+                            case ScenarioStepKind.Command:
+                                sr = await RunCommandStep((CommandStep)step, ct);
+                                break;
+                            case ScenarioStepKind.WaitSeconds:
+                                sr = await RunWaitSecondsStep((WaitStep)step, ct);
+                                break;
+                            case ScenarioStepKind.WaitFrames:
+                                sr = await RunWaitFramesStep((WaitStep)step, ct);
+                                break;
+                            case ScenarioStepKind.AssertEquals:
+                                sr = RunAssertStep((AssertStep)step, equals: true);
+                                break;
+                            case ScenarioStepKind.AssertNotEquals:
+                                sr = RunAssertStep((AssertStep)step, equals: false);
+                                break;
+                            case ScenarioStepKind.LoadScene:
+                                sr = await RunLoadSceneStep((LoadSceneStep)step, ct);
+                                break;
+                            case ScenarioStepKind.AssertCommandReturns:
+                                sr = await RunAssertCommandReturnsStep((AssertCommandReturnsStep)step, ct);
+                                break;
+                            default:
+                                sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
+                                break;
+                        }
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        sr = StepResult.Fail(step, $"unexpected: {ex.Message}");
+                    }
+                    stepSw.Stop();
+                    sr = sr.WithDuration(stepSw.Elapsed);
+                    results.Add(sr);
+
+                    if (!sr.Success)
+                    {
+                        failedIndex = i;
+                        break;
                     }
                 }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
-                {
-                    sr = StepResult.Fail(step, $"unexpected: {ex.Message}");
-                }
-                stepSw.Stop();
-                sr = sr.WithDuration(stepSw.Elapsed);
-                results.Add(sr);
-
-                if (!sr.Success)
-                {
-                    failedIndex = i;
-                    break;
-                }
+                sw.Stop();
+                finalResult = new ScenarioResult(failedIndex < 0, results, sw.Elapsed, failedIndex, path);
+                return finalResult;
             }
-            sw.Stop();
-            return new ScenarioResult(failedIndex < 0, results, sw.Elapsed, failedIndex, path);
+            finally
+            {
+                // 成功 / 失敗 / キャンセル いずれの経路でも必ず Finished を発火する
+                // (オーバーレイの片付け漏れで枠線が出っぱなしになるのを防ぐ)。
+                // OperationCanceledException で抜けた場合 finalResult は null のまま。
+                try { ScenarioRunFinished?.Invoke(finalResult); }
+                catch (Exception ex) { UnityEngine.Debug.LogWarning($"[LiminalPalette] ScenarioRunFinished handler threw: {ex}"); }
+            }
         }
 
         private async Task<StepResult> RunCommandStep(CommandStep step, CancellationToken ct)

@@ -66,6 +66,7 @@ namespace Void2610.LiminalPalette.Runtime
             {
                 // Production guard が有効な場合は既存 orphan も含めて全部破棄する。
                 DestroyAllRuntimes();
+                DestroyAllOverlays();
                 return;
             }
 
@@ -73,12 +74,24 @@ namespace Void2610.LiminalPalette.Runtime
             // (1 個再利用ではなく毎回 destroy + create にするのは、再コンパイルで参照が
             // 中途半端に切れた MonoBehaviour を引きずらないため。)
             DestroyAllRuntimes();
+            DestroyAllOverlays();
 
             var go = new GameObject("[LiminalPaletteRuntime]");
             go.hideFlags = HideFlags.HideAndDontSave;
 
             var runtime = go.AddComponent<LiminalPaletteRuntime>();
             runtime.Configure(settings);
+
+            // シナリオ実行中オーバーレイ。設定で無効化されていない場合のみ生成する。
+            // GameObject を別にするのは UIDocument が GameObject 単位の制約のため
+            // (パレット本体とオーバーレイで PanelSettings / sortingOrder を別個に管理したい)。
+            if (settings.ShowScenarioOverlay)
+            {
+                var overlayGo = new GameObject("[LiminalPaletteScenarioOverlay]");
+                overlayGo.hideFlags = HideFlags.HideAndDontSave;
+                var overlay = overlayGo.AddComponent<ScenarioOverlay>();
+                overlay.Configure(settings);
+            }
         }
 
         private static void DestroyAllRuntimes()
@@ -91,6 +104,20 @@ namespace Void2610.LiminalPalette.Runtime
                 if (go == null) continue;
                 // Editor 編集中も対応するため Application.isPlaying で分岐する必要はない。
                 // DestroyImmediate は HideAndDontSave のような hideFlags でも確実に破棄する。
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        // ScenarioOverlay も再コンパイル時に orphan として累積する可能性があるので
+        // LiminalPaletteRuntime と同じ手順で先に掃除する。
+        private static void DestroyAllOverlays()
+        {
+            var existing = Resources.FindObjectsOfTypeAll<ScenarioOverlay>();
+            for (var i = 0; i < existing.Length; i++)
+            {
+                if (existing[i] == null) continue;
+                var go = existing[i].gameObject;
+                if (go == null) continue;
                 Object.DestroyImmediate(go);
             }
         }

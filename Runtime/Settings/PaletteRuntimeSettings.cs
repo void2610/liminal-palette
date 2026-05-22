@@ -32,6 +32,19 @@ namespace Void2610.LiminalPalette.Runtime
         [Tooltip("Show のたびに Reset するか。false なら前回の検索クエリ / 選択を保持する。")]
         public bool ResetOnEachOpen = true;
 
+        [Header("Scenario Overlay")]
+        [Tooltip("シナリオ実行中、画面の周囲を色枠で囲み、現在の Path とステップ進捗を表示する。")]
+        public bool ShowScenarioOverlay = true;
+
+        [Tooltip("シナリオオーバーレイ枠線 / バッジの色。")]
+        public Color ScenarioOverlayColor = new Color(1f, 0.55f, 0.1f, 0.95f);
+
+        [Tooltip("シナリオオーバーレイ枠線の太さ (px)。")]
+        public float ScenarioOverlayBorderWidth = 6f;
+
+        [Tooltip("シナリオオーバーレイ用 UIDocument の sortingOrder。パレット本体より少し下に置く既定。")]
+        public int ScenarioOverlaySortingOrder = 999;
+
         /// <summary>
         /// Resources からユーザー定義 asset を探し、無ければデフォルト値の ScriptableObject を返す。
         /// 戻り値は破壊せず読み取り専用として扱う想定 (ScriptableObject のため意図せず Inspector 編集はされない)。

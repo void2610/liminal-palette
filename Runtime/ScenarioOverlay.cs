@@ -36,6 +36,14 @@ namespace Void2610.LiminalPalette.Runtime
 
         private PaletteRuntimeSettings _settings;
 
+        // 実行中 / 失敗時のカラー。
+        // 設定の ScenarioOverlayColor は「ベース色」ではなく初期値で、実行ステータスに応じて
+        // ここの色に切り替える。緑 = 走行中、赤 = 失敗 (1.5 秒残してから消える)。
+        private static readonly Color RunningColor = new Color(0.2f, 0.8f, 0.3f, 0.95f);
+        private static readonly Color FailedColor = new Color(1f, 0.2f, 0.2f, 0.95f);
+        // 失敗表示の表示時間 (秒)。短すぎると気付けず、長いとパレット操作の邪魔になる。
+        private const float FailedDisplaySeconds = 1.5f;
+
         // 表示状態。実行中だけ true。OnDestroy で event を確実に解除するためのフラグも兼ねる。
         private bool _eventsSubscribed;
 
@@ -193,6 +201,10 @@ namespace Void2610.LiminalPalette.Runtime
         {
             // Configure 前 (= UI 未構築) でも安全にスキップ。
             if (_root == null || _badge == null) return;
+            // 前回失敗からの再実行で赤が残らないよう、開始時に必ず緑へ戻す。
+            // CancelInvoke は HideOverlay の遅延 Invoke を打ち消すためにも必要。
+            CancelInvoke(nameof(HideOverlay));
+            ApplyColor(RunningColor);
             _badge.text = BuildBadgeText(p.Path, 0, p.TotalSteps, null);
             ShowOverlay();
         }
@@ -207,7 +219,33 @@ namespace Void2610.LiminalPalette.Runtime
         private void OnScenarioFinished(ScenarioResult result)
         {
             if (_root == null) return;
-            HideOverlay();
+            if (result != null && result.Success)
+            {
+                HideOverlay();
+                return;
+            }
+            // 失敗 / キャンセル / null は赤に塗って一定時間だけ残し、利用者が気付けるようにする。
+            ApplyColor(FailedColor);
+            if (_badge != null)
+            {
+                var path = result != null ? result.Path : null;
+                _badge.text = $"FAILED: {(string.IsNullOrEmpty(path) ? "(ad-hoc)" : path)}";
+            }
+            // 多重実行に備えて既存の遅延 Hide を一旦キャンセルしてから貼り直す。
+            CancelInvoke(nameof(HideOverlay));
+            Invoke(nameof(HideOverlay), FailedDisplaySeconds);
+        }
+
+        // 枠線 4 辺とバッジ背景色を同時に切り替える。
+        // 設定の ScenarioOverlayColor を起点にしているが、ステータス遷移ではこれを上書きする。
+        private void ApplyColor(Color c)
+        {
+            if (_root == null || _badge == null) return;
+            _root.style.borderTopColor = c;
+            _root.style.borderBottomColor = c;
+            _root.style.borderLeftColor = c;
+            _root.style.borderRightColor = c;
+            _badge.style.backgroundColor = c;
         }
 
         // 例: "Scenario: Combat/EnemyTakesDamage  3/5  Command"

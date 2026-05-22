@@ -157,14 +157,16 @@ namespace Void2610.LiminalPalette.Runtime
             _badge.pickingMode = PickingMode.Ignore;
             _badge.style.backgroundColor = color;
             _badge.style.color = Color.white;
-            _badge.style.paddingTop = 4;
-            _badge.style.paddingBottom = 4;
-            _badge.style.paddingLeft = 12;
-            _badge.style.paddingRight = 12;
-            _badge.style.borderBottomLeftRadius = 6;
-            _badge.style.borderBottomRightRadius = 6;
+            _badge.style.paddingTop = 8;
+            _badge.style.paddingBottom = 8;
+            _badge.style.paddingLeft = 18;
+            _badge.style.paddingRight = 18;
+            _badge.style.borderBottomLeftRadius = 10;
+            _badge.style.borderBottomRightRadius = 10;
             _badge.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _badge.style.fontSize = 13;
+            // 1440x810 ベースの PanelScaleMode.ScaleWithScreenSize 下で「離れても読める」サイズ。
+            // 13 はターゲット解像度では小さく、Game View 縮小時にほぼ判読不能になっていた。
+            _badge.style.fontSize = 22;
             _badge.style.whiteSpace = WhiteSpace.NoWrap;
             topBar.Add(_badge);
         }

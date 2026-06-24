@@ -630,13 +630,18 @@ namespace Void2610.LiminalPalette.UI
 
             // 矢印キーは OnKeyDown が責任を持って MoveSelection するので、
             // panel が解釈する NavigationMove は全方向で握りつぶす。
-            // 放置すると KeyDown を StopImmediatePropagation してもナビゲーション系統が
-            // 別経路で ListView の selectedIndex を進め「1 押下で 2 行進む」二重選択が起き、
+            // 放置すると ListView の selectedIndex が別経路で進み「1 押下で 2 行進む」二重選択が起き、
             // Runtime では uGUI EventSystem の Move axis (WASD) が panel に NavigationMove を
             // 配送して検索欄から focus が抜ける。Left/Right の TextField キャレット移動は
             // KeyDownEvent 経由で別途効くため、NavigationMove を全部止めても害はない。
-            RegisterCallback<NavigationMoveEvent>(
-                evt => evt.StopImmediatePropagation(), TrickleDown.TrickleDown);
+            //
+            // 重要: StopImmediatePropagation だけでは focusController の default action
+            // (Move 方向への focus 移動) は止まらないため、 PreventDefault も併用する。
+            RegisterCallback<NavigationMoveEvent>(evt =>
+            {
+                evt.StopImmediatePropagation();
+                evt.PreventDefault();
+            }, TrickleDown.TrickleDown);
         }
 
         // ------------------------------------------------------------

@@ -186,6 +186,12 @@ namespace Void2610.LiminalPalette.UI
             if (_searchInput != null)
             {
                 _searchInput.RegisterCallback<FocusOutEvent>(OnSearchInputFocusOut);
+                // UIToolkit のキーボードナビゲーション (Project Settings → Input System の Navigate action) は
+                // 既定で WASD を NavigationMoveEvent に変換するため、検索欄で w/a/s/d を打つと文字入力と同時に
+                // 別 element へ focus が飛んでしまう (ルートの NavigationMove 抑制は internal navigation を
+                // 止め切れない場合がある)。TextField focus 中だけ全方向の NavigationMove を握りつぶす。
+                _searchInput.RegisterCallback<NavigationMoveEvent>(
+                    evt => evt.StopImmediatePropagation(), TrickleDown.TrickleDown);
             }
 
             // Phase 5a: ObservableFieldsView を引数パネルの直前 (上) に挿入。

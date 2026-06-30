@@ -186,6 +186,12 @@ namespace Void2610.LiminalPalette.UI
             if (_searchInput != null)
             {
                 _searchInput.RegisterCallback<FocusOutEvent>(OnSearchInputFocusOut);
+                // UIToolkit のキーボードナビゲーション (Project Settings → Input System の Navigate action) は
+                // 既定で WASD を NavigationMoveEvent に変換するため、検索欄で w/a/s/d を打つと文字入力と同時に
+                // 別 element へ focus が飛んでしまう (ルートの NavigationMove 抑制は internal navigation を
+                // 止め切れない場合がある)。TextField focus 中だけ全方向の NavigationMove を握りつぶす。
+                _searchInput.RegisterCallback<NavigationMoveEvent>(
+                    evt => evt.StopImmediatePropagation(), TrickleDown.TrickleDown);
             }
 
             // Phase 5a: ObservableFieldsView を引数パネルの直前 (上) に挿入。
@@ -623,17 +629,18 @@ namespace Void2610.LiminalPalette.UI
             RegisterCallback<NavigationCancelEvent>(OnNavigationCancel, TrickleDown.TrickleDown);
 
             // 矢印キーは OnKeyDown が責任を持って MoveSelection するので、
-            // ListView 組み込みの NavigationMove (Up/Down) は捕まえてここで握りつぶす。
-            // 放置すると KeyDown を StopImmediatePropagation してもナビゲーション系統が
-            // 別経路で ListView の selectedIndex を進め、結果として「1 押下で 2 行進む」
-            // 二重選択が起きる。Left/Right や Submit/Cancel は他用途で使うため触らない。
+            // panel が解釈する NavigationMove は全方向で握りつぶす。
+            // 放置すると ListView の selectedIndex が別経路で進み「1 押下で 2 行進む」二重選択が起き、
+            // Runtime では uGUI EventSystem の Move axis (WASD) が panel に NavigationMove を
+            // 配送して検索欄から focus が抜ける。Left/Right の TextField キャレット移動は
+            // KeyDownEvent 経由で別途効くため、NavigationMove を全部止めても害はない。
+            //
+            // 重要: StopImmediatePropagation だけでは focusController の default action
+            // (Move 方向への focus 移動) は止まらないため、 PreventDefault も併用する。
             RegisterCallback<NavigationMoveEvent>(evt =>
             {
-                if (evt.direction == NavigationMoveEvent.Direction.Up
-                    || evt.direction == NavigationMoveEvent.Direction.Down)
-                {
-                    evt.StopImmediatePropagation();
-                }
+                evt.StopImmediatePropagation();
+                evt.PreventDefault();
             }, TrickleDown.TrickleDown);
         }
 
@@ -1385,9 +1392,29 @@ namespace Void2610.LiminalPalette.UI
                 if (style.display.value != DisplayStyle.Flex) return;
                 if (_paramFlowActive) return;
                 var focused = focusController?.focusedElement as VisualElement;
-                if (focused != null) return; // 他の UI 要素にフォーカスが移った → 通常操作
-                // フォーカスがどの UI 要素にも当たっていない = モバイル soft keyboard の「完了」とみなす。
-                var _ = ExecuteSelectedAsync();
+                if (focused == null)
+                {
+                    // フォーカスがどの UI 要素にも当たっていない = モバイル soft keyboard の「完了」とみなす。
+                    var _ = ExecuteSelectedAsync();
+                    return;
+                }
+                // _searchInput 自身 / 内部要素に戻っているなら通常操作。
+                if (focused == _searchInput || focused.GetFirstAncestorOfType<TextField>() == _searchInput) return;
+                // 引数フローパネル配下への意図的な focus 移動は許容する。
+                if (_argumentPanel != null)
+                {
+                    var cur = focused;
+                    while (cur != null)
+                    {
+                        if (cur == _argumentPanel) return;
+                        cur = cur.parent;
+                    }
+                }
+                // それ以外 (WASD / NavigationMove / Tab nav で ListView 等に飛ばされた) → 検索欄に強制復帰。
+                // Runtime で panel が InputAction の Navigate を直接購読していると
+                // NavigationMoveEvent の TrickleDown ガードでも止めきれないケースがあるため、
+                // 「抜けても即戻す」対症療法で確実に検索欄に focus を留める。
+                _searchInput?.Focus();
             }).ExecuteLater(0);
         }
 

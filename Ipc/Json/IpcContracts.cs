@@ -232,6 +232,12 @@ namespace Void2610.LiminalPalette.Ipc.Json
                 w.WriteString("observableFieldPath", asr.ObservableFieldPath);
                 w.WriteString("expected", asr.Expected == null ? null : TypeConverterRegistry.ToDisplayString(asr.Expected));
             }
+            else if (s.Step is AssertEventuallyStep aes)
+            {
+                w.WriteString("observableFieldPath", aes.ObservableFieldPath);
+                w.WriteString("expected", aes.Expected == null ? null : TypeConverterRegistry.ToDisplayString(aes.Expected));
+                w.WriteNumber("timeoutSeconds", aes.TimeoutSeconds);
+            }
             else if (s.Step is LoadSceneStep lss)
             {
                 w.WriteString("sceneName", lss.SceneName);

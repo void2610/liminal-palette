@@ -155,6 +155,11 @@ namespace Void2610.LiminalPalette.UI
                     sb.Append("Assert ").Append(asr.ObservableFieldPath).Append(' ').Append(op).Append(' ');
                     sb.Append(asr.Expected == null ? "null" : TypeConverterRegistry.ToDisplayString(asr.Expected));
                     break;
+                case AssertEventuallyStep aes:
+                    sb.Append("AssertEventually ").Append(aes.ObservableFieldPath).Append(" == ");
+                    sb.Append(aes.Expected == null ? "null" : TypeConverterRegistry.ToDisplayString(aes.Expected));
+                    sb.Append($" (within {aes.TimeoutSeconds}s)");
+                    break;
                 default:
                     sb.Append(sr.Step?.Kind.ToString() ?? "(null)");
                     break;

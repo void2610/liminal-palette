@@ -61,6 +61,35 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public void AssertEventually_BuildsAssertEventuallyStep()
+        {
+            var step = ScenarioStep.AssertEventually("Game/State", "WorldMap", 3f, "boot");
+            Assert.AreEqual(ScenarioStepKind.AssertEventually, step.Kind);
+            Assert.AreEqual("boot", step.Description);
+            var a = (AssertEventuallyStep)step;
+            Assert.AreEqual("Game/State", a.ObservableFieldPath);
+            Assert.AreEqual("WorldMap", a.Expected);
+            Assert.AreEqual(3f, a.TimeoutSeconds);
+        }
+
+        [Test]
+        public void AssertEventually_RejectsEmptyPathAndNonPositiveTimeout()
+        {
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertEventually("", "x"));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, 0f));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, -1f));
+        }
+
+        [Test]
+        public void AssertEventually_RejectsNonFiniteTimeout()
+        {
+            // NaN / Infinity は TimeSpan.FromSeconds で例外になる「待っても解決しない」値なので Factory で弾く。
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.NaN));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.PositiveInfinity));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.NegativeInfinity));
+        }
+
+        [Test]
         public void Run_RejectsEmptyPath()
         {
             Assert.Throws<System.ArgumentException>(() => ScenarioStep.Run(""));

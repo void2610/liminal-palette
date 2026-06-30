@@ -42,9 +42,14 @@ namespace Void2610.LiminalPalette.Tests
         private sealed class FakeFrameWaiter : IFrameWaiter
         {
             public int LastFramesRequested;
+            public int CallCount;
+            // N 回目 (1 始まり) の WaitFramesAsync 呼び出し時に観測値を書き換える等に使う。
+            public System.Action<int> OnWait;
             public Task WaitFramesAsync(int frames, CancellationToken ct)
             {
                 LastFramesRequested = frames;
+                CallCount++;
+                OnWait?.Invoke(CallCount);
                 return Task.CompletedTask;
             }
         }
@@ -206,6 +211,81 @@ namespace Void2610.LiminalPalette.Tests
                 null, CancellationToken.None);
             Assert.IsFalse(result.Success);
             StringAssert.Contains("not found", result.Steps[0].Error);
+        }
+
+        // ------------------------------------------------------------
+        // AssertEventually ステップ
+        // ------------------------------------------------------------
+
+        [Test]
+        public async Task Execute_AssertEventually_PassesWhenValueReachesExpected()
+        {
+            // 初期値 100。3 回目のポーリング (WaitFramesAsync) 時に 42 へ書き換わり、
+            // 次の再評価で一致 → 成功する。固定待ちなしで遅延確定値を拾えることを確認。
+            var ce = new FakeCommandExecutor();
+            var fw = new FakeFrameWaiter
+            {
+                OnWait = n => { if (n >= 3) _fakeContainer.Hp.Value = 42; }
+            };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertEventually("ScenarioTest/Hp", 42, 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
+            Assert.GreaterOrEqual(fw.CallCount, 3, "一致前に複数回ポーリングしているはず");
+        }
+
+        [Test]
+        public async Task Execute_AssertEventually_TimesOut_Fails()
+        {
+            // 値が期待値に到達しないままタイムアウトするケース。
+            // FakeFrameWaiter は即時完了するため実時間ベースの timeout (0.05s) で打ち切られる。
+            // 万一 timeout 判定が壊れて無限ループになってもテストをハングさせないよう、
+            // 呼び出し回数が異常に増えたら CancellationToken で打ち切る安全網を張る。
+            var ce = new FakeCommandExecutor();
+            var cts = new CancellationTokenSource();
+            var fw = new FakeFrameWaiter
+            {
+                OnWait = n => { if (n > 1_000_000) cts.Cancel(); }
+            };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertEventually("ScenarioTest/Hp", 999, 0.05f) },
+                null, cts.Token);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("not satisfied within", result.Steps[0].Error);
+            StringAssert.Contains("999", result.Steps[0].Error);
+            StringAssert.Contains("100", result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task Execute_AssertEventually_UnknownField_FailsImmediatelyWithoutPolling()
+        {
+            // ObservableField 未登録は「待っても解決しない構成エラー」なので、タイムアウトを待たず即時失敗。
+            var ce = new FakeCommandExecutor();
+            var fw = new FakeFrameWaiter();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertEventually("Missing/Field", 0, 5f) },
+                null, CancellationToken.None);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("not found", result.Steps[0].Error);
+            Assert.AreEqual(0, fw.CallCount, "構成エラーはポーリングせず即時失敗する");
+        }
+
+        [Test]
+        public async Task Execute_AssertEventually_ConversionError_FailsImmediatelyWithoutPolling()
+        {
+            // 型変換失敗 (int field に変換不能な string) も構成エラーとして即時失敗。
+            var ce = new FakeCommandExecutor();
+            var fw = new FakeFrameWaiter();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertEventually("ScenarioTest/Hp", "not-an-int", 5f) },
+                null, CancellationToken.None);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("convert", result.Steps[0].Error);
+            Assert.AreEqual(0, fw.CallCount, "変換失敗はポーリングせず即時失敗する");
         }
 
         // ------------------------------------------------------------

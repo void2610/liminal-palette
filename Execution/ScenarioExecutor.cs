@@ -232,6 +232,9 @@ namespace Void2610.LiminalPalette
                             case ScenarioStepKind.AssertCommandReturns:
                                 sr = await RunAssertCommandReturnsStep((AssertCommandReturnsStep)step, ct);
                                 break;
+                            case ScenarioStepKind.AssertEventually:
+                                sr = await RunAssertEventuallyStep((AssertEventuallyStep)step, ct);
+                                break;
                             default:
                                 sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
                                 break;
@@ -356,46 +359,104 @@ namespace Void2610.LiminalPalette
 
         private StepResult RunAssertStep(AssertStep step, bool equals)
         {
-            var d = _fieldRegistry.Find(step.ObservableFieldPath);
+            if (!TryReadAndCompare(step.ObservableFieldPath, step.Expected, out var actual, out var expectedTyped, out var matches, out var readError))
+                return StepResult.Fail(step, readError);
+
+            var passed = equals ? matches : !matches;
+            if (passed)
+                return new StepResult(step, true, null, null, actual, TimeSpan.Zero);
+
+            var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
+            // 表示には比較に使った変換後の値 (expectedTyped) を使い、表示と比較を一致させる。
+            var expectedStr = expectedTyped == null ? "null" : TypeConverterRegistry.ToDisplayString(expectedTyped);
+            var error = equals
+                ? $"expected '{expectedStr}' but got '{actualStr}'"
+                : $"expected NOT '{expectedStr}' but got '{actualStr}'";
+            return new StepResult(step, false, error, null, actual, TimeSpan.Zero);
+        }
+
+        // AssertEventually: timeoutSeconds 以内に field の現在値が expected と一致するまで毎フレーム再評価する。
+        // 演出 (LitMotion / UniTask) 完了後に確定する値を固定待ちなしで検証する用途。
+        private async Task<StepResult> RunAssertEventuallyStep(AssertEventuallyStep step, CancellationToken ct)
+        {
+            // Factory のバリデーションをすり抜けた経路 (直接 internal step 生成 / 将来の IPC 入力等) に備え、
+            // TimeSpan.FromSeconds で ArgumentException → 外側 catch の "unexpected" 扱いになる前に
+            // finite チェックして StepResult.Fail で回収する。
+            if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
+                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
+
+            var sw = Stopwatch.StartNew();
+            var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
+            string lastError = null;
+            object lastActual = null;
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // ObservableField が未登録 / 読取例外 / 型変換失敗は即時失敗 (待っても解決しない構成エラー)。
+                if (!TryReadAndCompare(step.ObservableFieldPath, step.Expected, out var actual, out var expectedTyped, out var matches, out var readError))
+                    return StepResult.Fail(step, readError);
+
+                if (matches)
+                    return new StepResult(step, true, null, null, actual, TimeSpan.Zero);
+
+                lastActual = actual;
+                // 表示には比較に使った変換後の値 (expectedTyped) を使い、表示と比較を一致させる。
+                var expectedStr = expectedTyped == null ? "null" : TypeConverterRegistry.ToDisplayString(expectedTyped);
+                var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
+                lastError = $"expected '{expectedStr}' but got '{actualStr}'";
+
+                if (sw.Elapsed >= timeout)
+                    return new StepResult(step, false,
+                        $"not satisfied within {step.TimeoutSeconds}s: {lastError}", null, lastActual, TimeSpan.Zero);
+
+                await _frameWaiter.WaitFramesAsync(1, ct);
+            }
+        }
+
+        // ObservableField を読み、expected (string なら field の型へ変換) と一致するかを判定する共通ヘルパ。
+        // 戻り値 false は「読取自体が失敗」(未登録 / 読取例外 / 型変換失敗) で readError に理由が入る。
+        // 値の一致/不一致は matches に入る (戻り値 true)。
+        // expectedTyped は実際に比較に用いた期待値 (string→field 型へ変換後)。エラー表示と比較対象を
+        // 一致させるため、呼び出し側はメッセージ生成にこの値を使う。
+        private bool TryReadAndCompare(string observableFieldPath, object expected, out object actual, out object expectedTyped, out bool matches, out string readError)
+        {
+            actual = null;
+            expectedTyped = expected;
+            matches = false;
+            readError = null;
+
+            var d = _fieldRegistry.Find(observableFieldPath);
             if (d == null)
-                return StepResult.Fail(step, $"ObservableField not found: {step.ObservableFieldPath}");
+            {
+                readError = $"ObservableField not found: {observableFieldPath}";
+                return false;
+            }
 
-            // インスタンス解決。IsStatic な field は VContainer 登録不要 (静的 utility 想定) なので
-            // Resolve を経由せず instance=null のまま ReadCurrent に渡す。
-            // インスタンスフィールドで instance が null の場合は ReadCurrent 内部で例外になり下の catch で吸い上げる。
+            // IsStatic な field は VContainer 登録不要 (静的 utility 想定) なので instance=null のまま読む。
             var instance = d.IsStatic ? null : LiminalPalette.InstanceResolver.Resolve(d.DeclaringType);
-
-            object actual;
             try
             {
                 actual = d.ReadCurrent(instance);
             }
             catch (Exception ex)
             {
-                return StepResult.Fail(step, $"failed to read {step.ObservableFieldPath}: {ex.Message}");
+                readError = $"failed to read {observableFieldPath}: {ex.Message}";
+                return false;
             }
 
-            // expected が string なら ValueType に変換、そうでなければそのまま比較。
-            // 比較対象が同じ型に揃わないと object.Equals が false になるため、ここで型を揃える。
-            object expectedTyped = step.Expected;
-            if (step.Expected is string s && d.ValueType != typeof(string))
+            // expected が string なら field の型へ変換して比較対象の型を揃える。
+            if (expected is string s && d.ValueType != typeof(string))
             {
                 if (!TypeConverterRegistry.TryConvert(s, d.ValueType, out expectedTyped, out var err))
-                    return StepResult.Fail(step, $"cannot convert expected '{s}' to {d.ValueType.Name}: {err}");
+                {
+                    readError = $"cannot convert expected '{s}' to {d.ValueType.Name}: {err}";
+                    return false;
+                }
             }
 
-            var matches = object.Equals(actual, expectedTyped);
-            var passed = equals ? matches : !matches;
-
-            if (passed)
-                return new StepResult(step, true, null, null, actual, TimeSpan.Zero);
-
-            var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
-            var expectedStr = expectedTyped == null ? "null" : TypeConverterRegistry.ToDisplayString(expectedTyped);
-            var error = equals
-                ? $"expected '{expectedStr}' but got '{actualStr}'"
-                : $"expected NOT '{expectedStr}' but got '{actualStr}'";
-            return new StepResult(step, false, error, null, actual, TimeSpan.Zero);
+            matches = object.Equals(actual, expectedTyped);
+            return true;
         }
     }
 }

@@ -13,6 +13,7 @@ namespace Void2610.LiminalPalette
         AssertNotEquals,
         LoadScene,
         AssertCommandReturns,
+        AssertEventually,
     }
 
     /// <summary>
@@ -101,6 +102,27 @@ namespace Void2610.LiminalPalette
         }
 
         /// <summary>
+        /// LiminalObservableField の現在値が expected と一致するまで毎フレーム再評価するステップ。
+        /// timeoutSeconds 以内に一致すれば成功、超過したら最後の不一致内容を添えて失敗する。
+        /// 演出 (LitMotion / UniTask) 完了後に確定する値を、固定待ち (WaitSeconds) なしで検証するためのもの。
+        /// 比較規則は `AssertEquals` と同じ (expected が string なら field の型へ変換して比較)。
+        /// </summary>
+        public static ScenarioStep AssertEventually(
+            string observableFieldPath,
+            object expected,
+            float timeoutSeconds = 5f,
+            string description = null)
+        {
+            if (string.IsNullOrEmpty(observableFieldPath))
+                throw new ArgumentException("observableFieldPath must not be null or empty", nameof(observableFieldPath));
+            // NaN / Infinity は TimeSpan.FromSeconds で例外になり「待っても解決しない」値なので、
+            // 「有限かつ > 0」を保証してここで弾く (timeoutSeconds <= 0f だけだと NaN/Infinity が通り抜ける)。
+            if (!(timeoutSeconds > 0f) || float.IsInfinity(timeoutSeconds))
+                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be a finite value > 0");
+            return new AssertEventuallyStep(observableFieldPath, expected, timeoutSeconds, description);
+        }
+
+        /// <summary>
         /// 指定シーンを Single モードで非同期ロードするステップ。完了 (op.isDone) まで待機する。
         /// シーン切替で VContainer のスコープが再構築されるため、後続コマンドは自動的に
         /// 新シーンに登録された instance に解決される。
@@ -176,6 +198,22 @@ namespace Void2610.LiminalPalette
             CommandPath = commandPath;
             Args = args ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             Expected = expected;
+        }
+    }
+
+    /// <summary>ObservableField の現在値が expected と一致するまでポーリングするステップ。</summary>
+    internal sealed class AssertEventuallyStep : ScenarioStep
+    {
+        public string ObservableFieldPath { get; }
+        public object Expected { get; }
+        public float TimeoutSeconds { get; }
+
+        public AssertEventuallyStep(string observableFieldPath, object expected, float timeoutSeconds, string description)
+            : base(ScenarioStepKind.AssertEventually, description)
+        {
+            ObservableFieldPath = observableFieldPath;
+            Expected = expected;
+            TimeoutSeconds = timeoutSeconds;
         }
     }
 

@@ -359,7 +359,7 @@ namespace Void2610.LiminalPalette
 
         private StepResult RunAssertStep(AssertStep step, bool equals)
         {
-            if (!TryReadAndCompare(step.ObservableFieldPath, step.Expected, out var actual, out var matches, out var readError))
+            if (!TryReadAndCompare(step.ObservableFieldPath, step.Expected, out var actual, out var expectedTyped, out var matches, out var readError))
                 return StepResult.Fail(step, readError);
 
             var passed = equals ? matches : !matches;
@@ -367,7 +367,8 @@ namespace Void2610.LiminalPalette
                 return new StepResult(step, true, null, null, actual, TimeSpan.Zero);
 
             var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
-            var expectedStr = step.Expected == null ? "null" : TypeConverterRegistry.ToDisplayString(step.Expected);
+            // 表示には比較に使った変換後の値 (expectedTyped) を使い、表示と比較を一致させる。
+            var expectedStr = expectedTyped == null ? "null" : TypeConverterRegistry.ToDisplayString(expectedTyped);
             var error = equals
                 ? $"expected '{expectedStr}' but got '{actualStr}'"
                 : $"expected NOT '{expectedStr}' but got '{actualStr}'";
@@ -378,6 +379,12 @@ namespace Void2610.LiminalPalette
         // 演出 (LitMotion / UniTask) 完了後に確定する値を固定待ちなしで検証する用途。
         private async Task<StepResult> RunAssertEventuallyStep(AssertEventuallyStep step, CancellationToken ct)
         {
+            // Factory のバリデーションをすり抜けた経路 (直接 internal step 生成 / 将来の IPC 入力等) に備え、
+            // TimeSpan.FromSeconds で ArgumentException → 外側 catch の "unexpected" 扱いになる前に
+            // finite チェックして StepResult.Fail で回収する。
+            if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
+                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
+
             var sw = Stopwatch.StartNew();
             var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
             string lastError = null;
@@ -386,15 +393,16 @@ namespace Void2610.LiminalPalette
             {
                 ct.ThrowIfCancellationRequested();
 
-                // ObservableField が未登録 / 読取例外は即時失敗 (待っても解決しない構成エラー)。
-                if (!TryReadAndCompare(step.ObservableFieldPath, step.Expected, out var actual, out var matches, out var readError))
+                // ObservableField が未登録 / 読取例外 / 型変換失敗は即時失敗 (待っても解決しない構成エラー)。
+                if (!TryReadAndCompare(step.ObservableFieldPath, step.Expected, out var actual, out var expectedTyped, out var matches, out var readError))
                     return StepResult.Fail(step, readError);
 
                 if (matches)
                     return new StepResult(step, true, null, null, actual, TimeSpan.Zero);
 
                 lastActual = actual;
-                var expectedStr = step.Expected == null ? "null" : TypeConverterRegistry.ToDisplayString(step.Expected);
+                // 表示には比較に使った変換後の値 (expectedTyped) を使い、表示と比較を一致させる。
+                var expectedStr = expectedTyped == null ? "null" : TypeConverterRegistry.ToDisplayString(expectedTyped);
                 var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
                 lastError = $"expected '{expectedStr}' but got '{actualStr}'";
 
@@ -409,9 +417,12 @@ namespace Void2610.LiminalPalette
         // ObservableField を読み、expected (string なら field の型へ変換) と一致するかを判定する共通ヘルパ。
         // 戻り値 false は「読取自体が失敗」(未登録 / 読取例外 / 型変換失敗) で readError に理由が入る。
         // 値の一致/不一致は matches に入る (戻り値 true)。
-        private bool TryReadAndCompare(string observableFieldPath, object expected, out object actual, out bool matches, out string readError)
+        // expectedTyped は実際に比較に用いた期待値 (string→field 型へ変換後)。エラー表示と比較対象を
+        // 一致させるため、呼び出し側はメッセージ生成にこの値を使う。
+        private bool TryReadAndCompare(string observableFieldPath, object expected, out object actual, out object expectedTyped, out bool matches, out string readError)
         {
             actual = null;
+            expectedTyped = expected;
             matches = false;
             readError = null;
 
@@ -435,7 +446,6 @@ namespace Void2610.LiminalPalette
             }
 
             // expected が string なら field の型へ変換して比較対象の型を揃える。
-            object expectedTyped = expected;
             if (expected is string s && d.ValueType != typeof(string))
             {
                 if (!TypeConverterRegistry.TryConvert(s, d.ValueType, out expectedTyped, out var err))

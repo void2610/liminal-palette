@@ -115,8 +115,10 @@ namespace Void2610.LiminalPalette
         {
             if (string.IsNullOrEmpty(observableFieldPath))
                 throw new ArgumentException("observableFieldPath must not be null or empty", nameof(observableFieldPath));
-            if (timeoutSeconds <= 0f)
-                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be > 0");
+            // NaN / Infinity は TimeSpan.FromSeconds で例外になり「待っても解決しない」値なので、
+            // 「有限かつ > 0」を保証してここで弾く (timeoutSeconds <= 0f だけだと NaN/Infinity が通り抜ける)。
+            if (!(timeoutSeconds > 0f) || float.IsInfinity(timeoutSeconds))
+                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be a finite value > 0");
             return new AssertEventuallyStep(observableFieldPath, expected, timeoutSeconds, description);
         }
 

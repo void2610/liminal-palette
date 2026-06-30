@@ -81,6 +81,15 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public void AssertEventually_RejectsNonFiniteTimeout()
+        {
+            // NaN / Infinity は TimeSpan.FromSeconds で例外になる「待っても解決しない」値なので Factory で弾く。
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.NaN));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.PositiveInfinity));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.NegativeInfinity));
+        }
+
+        [Test]
         public void Run_RejectsEmptyPath()
         {
             Assert.Throws<System.ArgumentException>(() => ScenarioStep.Run(""));

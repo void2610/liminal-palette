@@ -4,7 +4,9 @@
     "references": [
         "Void2610.LiminalPalette"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,
@@ -13,8 +15,14 @@
     ],
     "autoReferenced": false,
     "defineConstraints": [
-        "UNITY_INCLUDE_TESTS"
+        "LIMINAL_TESTSUPPORT"
     ],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.test-framework",
+            "expression": "",
+            "define": "LIMINAL_TESTSUPPORT"
+        }
+    ],
     "noEngineReferences": false
 }

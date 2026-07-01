@@ -1,0 +1,34 @@
+{
+    "name": "Void2610.LiminalPalette.Tests.LitMotion",
+    "rootNamespace": "Void2610.LiminalPalette.Tests.LitMotion",
+    "references": [
+        "Void2610.LiminalPalette",
+        "Void2610.LiminalPalette.Runtime",
+        "Void2610.LiminalPalette.Runtime.LitMotion",
+        "LitMotion",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "LIMINAL_PALETTE_LITMOTION"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.annulusgames.lit-motion",
+            "expression": "1.0.0",
+            "define": "LIMINAL_PALETTE_LITMOTION"
+        }
+    ],
+    "noEngineReferences": false
+}

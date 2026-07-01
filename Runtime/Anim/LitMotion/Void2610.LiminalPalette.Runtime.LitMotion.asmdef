@@ -1,0 +1,26 @@
+{
+    "name": "Void2610.LiminalPalette.Runtime.LitMotion",
+    "rootNamespace": "Void2610.LiminalPalette.Runtime",
+    "references": [
+        "Void2610.LiminalPalette",
+        "Void2610.LiminalPalette.Runtime",
+        "LitMotion"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LIMINAL_PALETTE_LITMOTION"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.annulusgames.lit-motion",
+            "expression": "1.0.0",
+            "define": "LIMINAL_PALETTE_LITMOTION"
+        }
+    ],
+    "noEngineReferences": false
+}

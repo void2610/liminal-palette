@@ -49,7 +49,23 @@ namespace Void2610.LiminalPalette.Tests.LitMotion
             Assert.AreEqual(42f, finished, 0.0001f, "有限 tween は Complete で終端値に到達");
             Assert.IsFalse(finiteHandle.IsActive());
             Assert.IsTrue(infHandle.IsActive(), "無限ループは Complete では止まらない仕様なので生き残る");
-            StringAssert.Contains("skipped=", result);
+            // skipped は最終スナップショット時点の残数 = 1 (infinite の 1 本のみ)。
+            // 「finite complete で進捗ありのイテレーションで infinite が再度カウントされる」水増しが
+            // 起きていないことを担保するリグレッションガード (以前の実装は skipped=2 を返した)。
+            StringAssert.Contains("skipped=1 ", result);
+        }
+
+        [Test]
+        public void CompleteAll_InfiniteAloneReportsIterationsOne()
+        {
+            LMotion.Create(0f, 1f, 1f).WithLoops(-1).Bind(_ => { });
+
+            var result = LitMotionCommands.CompleteAll();
+
+            // 全 skip の 1 回打ち切りで iterations=1 (実行回数)。以前の `for(...; i++)` 実装では
+            // ループカウンタをそのまま返す都合で 0 を返していた off-by-one のリグレッションガード。
+            StringAssert.Contains("iterations=1", result);
+            StringAssert.Contains("completed=0 skipped=1", result);
         }
 
         [Test]

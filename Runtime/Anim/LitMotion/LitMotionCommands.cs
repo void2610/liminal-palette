@@ -65,27 +65,47 @@ namespace Void2610.LiminalPalette.Runtime
         // ---- Commands ----
 
         [LiminalCommand("Anim/CompleteAll",
-            Description = "アクティブな LitMotion tween すべてを最終値まで即座に進める (bound property の反映と OnComplete が同フレーム内に発火)。Sequence 内 tween と無限ループ tween は仕様上 Complete できないので skip する。E2E シナリオでの演出待機撲滅用")]
+            Description = "アクティブな LitMotion tween すべてを最終値まで即座に進める (bound property の反映と OnComplete が同フレーム内に発火)。Sequence 内 tween と無限ループ tween は仕様上 Complete できないので残る。戻り値の skipped は最終時点で残ったハンドル数。MaxIterations (連鎖 OnComplete 深度) を超えて打ち切った場合は末尾に truncated=true を付与する")]
         public static string CompleteAll()
         {
             if (_initError.Length > 0) return "reflection init failed: " + _initError;
 
-            int completed = 0, skipped = 0, iterations = 0;
-            for (; iterations < MaxIterations; iterations++)
+            var completed = 0;
+            var iterations = 0;
+            var truncated = false;
+            while (true)
             {
                 var handles = SnapshotActiveHandles();
                 if (handles.Count == 0) break;
 
-                var prevCompleted = completed;
+                // イテレーション上限判定はスナップショット取得後に行う。まだ残っているのに打ち切る場合を
+                // 呼び出し側が truncated マーカーで区別できるようにする (通常収束との差別化)。
+                if (iterations >= MaxIterations)
+                {
+                    truncated = true;
+                    break;
+                }
+
+                var completedBefore = completed;
                 foreach (var h in handles)
                 {
+                    // TryComplete が false のときは Sequence 内 / 無限ループ / 既完了 のいずれか。
+                    // ここではカウントせず、最終残数 (下の再スナップショット) に含めることで水増しを避ける。
                     if (h.TryComplete()) completed++;
-                    else skipped++;
                 }
-                // 進捗ゼロ (全 skip: 無限ループ or Sequence 内のみ残存) ならこれ以上回しても無駄なので break。
-                if (completed == prevCompleted) break;
+                iterations++;
+
+                // 進捗ゼロ (全て Complete 不可能) ならこれ以上回しても無駄なので break。
+                if (completed == completedBefore) break;
             }
-            return $"completed={completed} skipped={skipped} iterations={iterations}";
+
+            // skipped は最終スナップショット時点で残っているハンドル数 = CompleteAll で終わらせられなかった tween。
+            // 各イテレーションで加算する方式だと同じ handle が複数回カウントされて水増しになるためこの形にする。
+            var skipped = SnapshotActiveHandles().Count;
+
+            return truncated
+                ? $"completed={completed} skipped={skipped} iterations={iterations} truncated=true"
+                : $"completed={completed} skipped={skipped} iterations={iterations}";
         }
 
         [LiminalCommand("Anim/CancelAll",
@@ -134,8 +154,8 @@ namespace Void2610.LiminalPalette.Runtime
 
                 for (var i = 0; i < count && i < lookup.Length; i++)
                 {
-                    var sparseIndex = lookup.GetValue(i);
-                    if (sparseIndex == null) continue;
+                    // SparseIndex は value type のため GetValue は必ず boxed 非 null (Array.GetValue の仕様)。
+                    var sparseIndex = lookup.GetValue(i)!;
 
                     if (_sparseIndexIndexProp == null)
                     {

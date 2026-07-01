@@ -170,7 +170,13 @@ namespace Void2610.LiminalPalette.Runtime
                     // Version <= 0 は SparseSetCore の未使用スロットマーカー。念のため防衛的に弾く。
                     if (ver <= 0) continue;
 
-                    result.Add(new MotionHandle { Index = idx, Version = ver, StorageId = id });
+                    var handle = new MotionHandle { Index = idx, Version = ver, StorageId = id };
+                    // TryComplete / TryCancel した直後の Completed / Canceled 状態の motion は
+                    // UpdateRunner の次 Tick まで storage に残る (RemoveAt が遅延)。IsActive() で
+                    // 弾かないと同じ handle を次イテレーションで拾って skipped の過大計上に繋がる。
+                    if (!handle.IsActive()) continue;
+
+                    result.Add(handle);
                 }
             }
             return result;

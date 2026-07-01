@@ -26,7 +26,10 @@ namespace Void2610.LiminalPalette.Tests.LitMotion
             var result = LitMotionCommands.CompleteAll();
 
             Assert.AreEqual(100f, value, 0.0001f, "CompleteAll 後は bound property が終端値になっているべき");
-            StringAssert.StartsWith("completed=1", result);
+            // 単独 finite tween 1 本 → 1 iter で完了、skip なし。
+            // 以前は Completed 状態の handle が snapshot に残り 2 iter 目で false-positive skipped が
+            // 出ていた (実機検証で `completed=1 skipped=1 iterations=2` 観測) 件のリグレッションガード。
+            Assert.AreEqual("completed=1 skipped=0 iterations=1", result);
             Assert.IsFalse(handle.IsActive(), "Complete 後は tween は非アクティブ");
         }
 

@@ -24,6 +24,7 @@ VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグ�
 - 入力: Legacy Input Manager / Input System Package のどちらでも動く (両方有効でも可)
 - **R3** ([Cysharp/R3](https://github.com/Cysharp/R3)) — `ReactiveProperty<T>` / `Observable<T>` 対応 (Phase 5a 以降必須)
 - **VContainer** ([hadashiA/VContainer](https://github.com/hadashiA/VContainer)) — インスタンスメソッドコマンドの解決 (Phase 5a 以降必須)
+- **UniTask** ([Cysharp/UniTask](https://github.com/Cysharp/UniTask)) — `UniTask` / `UniTask<T>` 戻り値コマンドの await (v0.9 以降必須)
 
 > Phase 4 までは外部依存ゼロだったが、Phase 5a で R3 + VContainer 必須に方針転換した。利用側のコード量を最小化する設計判断。
 

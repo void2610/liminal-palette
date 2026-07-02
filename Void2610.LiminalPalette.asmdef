@@ -2,7 +2,8 @@
     "name": "Void2610.LiminalPalette",
     "rootNamespace": "Void2610.LiminalPalette",
     "references": [
-        "R3.Unity"
+        "R3.Unity",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

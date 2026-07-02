@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace Void2610.LiminalPalette.Tests
@@ -28,6 +29,19 @@ namespace Void2610.LiminalPalette.Tests
         public static async Task<string> AsyncCommand(string s)
         {
             await Task.Yield();
+            return s.ToUpperInvariant();
+        }
+
+        [LiminalCommand("Test/UniTaskVoid", Description = "UniTask (non-generic) command")]
+        public static async UniTask UniTaskVoidCommand()
+        {
+            await UniTask.Yield();
+        }
+
+        [LiminalCommand("Test/UniTaskString", Description = "UniTask<T> command")]
+        public static async UniTask<string> UniTaskStringCommand(string s)
+        {
+            await UniTask.Yield();
             return s.ToUpperInvariant();
         }
     }

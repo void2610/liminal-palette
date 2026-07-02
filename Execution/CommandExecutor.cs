@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 
 namespace Void2610.LiminalPalette
 {
     /// <summary>
     /// ICommandExecutor の標準実装。
-    /// 同期メソッドと Task / Task&lt;T&gt; / ValueTask / ValueTask&lt;T&gt; を await して結果を CommandResult に詰める。
+    /// 同期メソッドと Task / Task&lt;T&gt; / ValueTask / ValueTask&lt;T&gt; / UniTask / UniTask&lt;T&gt; を await して結果を CommandResult に詰める。
     /// 例外はすべて握りつぶして CommandResult.Fail に変換するため、利用側は try-catch 不要。
     /// </summary>
     public sealed class CommandExecutor : ICommandExecutor
@@ -129,6 +131,8 @@ namespace Void2610.LiminalPalette
         // - Task<T>         → await のち T
         // - ValueTask       → await のち null
         // - ValueTask<T>    → await のち T
+        // - UniTask         → await のち null
+        // - UniTask<T>      → await のち T
         private static async Task<object> UnwrapAsync(object raw, Type returnType)
         {
             if (raw == null) return null;
@@ -161,8 +165,29 @@ namespace Void2610.LiminalPalette
                 }
             }
 
+            // UniTask 系も AsTask で Task に正規化する。AsTask はインスタンスメソッドではなく
+            // UniTaskExtensions の拡張メソッドで、UniTask<T> の T は実行時にしか分からないため
+            // ジェネリック定義を MakeGenericMethod で閉じて呼び出す。
+            if (returnType == typeof(UniTask))
+            {
+                await ((UniTask)raw).AsTask().ConfigureAwait(false);
+                return null;
+            }
+            if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(UniTask<>))
+            {
+                var asTask = UniTaskAsTaskGenericDefinition.MakeGenericMethod(returnType.GetGenericArguments()[0]);
+                var task2 = (Task)asTask.Invoke(null, new[] { raw });
+                await task2.ConfigureAwait(false);
+                return task2.GetType().GetProperty("Result")?.GetValue(task2);
+            }
+
             // 同期戻り値はそのまま返す。
             return raw;
         }
+
+        // UniTaskExtensions.AsTask<T>(UniTask<T>) のジェネリック定義キャッシュ。
+        private static readonly MethodInfo UniTaskAsTaskGenericDefinition =
+            typeof(UniTaskExtensions).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .First(m => m.Name == nameof(UniTaskExtensions.AsTask) && m.IsGenericMethodDefinition);
     }
 }

@@ -52,6 +52,22 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public async Task UniTask_NonGeneric_AwaitedAndNullValue()
+        {
+            var r = await _executor.ExecuteAsync("Test/UniTaskVoid", new Dictionary<string, string>());
+            Assert.IsTrue(r.Success, r.Error);
+            Assert.IsNull(r.Value);
+        }
+
+        [Test]
+        public async Task UniTask_Generic_AwaitedAndResultReturned()
+        {
+            var r = await _executor.ExecuteAsync("Test/UniTaskString", new Dictionary<string, string> { ["s"] = "hello" });
+            Assert.IsTrue(r.Success, r.Error);
+            Assert.AreEqual("HELLO", r.Value);
+        }
+
+        [Test]
         public async Task Throws_ConvertedToFail_WithExceptionPreserved()
         {
             var r = await _executor.ExecuteAsync("Test/Throws", new Dictionary<string, string>());

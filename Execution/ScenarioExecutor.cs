@@ -54,6 +54,7 @@ namespace Void2610.LiminalPalette
             ScenarioRunStarted = null;
             ScenarioRunStepChanged = null;
             ScenarioRunFinished = null;
+            TimeScaleHook.ResetToDefault();
         }
 
         private readonly ICommandExecutor _commandExecutor;
@@ -157,6 +158,20 @@ namespace Void2610.LiminalPalette
                     {
                         stepList.Add(ScenarioStep.LoadScene(descriptor.Scene, $"auto: load {descriptor.Scene}"));
                     }
+                    if (!string.IsNullOrEmpty(descriptor.ReadyWhen))
+                    {
+                        if (!TryParseReadyWhen(descriptor.ReadyWhen, out var readyStep, out var parseError))
+                        {
+                            var step = ScenarioStep.Run("<n/a>");
+                            return new ScenarioResult(
+                                success: false,
+                                steps: new[] { StepResult.Fail(step, parseError) },
+                                duration: TimeSpan.Zero,
+                                failedAtStep: 0,
+                                path: scenarioPath);
+                        }
+                        stepList.Add(readyStep);
+                    }
                     foreach (var s in descriptor.StepsFactory(instance))
                     {
                         if (s == null) continue;
@@ -173,12 +188,69 @@ namespace Void2610.LiminalPalette
                         failedAtStep: 0,
                         path: scenarioPath);
                 }
-                return await ExecuteCoreAsync(stepList, scenarioPath, ct);
+
+                // TimeScale 上書きはステップではなく実行全体の wrap で行い、失敗・キャンセル時も必ず復元する。
+                var timeScaleOverridden = false;
+                var originalTimeScale = 0f;
+                if (descriptor.TimeScale > 0f && TimeScaleHook.IsPlaying())
+                {
+                    originalTimeScale = TimeScaleHook.Get();
+                    TimeScaleHook.Set(descriptor.TimeScale);
+                    timeScaleOverridden = true;
+                }
+                try
+                {
+                    return await ExecuteCoreAsync(stepList, scenarioPath, ct);
+                }
+                finally
+                {
+                    if (timeScaleOverridden)
+                    {
+                        TimeScaleHook.Set(originalTimeScale);
+                    }
+                }
             }
             finally
             {
                 _runLock.Release();
             }
+        }
+
+        /// <summary>TimeScale wrap が触る Unity API の差し替え点 (EditMode テストで適用・復元を検証するため)</summary>
+        internal static class TimeScaleHook
+        {
+            public static Func<bool> IsPlaying = () => Application.isPlaying;
+            public static Func<float> Get = () => Time.timeScale;
+            public static Action<float> Set = v => Time.timeScale = v;
+
+            public static void ResetToDefault()
+            {
+                IsPlaying = () => Application.isPlaying;
+                Get = () => Time.timeScale;
+                Set = v => Time.timeScale = v;
+            }
+        }
+
+        // ReadyWhen ("path=value") を AssertEventually ステップへ変換する。'=' は最初の 1 個で分割する。
+        private static bool TryParseReadyWhen(string readyWhen, out ScenarioStep step, out string error)
+        {
+            step = null;
+            error = null;
+            var idx = readyWhen.IndexOf('=');
+            if (idx <= 0 || idx >= readyWhen.Length - 1)
+            {
+                error = $"invalid ReadyWhen: '{readyWhen}' (expected \"observableFieldPath=expectedValue\")";
+                return false;
+            }
+            var path = readyWhen.Substring(0, idx).Trim();
+            var expected = readyWhen.Substring(idx + 1).Trim();
+            if (path.Length == 0 || expected.Length == 0)
+            {
+                error = $"invalid ReadyWhen: '{readyWhen}' (path and expected value must be non-empty)";
+                return false;
+            }
+            step = ScenarioStep.AssertEventually(path, expected, description: $"auto: ready when {path}={expected}");
+            return true;
         }
 
         // 共通本体。lock 取得後に呼ばれる前提。

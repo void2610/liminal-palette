@@ -402,5 +402,126 @@ namespace Void2610.LiminalPalette.Tests
             Assert.AreEqual(ScenarioStepKind.LoadScene, result.Steps[0].Step.Kind);
             Assert.AreEqual(0, ce.CallCount, "LoadScene 失敗で本体 Run は呼ばれない");
         }
+
+        [Test]
+        public async Task ExecuteByPath_ReadyWhen_PrependsAssertEventuallyBeforeBody()
+        {
+            // 条件成立 (初期値 100 と一致) で本体 Run へ進むことで、前置きの位置と通過を確認する。
+            var registry = new ScenarioRegistry();
+            registry.Register(new ScenarioDescriptor(
+                path: "TestScenario/WithReady",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                readyWhen: "ScenarioTest/Hp=100"));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithReady", CancellationToken.None);
+
+            Assert.IsTrue(result.Success, result.Success ? null : result.Steps[result.FailedAtStep].Error);
+            Assert.AreEqual(2, result.Steps.Count, "AssertEventually + 本体 Run の 2 ステップ");
+            Assert.AreEqual(ScenarioStepKind.AssertEventually, result.Steps[0].Step.Kind);
+            Assert.AreEqual(1, ce.CallCount, "条件成立後に本体 Run が 1 回呼ばれる");
+        }
+
+        [Test]
+        public async Task ExecuteByPath_InvalidReadyWhen_FailsWithoutRunningBody()
+        {
+            // '=' を含まない ReadyWhen は構成エラーとしてステップ実行前に失敗する。
+            var registry = new ScenarioRegistry();
+            registry.Register(new ScenarioDescriptor(
+                path: "TestScenario/BrokenReady",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                readyWhen: "ScenarioTest/Hp"));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/BrokenReady", CancellationToken.None);
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("invalid ReadyWhen", result.Steps[0].Error);
+            Assert.AreEqual(0, ce.CallCount, "構成エラーで本体 Run は呼ばれない");
+        }
+
+        // TimeScaleHook を偽装して PlayMode 相当の適用・復元ロジックを EditMode で検証するヘルパ。
+        private sealed class FakeTimeScale : System.IDisposable
+        {
+            public float Current = 1f;
+            public readonly List<float> SetHistory = new List<float>();
+
+            public FakeTimeScale(bool isPlaying)
+            {
+                ScenarioExecutor.TimeScaleHook.IsPlaying = () => isPlaying;
+                ScenarioExecutor.TimeScaleHook.Get = () => Current;
+                ScenarioExecutor.TimeScaleHook.Set = v => { Current = v; SetHistory.Add(v); };
+            }
+
+            public void Dispose() => ScenarioExecutor.TimeScaleHook.ResetToDefault();
+        }
+
+        private static ScenarioDescriptor TimeScaleDescriptor(System.Func<object, IEnumerable<ScenarioStep>> steps)
+            => new ScenarioDescriptor(
+                path: "TestScenario/WithTimeScale",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: steps,
+                timeScale: 20f);
+
+        [Test]
+        public async Task ExecuteByPath_TimeScale_AppliesAndRestoresOnSuccess()
+        {
+            using var fake = new FakeTimeScale(isPlaying: true);
+            fake.Current = 0.5f;
+            var registry = new ScenarioRegistry();
+            registry.Register(TimeScaleDescriptor(_ => new[] { ScenarioStep.Run("Test/NoArg") }));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithTimeScale", CancellationToken.None);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(new List<float> { 20f, 0.5f }, fake.SetHistory, "実行前に 20 へ上書きし、終了時に元値 0.5 へ復元");
+        }
+
+        [Test]
+        public async Task ExecuteByPath_TimeScale_RestoresOnFailure()
+        {
+            using var fake = new FakeTimeScale(isPlaying: true);
+            fake.Current = 1f;
+            var registry = new ScenarioRegistry();
+            registry.Register(TimeScaleDescriptor(_ => new[] { ScenarioStep.Run("Test/NoArg") }));
+
+            var ce = new FakeCommandExecutor { ShouldFail = true };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithTimeScale", CancellationToken.None);
+
+            Assert.IsFalse(result.Success, "ステップ失敗でシナリオは失敗");
+            Assert.AreEqual(1f, fake.Current, "失敗経路でも finally で元値へ復元");
+        }
+
+        [Test]
+        public async Task ExecuteByPath_TimeScale_NotAppliedInEditMode()
+        {
+            using var fake = new FakeTimeScale(isPlaying: false);
+            fake.Current = 1f;
+            var registry = new ScenarioRegistry();
+            registry.Register(TimeScaleDescriptor(_ => new[] { ScenarioStep.Run("Test/NoArg") }));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithTimeScale", CancellationToken.None);
+
+            Assert.IsTrue(result.Success);
+            Assert.IsEmpty(fake.SetHistory, "isPlaying=false では timeScale を一切触らない");
+        }
     }
 }

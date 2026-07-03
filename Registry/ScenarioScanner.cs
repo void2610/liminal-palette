@@ -182,7 +182,9 @@ namespace Void2610.LiminalPalette
                 method: method,
                 isStatic: isStatic,
                 stepsFactory: factory,
-                scene: attr.Scene);
+                scene: attr.Scene,
+                readyWhen: attr.ReadyWhen,
+                timeScale: attr.TimeScale);
             return true;
         }
 

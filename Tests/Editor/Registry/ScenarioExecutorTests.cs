@@ -402,5 +402,75 @@ namespace Void2610.LiminalPalette.Tests
             Assert.AreEqual(ScenarioStepKind.LoadScene, result.Steps[0].Step.Kind);
             Assert.AreEqual(0, ce.CallCount, "LoadScene 失敗で本体 Run は呼ばれない");
         }
+
+        [Test]
+        public async Task ExecuteByPath_ReadyWhen_PrependsAssertEventuallyBeforeBody()
+        {
+            // 条件成立 (初期値 100 と一致) で本体 Run へ進むことで、前置きの位置と通過を確認する。
+            var registry = new ScenarioRegistry();
+            registry.Register(new ScenarioDescriptor(
+                path: "TestScenario/WithReady",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                readyWhen: "ScenarioTest/Hp=100"));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithReady", CancellationToken.None);
+
+            Assert.IsTrue(result.Success, result.Success ? null : result.Steps[result.FailedAtStep].Error);
+            Assert.AreEqual(2, result.Steps.Count, "AssertEventually + 本体 Run の 2 ステップ");
+            Assert.AreEqual(ScenarioStepKind.AssertEventually, result.Steps[0].Step.Kind);
+            Assert.AreEqual(1, ce.CallCount, "条件成立後に本体 Run が 1 回呼ばれる");
+        }
+
+        [Test]
+        public async Task ExecuteByPath_InvalidReadyWhen_FailsWithoutRunningBody()
+        {
+            // '=' を含まない ReadyWhen は構成エラーとしてステップ実行前に失敗する。
+            var registry = new ScenarioRegistry();
+            registry.Register(new ScenarioDescriptor(
+                path: "TestScenario/BrokenReady",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                readyWhen: "ScenarioTest/Hp"));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/BrokenReady", CancellationToken.None);
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("invalid ReadyWhen", result.Steps[0].Error);
+            Assert.AreEqual(0, ce.CallCount, "構成エラーで本体 Run は呼ばれない");
+        }
+
+        [Test]
+        public async Task ExecuteByPath_TimeScale_NotAppliedInEditMode()
+        {
+            // TimeScale 上書きは Application.isPlaying ガード付きで、EditMode では触らない。
+            var registry = new ScenarioRegistry();
+            registry.Register(new ScenarioDescriptor(
+                path: "TestScenario/WithTimeScale",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                timeScale: 20f));
+
+            var before = UnityEngine.Time.timeScale;
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithTimeScale", CancellationToken.None);
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(before, UnityEngine.Time.timeScale, "EditMode では timeScale を書き換えない");
+        }
     }
 }

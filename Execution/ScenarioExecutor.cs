@@ -157,6 +157,20 @@ namespace Void2610.LiminalPalette
                     {
                         stepList.Add(ScenarioStep.LoadScene(descriptor.Scene, $"auto: load {descriptor.Scene}"));
                     }
+                    if (!string.IsNullOrEmpty(descriptor.ReadyWhen))
+                    {
+                        if (!TryParseReadyWhen(descriptor.ReadyWhen, out var readyStep, out var parseError))
+                        {
+                            var step = ScenarioStep.Run("<n/a>");
+                            return new ScenarioResult(
+                                success: false,
+                                steps: new[] { StepResult.Fail(step, parseError) },
+                                duration: TimeSpan.Zero,
+                                failedAtStep: 0,
+                                path: scenarioPath);
+                        }
+                        stepList.Add(readyStep);
+                    }
                     foreach (var s in descriptor.StepsFactory(instance))
                     {
                         if (s == null) continue;
@@ -173,12 +187,52 @@ namespace Void2610.LiminalPalette
                         failedAtStep: 0,
                         path: scenarioPath);
                 }
-                return await ExecuteCoreAsync(stepList, scenarioPath, ct);
+
+                // TimeScale 上書きはステップではなく実行全体の wrap で行い、失敗・キャンセル時も必ず復元する。
+                var originalTimeScale = float.NaN;
+                if (descriptor.TimeScale > 0f && Application.isPlaying)
+                {
+                    originalTimeScale = Time.timeScale;
+                    Time.timeScale = descriptor.TimeScale;
+                }
+                try
+                {
+                    return await ExecuteCoreAsync(stepList, scenarioPath, ct);
+                }
+                finally
+                {
+                    if (!float.IsNaN(originalTimeScale))
+                    {
+                        Time.timeScale = originalTimeScale;
+                    }
+                }
             }
             finally
             {
                 _runLock.Release();
             }
+        }
+
+        // ReadyWhen ("path=value") を AssertEventually ステップへ変換する。'=' は最初の 1 個で分割する。
+        private static bool TryParseReadyWhen(string readyWhen, out ScenarioStep step, out string error)
+        {
+            step = null;
+            error = null;
+            var idx = readyWhen.IndexOf('=');
+            if (idx <= 0 || idx >= readyWhen.Length - 1)
+            {
+                error = $"invalid ReadyWhen: '{readyWhen}' (expected \"observableFieldPath=expectedValue\")";
+                return false;
+            }
+            var path = readyWhen.Substring(0, idx).Trim();
+            var expected = readyWhen.Substring(idx + 1).Trim();
+            if (path.Length == 0 || expected.Length == 0)
+            {
+                error = $"invalid ReadyWhen: '{readyWhen}' (path and expected value must be non-empty)";
+                return false;
+            }
+            step = ScenarioStep.AssertEventually(path, expected, description: $"auto: ready when {path}={expected}");
+            return true;
         }
 
         // 共通本体。lock 取得後に呼ばれる前提。

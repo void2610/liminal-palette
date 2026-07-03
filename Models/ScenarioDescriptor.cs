@@ -31,6 +31,12 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public string Scene { get; }
 
+        /// <summary>"観測パス=期待値" 形式の開始条件。詳細は <see cref="LiminalScenarioAttribute.ReadyWhen"/> 参照。</summary>
+        public string ReadyWhen { get; }
+
+        /// <summary>実行中の Time.timeScale 上書き値 (0 以下は未指定)。詳細は <see cref="LiminalScenarioAttribute.TimeScale"/> 参照。</summary>
+        public float TimeScale { get; }
+
         /// <summary>
         /// インスタンス (static の場合は null) を受け取って ScenarioStep の列を返すファクトリ。
         /// 列挙のたびに新しい列が作られるため、シナリオを連続実行しても各回で副作用が発火する仕様。
@@ -44,7 +50,9 @@ namespace Void2610.LiminalPalette
             MethodInfo method,
             bool isStatic,
             Func<object, IEnumerable<ScenarioStep>> stepsFactory,
-            string scene = "")
+            string scene = "",
+            string readyWhen = "",
+            float timeScale = 0f)
         {
             Path = path;
             Description = description ?? "";
@@ -52,6 +60,8 @@ namespace Void2610.LiminalPalette
             Method = method;
             IsStatic = isStatic;
             Scene = scene ?? "";
+            ReadyWhen = readyWhen ?? "";
+            TimeScale = timeScale;
             StepsFactory = stepsFactory ?? throw new ArgumentNullException(nameof(stepsFactory));
         }
     }

@@ -26,6 +26,12 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public string Scene { get; set; } = "";
 
+        /// <summary>任意。"観測パス=期待値" 形式 (例: "Game/State=WorldMap")。Scene ロード後に AssertEventually を自動挿入し、条件成立まで本体ステップの開始を遅延する。</summary>
+        public string ReadyWhen { get; set; } = "";
+
+        /// <summary>任意。0 より大きければシナリオ実行中だけ Time.timeScale をこの値にし、終了時 (失敗・キャンセル含む) に必ず元の値へ復元する。</summary>
+        public float TimeScale { get; set; }
+
         public LiminalScenarioAttribute(string path) => Path = path;
     }
 }

@@ -54,6 +54,7 @@ namespace Void2610.LiminalPalette
             ScenarioRunStarted = null;
             ScenarioRunStepChanged = null;
             ScenarioRunFinished = null;
+            TimeScaleHook.ResetToDefault();
         }
 
         private readonly ICommandExecutor _commandExecutor;
@@ -189,11 +190,13 @@ namespace Void2610.LiminalPalette
                 }
 
                 // TimeScale 上書きはステップではなく実行全体の wrap で行い、失敗・キャンセル時も必ず復元する。
-                var originalTimeScale = float.NaN;
-                if (descriptor.TimeScale > 0f && Application.isPlaying)
+                var timeScaleOverridden = false;
+                var originalTimeScale = 0f;
+                if (descriptor.TimeScale > 0f && TimeScaleHook.IsPlaying())
                 {
-                    originalTimeScale = Time.timeScale;
-                    Time.timeScale = descriptor.TimeScale;
+                    originalTimeScale = TimeScaleHook.Get();
+                    TimeScaleHook.Set(descriptor.TimeScale);
+                    timeScaleOverridden = true;
                 }
                 try
                 {
@@ -201,15 +204,30 @@ namespace Void2610.LiminalPalette
                 }
                 finally
                 {
-                    if (!float.IsNaN(originalTimeScale))
+                    if (timeScaleOverridden)
                     {
-                        Time.timeScale = originalTimeScale;
+                        TimeScaleHook.Set(originalTimeScale);
                     }
                 }
             }
             finally
             {
                 _runLock.Release();
+            }
+        }
+
+        /// <summary>TimeScale wrap が触る Unity API の差し替え点 (EditMode テストで適用・復元を検証するため)</summary>
+        internal static class TimeScaleHook
+        {
+            public static Func<bool> IsPlaying = () => Application.isPlaying;
+            public static Func<float> Get = () => Time.timeScale;
+            public static Action<float> Set = v => Time.timeScale = v;
+
+            public static void ResetToDefault()
+            {
+                IsPlaying = () => Application.isPlaying;
+                Get = () => Time.timeScale;
+                Set = v => Time.timeScale = v;
             }
         }
 

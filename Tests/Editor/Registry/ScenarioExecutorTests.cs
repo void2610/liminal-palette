@@ -20,6 +20,8 @@ namespace Void2610.LiminalPalette.Tests
         {
             public int CallCount;
             public bool ShouldFail;
+            // CallCount がこの値未満の間は instance 未解決失敗を返す (LoadScene 直後の DI 未構築を模擬)
+            public int UnresolvedUntilCall;
 
             public Task<CommandResult> ExecuteAsync(string pathOrAlias, IReadOnlyDictionary<string, string> args, CancellationToken ct = default)
                 => Task.FromResult(BuildResult());
@@ -34,9 +36,15 @@ namespace Void2610.LiminalPalette.Tests
             }
 
             private CommandResult BuildResult()
-                => ShouldFail
+            {
+                if (CallCount < UnresolvedUntilCall)
+                    return CommandResult.Fail("Instance not resolved for Fake",
+                        new InstanceUnresolvedException("Instance not resolved for Fake"),
+                        System.Array.Empty<LogEntry>(), System.TimeSpan.Zero);
+                return ShouldFail
                     ? CommandResult.Fail("simulated failure", null, System.Array.Empty<LogEntry>(), System.TimeSpan.Zero)
                     : CommandResult.Ok(null, System.Array.Empty<LogEntry>(), System.TimeSpan.Zero);
+            }
         }
 
         private sealed class FakeFrameWaiter : IFrameWaiter
@@ -124,6 +132,19 @@ namespace Void2610.LiminalPalette.Tests
             Assert.AreEqual(1, result.Steps.Count, "fail-fast: 2 件目は実行されない");
             Assert.AreEqual(0, result.FailedAtStep);
             Assert.AreEqual(1, ce.CallCount);
+        }
+
+        [Test]
+        public async Task Execute_CommandInstanceUnresolved_RetriesUntilResolved()
+        {
+            // LoadScene 直後の DI 構築レースを模擬: 3 回目の呼び出しで instance が解決される
+            var ce = new FakeCommandExecutor { UnresolvedUntilCall = 3 };
+            var fw = new FakeFrameWaiter();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(new[] { ScenarioStep.Run("Foo/Bar") }, "test", CancellationToken.None);
+            Assert.IsTrue(result.Success, "未解決が解消したら成功する");
+            Assert.AreEqual(3, ce.CallCount, "解決するまでリトライする");
+            Assert.AreEqual(2, fw.CallCount, "リトライ間はフレーム待ちする");
         }
 
         // ------------------------------------------------------------

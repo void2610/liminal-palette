@@ -86,8 +86,8 @@ namespace Void2610.LiminalPalette
                     var instance = LiminalPalette.InstanceResolver.Resolve(descriptor.Method.DeclaringType);
                     if (instance == null)
                     {
-                        // resolver 未登録 / DI 未登録のケース。利用者に対処方法を提示する。
-                        throw new InvalidOperationException(
+                        // 未登録 / LoadScene 直後の一過性未解決。専用例外型でシナリオ側の識別・リトライを可能にする。
+                        throw new InstanceUnresolvedException(
                             $"Instance not resolved for {descriptor.Method.DeclaringType?.FullName ?? "<unknown>"}. " +
                             "Register the type with VContainer (e.g. builder.RegisterComponentInHierarchy<T>()) " +
                             "and call builder.RegisterEntryPoint<LiminalPaletteEntryPoint>() in your LifetimeScope.");

@@ -344,10 +344,20 @@ namespace Void2610.LiminalPalette
             }
         }
 
+        // LoadScene 直後の DI 構築中は instance が一過性で未解決になるため、固定待ちに頼らずこの範囲でリトライする
+        private static readonly TimeSpan CommandInstanceResolveTimeout = TimeSpan.FromSeconds(5);
+
         private async Task<StepResult> RunCommandStep(CommandStep step, CancellationToken ct)
         {
-            var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
-            return new StepResult(step, result.Success, result.Error, result, null, TimeSpan.Zero);
+            var sw = Stopwatch.StartNew();
+            while (true)
+            {
+                var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
+                // instance 未解決 (シーン DI 構築中) のみ一過性としてリトライ。他の失敗・成功は即返す。
+                if (result.Success || !(result.Exception is InstanceUnresolvedException) || sw.Elapsed >= CommandInstanceResolveTimeout)
+                    return new StepResult(step, result.Success, result.Error, result, null, TimeSpan.Zero);
+                await _frameWaiter.WaitFramesAsync(1, ct);
+            }
         }
 
         // AssertCommandReturns: 内部でコマンドを実行し、戻り値文字列が expected と一致するか検証する。

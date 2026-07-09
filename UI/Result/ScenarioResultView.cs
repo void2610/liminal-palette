@@ -160,6 +160,11 @@ namespace Void2610.LiminalPalette.UI
                     sb.Append(aes.Expected == null ? "null" : TypeConverterRegistry.ToDisplayString(aes.Expected));
                     sb.Append($" (within {aes.TimeoutSeconds}s)");
                     break;
+                case AssertCommandEventuallyStep ace:
+                    sb.Append("AssertCommandEventually ").Append(ace.CommandPath).Append(" == ");
+                    sb.Append(ace.Expected ?? "null");
+                    sb.Append($" (within {ace.TimeoutSeconds}s)");
+                    break;
                 default:
                     sb.Append(sr.Step?.Kind.ToString() ?? "(null)");
                     break;

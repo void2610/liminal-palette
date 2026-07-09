@@ -1,0 +1,28 @@
+{
+    "name": "Void2610.LiminalPalette.Editor.TestRunner",
+    "rootNamespace": "Void2610.LiminalPalette.Editor",
+    "references": [
+        "Void2610.LiminalPalette",
+        "UnityEditor.TestRunner",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "LIMINAL_PALETTE_TEST_FRAMEWORK"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.test-framework",
+            "expression": "1.0.0",
+            "define": "LIMINAL_PALETTE_TEST_FRAMEWORK"
+        }
+    ],
+    "noEngineReferences": false
+}

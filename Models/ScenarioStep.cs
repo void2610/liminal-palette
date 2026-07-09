@@ -14,6 +14,7 @@ namespace Void2610.LiminalPalette
         LoadScene,
         AssertCommandReturns,
         AssertEventually,
+        AssertCommandEventually,
     }
 
     /// <summary>
@@ -123,6 +124,29 @@ namespace Void2610.LiminalPalette
         }
 
         /// <summary>
+        /// 指定コマンドを毎フレーム実行し、戻り値の文字列が expected と一致するまでポーリングするステップ。
+        /// timeoutSeconds 以内に一致すれば成功、超過したら最後の結果を添えて失敗する。
+        /// `AssertEventually` の観測コマンド版: ObservableField を持たない状態 (bool/enum を返す観測コマンド等) を、
+        /// 演出 (LitMotion / UniTask) や非同期遷移の完了後に確定する値として固定待ちなしで検証する。
+        /// expected を null にすると「コマンドが成功するまで待つ」モードになる。
+        /// **副作用のある操作コマンドではなく、読み取り専用の観測コマンドにのみ使うこと** (毎フレーム再実行するため)。
+        /// </summary>
+        public static ScenarioStep AssertCommandEventually(
+            string commandPath,
+            IReadOnlyDictionary<string, object> args = null,
+            string expected = null,
+            float timeoutSeconds = 5f,
+            string description = null)
+        {
+            if (string.IsNullOrEmpty(commandPath))
+                throw new ArgumentException("commandPath must not be null or empty", nameof(commandPath));
+            // AssertEventually と同じく NaN / Infinity / <= 0 を弾く (待っても解決しない値)。
+            if (!(timeoutSeconds > 0f) || float.IsInfinity(timeoutSeconds))
+                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be a finite value > 0");
+            return new AssertCommandEventuallyStep(commandPath, args, expected, timeoutSeconds, description);
+        }
+
+        /// <summary>
         /// 指定シーンを Single モードで非同期ロードするステップ。完了 (op.isDone) まで待機する。
         /// シーン切替で VContainer のスコープが再構築されるため、後続コマンドは自動的に
         /// 新シーンに登録された instance に解決される。
@@ -212,6 +236,31 @@ namespace Void2610.LiminalPalette
             : base(ScenarioStepKind.AssertEventually, description)
         {
             ObservableFieldPath = observableFieldPath;
+            Expected = expected;
+            TimeoutSeconds = timeoutSeconds;
+        }
+    }
+
+    /// <summary>コマンドを毎フレーム実行し、戻り値文字列が expected と一致するまでポーリングするステップ。</summary>
+    internal sealed class AssertCommandEventuallyStep : ScenarioStep
+    {
+        public string CommandPath { get; }
+        public IReadOnlyDictionary<string, object> Args { get; }
+
+        /// <summary>期待する戻り値文字列。null の場合は「コマンドが成功するまで待つ」。</summary>
+        public string Expected { get; }
+        public float TimeoutSeconds { get; }
+
+        public AssertCommandEventuallyStep(
+            string commandPath,
+            IReadOnlyDictionary<string, object> args,
+            string expected,
+            float timeoutSeconds,
+            string description)
+            : base(ScenarioStepKind.AssertCommandEventually, description)
+        {
+            CommandPath = commandPath;
+            Args = args ?? new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             Expected = expected;
             TimeoutSeconds = timeoutSeconds;
         }

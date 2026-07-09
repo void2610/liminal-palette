@@ -307,6 +307,9 @@ namespace Void2610.LiminalPalette
                             case ScenarioStepKind.AssertEventually:
                                 sr = await RunAssertEventuallyStep((AssertEventuallyStep)step, ct);
                                 break;
+                            case ScenarioStepKind.AssertCommandEventually:
+                                sr = await RunAssertCommandEventuallyStep((AssertCommandEventuallyStep)step, ct);
+                                break;
                             default:
                                 sr = StepResult.Fail(step, $"unknown step kind: {step.Kind}");
                                 break;
@@ -379,6 +382,50 @@ namespace Void2610.LiminalPalette
             return new StepResult(step, success: false,
                 error: $"command '{step.CommandPath}' returned '{actual}', expected '{step.Expected}'",
                 commandResult: result, actualValue: actual, duration: TimeSpan.Zero);
+        }
+
+        // AssertEventually の観測コマンド版 (ObservableField を持たない状態を毎フレームコマンド再実行でポーリング)。
+        private async Task<StepResult> RunAssertCommandEventuallyStep(AssertCommandEventuallyStep step, CancellationToken ct)
+        {
+            if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
+                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
+
+            var sw = Stopwatch.StartNew();
+            var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
+            string lastError = null;
+            object lastActual = null;
+            CommandResult lastResult = null;
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
+                lastResult = result;
+                if (!result.Success)
+                {
+                    // 構築中の "no view" 等は一過性でありうるため即失敗にせずポーリング継続。
+                    lastError = $"command '{step.CommandPath}' failed: {result.Error ?? "<no error>"}";
+                    lastActual = null;
+                }
+                else if (step.Expected == null)
+                {
+                    return new StepResult(step, true, null, result, result.Value, TimeSpan.Zero);
+                }
+                else
+                {
+                    var actual = result.Value == null ? "" : TypeConverterRegistry.ToDisplayString(result.Value);
+                    if (string.Equals(actual, step.Expected, StringComparison.Ordinal))
+                        return new StepResult(step, true, null, result, actual, TimeSpan.Zero);
+                    lastActual = actual;
+                    lastError = $"command '{step.CommandPath}' returned '{actual}', expected '{step.Expected}'";
+                }
+
+                if (sw.Elapsed >= timeout)
+                    return new StepResult(step, false,
+                        $"not satisfied within {step.TimeoutSeconds}s: {lastError}", lastResult, lastActual, TimeSpan.Zero);
+
+                await _frameWaiter.WaitFramesAsync(1, ct);
+            }
         }
 
         private async Task<StepResult> RunWaitSecondsStep(WaitStep step, CancellationToken ct)

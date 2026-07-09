@@ -376,6 +376,58 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public async Task Execute_AssertCommandEventually_PassesWhenCommandReachesExpected()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "wait" };
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n >= 3) ce.ReturnValue = "ready"; } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
+            Assert.GreaterOrEqual(fw.CallCount, 3, "一致前に複数回ポーリングしているはず");
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_TimesOut_Fails()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "never" };
+            var cts = new CancellationTokenSource();
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n > 1_000_000) cts.Cancel(); } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 0.05f) },
+                null, cts.Token);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("not satisfied within", result.Steps[0].Error);
+            StringAssert.Contains("ready", result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_NullExpected_PassesWhenSucceeds()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "whatever" };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: null, timeoutSeconds: 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_KeepsPollingWhileCommandFails_ThenSucceeds()
+        {
+            // AssertCommandReturns と異なり、コマンド失敗を即 fail にせずポーリング継続する契約を守っているか。
+            var ce = new FakeCommandExecutorWithValue { ShouldFail = true, ReturnValue = "ready" };
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n >= 2) ce.ShouldFail = false; } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
+        }
+
+        [Test]
         public async Task ExecuteByPath_AutoPrependsLoadSceneWhenAttributeHasScene()
         {
             // [LiminalScenario(Scene="...")] が付いていれば、ScenarioExecutor が本体ステップの前に

@@ -1144,14 +1144,14 @@ def cmd_test(args, base_url, token):
     `liminal test result` は現在の結果だけを 1 回取得する。
     exit code: 完了して Passed → 0、それ以外 (Failed 等) → 2。
     """
-    if args.mode == "result":
+    if args.test_mode == "result":
         status, body = _request("GET", f"{base_url}/api/v1/tests/result", token)
         _check_status(status, body)
         _emit_test_status(args, body)
         sys.exit(_test_exit_code(body))
 
     # 実行開始
-    req_body = {"mode": args.mode}
+    req_body = {"mode": args.test_mode}
     if args.filter:
         req_body["filter"] = args.filter
     status, resp = _request("POST", f"{base_url}/api/v1/tests/run", token, req_body)
@@ -1168,7 +1168,7 @@ def cmd_test(args, base_url, token):
     else:
         _check_status(status, resp)
         if not args.json and isinstance(resp, dict):
-            print(_dim(f"started {resp.get('mode', args.mode)} (filter={resp.get('filter', 'all')})"))
+            print(_dim(f"started {resp.get('mode', args.test_mode)} (filter={resp.get('filter', 'all')})"))
 
     if args.no_wait:
         if args.json:
@@ -1510,7 +1510,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("scenarios", help="登録シナリオの一覧")
 
     sp = sub.add_parser("test", help="Unity Test Runner を起動して結果を待つ (編集時専用)")
-    sp.add_argument("mode", choices=("playmode", "editmode", "result"),
+    # dest は test_mode。位置引数を "mode" にするとグローバル --mode (editor/runtime) を
+    # 上書きしてポート解決が壊れるため衝突させない。
+    sp.add_argument("test_mode", metavar="mode", choices=("playmode", "editmode", "result"),
                     help="playmode / editmode で実行を開始し完了まで待機。result で現在の結果のみ取得")
     sp.add_argument("--filter", help="テスト full name の正規表現で絞り込み (省略で全件)")
     sp.add_argument("--timeout", type=float, default=600.0, help="完了待ちのタイムアウト秒 (既定 600)")

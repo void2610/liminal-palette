@@ -63,7 +63,17 @@ liminal run 'Battle/**'
 
 # JUnit XML レポート (CI 向け)
 liminal run 'Battle/**' --report reports/liminal.xml
+
+# Unity Test Runner (編集時専用) — start して完了まで polling
+liminal test playmode
+liminal test editmode --filter 'MyGame.Tests.CombatTests'
+
+# 開始だけして待たない / 現在の結果だけ取得
+liminal test playmode --no-wait
+liminal test result
 ```
+
+`liminal test` は専用エンドポイント (`/api/v1/tests/run`, `/api/v1/tests/result`) を叩く。`exec` 経由のコマンドではなく、enterPlayModeOptions を書き換えずに Unity Test Runner を起動するため `ProjectSettings/EditorSettings.asset` の churn が出ない。`com.unity.test-framework` 未導入の場合は `501`。完了して `Passed` なら exit code 0、それ以外は 2。
 
 ## グローバルオプション
 
@@ -145,7 +155,7 @@ liminal --mode runtime state   # Play Mode 側を叩く
 |---|---|
 | 0 | 成功 |
 | 1 | HTTP / ネットワークエラー、トークン未設定 等の使用エラー |
-| 2 | コマンド実行は届いたが `success: false` (`exec` / `run`)。glob `run` の場合は **1 つでも失敗すれば 2** |
+| 2 | コマンド実行は届いたが `success: false` (`exec` / `run`)。glob `run` の場合は **1 つでも失敗すれば 2**。`test` は完了結果が `Passed` 以外なら 2 |
 
 ## シナリオ glob と JUnit レポート
 

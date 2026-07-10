@@ -12,6 +12,8 @@
 #   liminal state [Player/Health]
 #   liminal scenarios
 #   liminal run Combat/EnemyTakesDamage
+#   liminal test playmode [--filter Regex]
+#   liminal test result
 #   liminal project show
 #   liminal project set-port [--runtime] 7613
 #   liminal project unset-port [--runtime]
@@ -29,6 +31,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -94,6 +97,10 @@ def _request(method: str, url: str, token: str | None, body: dict | None = None,
         return e.code, _try_json(raw)
     except urllib.error.URLError as e:
         raise ApiError(0, str(e.reason), url) from e
+    except TimeoutError as e:
+        # EditMode テストはメインスレッドを占有し MainThreadDispatcher 越しの応答が返らず read timeout する。
+        # polling 側が ApiError として握って継続できるよう URLError と同じ扱いにする。
+        raise ApiError(0, f"timeout: {e}", url) from e
 
 
 def _try_json(raw: str):
@@ -1136,6 +1143,96 @@ def cmd_scenarios(args, base_url, token):
     print(_dim(f"\n  total: {len(scenarios)}"))
 
 
+def cmd_test(args, base_url, token):
+    """Unity Test Runner を start → 完了まで polling する (編集時専用)。
+    `liminal test result` は現在の結果だけを 1 回取得する。
+    exit code: 完了して Passed → 0、それ以外 (Failed 等) → 2。
+    """
+    if args.test_mode == "result":
+        status, body = _request("GET", f"{base_url}/api/v1/tests/result", token)
+        _check_status(status, body)
+        _emit_test_status(args, body)
+        sys.exit(_test_exit_code(body))
+
+    # 実行開始
+    req_body = {"mode": args.test_mode}
+    if args.filter:
+        req_body["filter"] = args.filter
+    status, resp = _request("POST", f"{base_url}/api/v1/tests/run", token, req_body)
+    if status == 409:
+        # 既に実行中。--no-wait なら諦め、待機モードなら進行中のランを polling する。
+        if args.no_wait:
+            if args.json:
+                _emit_json(resp)
+            else:
+                print(_yellow("既にテスト実行中です (liminal test result で状況を確認できます)"))
+            sys.exit(2)
+        if not args.json:
+            print(_yellow("既にテスト実行中 → 進行中のランを polling します"))
+    else:
+        _check_status(status, resp)
+        if not args.json and isinstance(resp, dict):
+            print(_dim(f"started {resp.get('mode', args.test_mode)} (filter={resp.get('filter', 'all')})"))
+
+    if args.no_wait:
+        if args.json:
+            _emit_json(resp)
+        return
+
+    # 完了まで polling。PlayMode テストは DomainReload でサーバーが一時的に落ちる (接続エラー) ため、
+    # 接続失敗はタイムアウトまで握って継続する。
+    deadline = time.monotonic() + args.timeout
+    while True:
+        time.sleep(args.interval)
+        try:
+            s, b = _request("GET", f"{base_url}/api/v1/tests/result", token)
+        except ApiError:
+            if time.monotonic() > deadline:
+                raise SystemExit(_red(f"timeout ({args.timeout}s): 結果取得中に接続できませんでした"))
+            continue
+        if s != 200:
+            _check_status(s, b)
+        state = b.get("state") if isinstance(b, dict) else None
+        if state == "completed":
+            _emit_test_status(args, b)
+            sys.exit(_test_exit_code(b))
+        if time.monotonic() > deadline:
+            raise SystemExit(_red(f"timeout ({args.timeout}s) — 最後の状態: {state or '?'}"))
+
+
+def _emit_test_status(args, body) -> None:
+    if args.json:
+        _emit_json(body)
+        return
+    if not isinstance(body, dict):
+        print(str(body))
+        return
+    state = body.get("state")
+    if state == "idle":
+        print(_dim("(まだテストを実行していません)"))
+        return
+    if state == "running":
+        print(f"{_yellow('running')}  {body.get('mode', '?')}")
+        return
+    result = body.get("result", "?")
+    ok = result == "Passed"
+    head = _green("PASS") if ok else _red("FAIL")
+    dur = body.get("durationSeconds")
+    print(f"{head}  {result}  [{body.get('mode', '?')}]  ({dur}s)")
+    failed = body.get("failed", 0)
+    print(f"  passed       : {body.get('passed')}")
+    print(f"  failed       : {_red(str(failed)) if failed else failed}")
+    print(f"  skipped      : {body.get('skipped')}")
+    print(f"  inconclusive : {body.get('inconclusive')}")
+
+
+def _test_exit_code(body) -> int:
+    """完了して Passed のときだけ 0。Failed 等は 2。running / idle は 0 (失敗ではない)。"""
+    if isinstance(body, dict) and body.get("state") == "completed":
+        return 0 if body.get("result") == "Passed" else 2
+    return 0
+
+
 def cmd_run(args, base_url, token):
     # ad-hoc (--steps) を最優先で処理。path との併用はドキュメント上排他なのでエラーで弾く。
     if args.steps is not None:
@@ -1416,6 +1513,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("scenarios", help="登録シナリオの一覧")
 
+    sp = sub.add_parser("test", help="Unity Test Runner を起動して結果を待つ (編集時専用)")
+    # dest は test_mode。位置引数を "mode" にするとグローバル --mode (editor/runtime) を
+    # 上書きしてポート解決が壊れるため衝突させない。
+    sp.add_argument("test_mode", metavar="mode", choices=("playmode", "editmode", "result"),
+                    help="playmode / editmode で実行を開始し完了まで待機。result で現在の結果のみ取得")
+    sp.add_argument("--filter", help="テスト full name の正規表現で絞り込み (省略で全件)")
+    sp.add_argument("--timeout", type=float, default=600.0, help="完了待ちのタイムアウト秒 (既定 600)")
+    sp.add_argument("--interval", type=float, default=1.0, help="結果 polling の間隔秒 (既定 1.0)")
+    sp.add_argument("--no-wait", action="store_true", help="実行を開始するだけで完了を待たない")
+
     sp = sub.add_parser("run", help="シナリオ実行 (named / glob / ad-hoc)")
     sp.add_argument("path", nargs="?", help="シナリオパス (例: Combat/EnemyTakesDamage)。glob (例: 'Battle/*') で複数実行も可。--steps 使用時は省略")
     sp.add_argument("--steps", metavar="FILE_OR_DASH", help="ad-hoc: '-' で stdin、それ以外はファイルから JSON を読む")
@@ -1458,6 +1565,7 @@ def main() -> None:
         "state": cmd_state,
         "scenarios": cmd_scenarios,
         "run": cmd_run,
+        "test": cmd_test,
     }
     handler = handlers[args.command]
     try:

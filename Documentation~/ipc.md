@@ -351,6 +351,60 @@ GET /api/v1/state
 
 詳細: [scenarios.md](scenarios.md)
 
+### `POST /api/v1/tests/run` (認証必須、**編集時専用**)
+
+Unity Test Runner を起動する専用エンドポイント (コマンド経由ではない)。即リターンし、結果は
+`GET /api/v1/tests/result` を polling して取得する。enterPlayModeOptions を一切書き換えないため、
+外部 MCP ブリッジ (uLoopMCP 等) の run-tests のように `ProjectSettings/EditorSettings.asset` を
+汚す git churn を起こさない。
+
+実装 (`TestRunnerApi`) は `com.unity.test-framework` 導入時のみコンパイルされる独立サブ asmdef
+(`Void2610.LiminalPalette.Editor.TestRunner`) に隔離される。未導入 / Runtime (Play Mode / Player)
+では両エンドポイントは `501` を返す。
+
+**Request**:
+```json
+{"mode": "playmode", "filter": "MyGame.Tests.CombatTests"}
+```
+
+| フィールド | 必須 | 説明 |
+|---|---|---|
+| `mode` | ✓ | `"playmode"` または `"editmode"` (大文字小文字無視) |
+| `filter` | | テスト full name の正規表現 (省略 / 空で全件) |
+
+**Response 200** (受理):
+```json
+{"status": "started", "mode": "PlayMode", "filter": "all"}
+```
+
+**ステータスコード**:
+- `200 OK` — 実行を開始 (完了は待たない)
+- `400 BadRequest` — `mode` 欠落 / 不正、body 文法エラー
+- `409 Conflict` — 前回の実行が未完了 (`{"status":"running"}`)
+- `429 Too Many Requests` — レートリミット (`/execute` と共通の制限)
+- `501 Not Implemented` — `com.unity.test-framework` 未導入 (Test Runner が使えない)
+
+### `GET /api/v1/tests/result` (認証必須、**編集時専用**)
+
+直近の `POST /api/v1/tests/run` の結果を返す。結果は `SessionState` に保存されるため、
+PlayMode テストの DomainReload を跨いでも polling で取得できる。
+
+**Response 200** (いずれか):
+```json
+{"state": "idle"}
+{"state": "running", "mode": "PlayMode"}
+{"state": "completed", "result": "Passed", "mode": "PlayMode",
+ "passed": 12, "failed": 0, "skipped": 1, "inconclusive": 0, "durationSeconds": 3.5}
+```
+
+| `state` | 説明 |
+|---|---|
+| `idle` | 未実行 (結果なし) |
+| `running` | 実行中 |
+| `completed` | 完了。`result` は `Passed` / `Failed` / `Inconclusive` / `Skipped` |
+
+CLI からは `liminal test playmode [--filter Regex]` で start → 完了まで polling できる。
+
 ### curl 例
 
 ```bash

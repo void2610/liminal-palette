@@ -1,8 +1,9 @@
 {
     "name": "Void2610.LiminalPalette.Editor.TestRunner",
-    "rootNamespace": "Void2610.LiminalPalette.Editor",
+    "rootNamespace": "Void2610.LiminalPalette.Editor.TestRunning",
     "references": [
         "Void2610.LiminalPalette",
+        "Void2610.LiminalPalette.Ipc",
         "UnityEditor.TestRunner",
         "UnityEngine.TestRunner"
     ],

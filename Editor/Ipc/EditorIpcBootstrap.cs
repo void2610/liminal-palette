@@ -70,6 +70,10 @@ namespace Void2610.LiminalPalette.Editor.Ipc
             router.Register("GET", "/api/v1/state", new GetStateEndpoint());
             router.Register("GET", "/api/v1/scenarios", new ListScenariosEndpoint());
             router.Register("POST", "/api/v1/scenarios/run", new RunScenarioEndpoint());
+            // テスト実行は編集時専用。実装 (TestRunnerApi) は com.unity.test-framework 導入時のみ
+            // TestRunnerBridge に登録され、未導入なら両エンドポイントは 501 を返す。
+            router.Register("POST", "/api/v1/tests/run", new RunTestsEndpoint());
+            router.Register("GET", "/api/v1/tests/result", new TestResultEndpoint());
 
             // プロジェクト固有の preferred port があればそれを起点にする (複数 Unity プロジェクト同時起動対応)。
             // 未指定なら IpcSettings.DefaultPort にフォールバック。HttpServer 側で衝突時は隣接ポートに retry する。

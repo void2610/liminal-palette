@@ -97,6 +97,10 @@ def _request(method: str, url: str, token: str | None, body: dict | None = None,
         return e.code, _try_json(raw)
     except urllib.error.URLError as e:
         raise ApiError(0, str(e.reason), url) from e
+    except TimeoutError as e:
+        # EditMode テストはメインスレッドを占有し MainThreadDispatcher 越しの応答が返らず read timeout する。
+        # polling 側が ApiError として握って継続できるよう URLError と同じ扱いにする。
+        raise ApiError(0, f"timeout: {e}", url) from e
 
 
 def _try_json(raw: str):

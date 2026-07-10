@@ -20,6 +20,8 @@ namespace Void2610.LiminalPalette.Tests
         {
             public int CallCount;
             public bool ShouldFail;
+            // CallCount がこの値未満の間は instance 未解決失敗を返す (LoadScene 直後の DI 未構築を模擬)
+            public int UnresolvedUntilCall;
 
             public Task<CommandResult> ExecuteAsync(string pathOrAlias, IReadOnlyDictionary<string, string> args, CancellationToken ct = default)
                 => Task.FromResult(BuildResult());
@@ -34,9 +36,15 @@ namespace Void2610.LiminalPalette.Tests
             }
 
             private CommandResult BuildResult()
-                => ShouldFail
+            {
+                if (CallCount < UnresolvedUntilCall)
+                    return CommandResult.Fail("Instance not resolved for Fake",
+                        new InstanceUnresolvedException("Instance not resolved for Fake"),
+                        System.Array.Empty<LogEntry>(), System.TimeSpan.Zero);
+                return ShouldFail
                     ? CommandResult.Fail("simulated failure", null, System.Array.Empty<LogEntry>(), System.TimeSpan.Zero)
                     : CommandResult.Ok(null, System.Array.Empty<LogEntry>(), System.TimeSpan.Zero);
+            }
         }
 
         private sealed class FakeFrameWaiter : IFrameWaiter
@@ -124,6 +132,19 @@ namespace Void2610.LiminalPalette.Tests
             Assert.AreEqual(1, result.Steps.Count, "fail-fast: 2 件目は実行されない");
             Assert.AreEqual(0, result.FailedAtStep);
             Assert.AreEqual(1, ce.CallCount);
+        }
+
+        [Test]
+        public async Task Execute_CommandInstanceUnresolved_RetriesUntilResolved()
+        {
+            // LoadScene 直後の DI 構築レースを模擬: 3 回目の呼び出しで instance が解決される
+            var ce = new FakeCommandExecutor { UnresolvedUntilCall = 3 };
+            var fw = new FakeFrameWaiter();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(new[] { ScenarioStep.Run("Foo/Bar") }, "test", CancellationToken.None);
+            Assert.IsTrue(result.Success, "未解決が解消したら成功する");
+            Assert.AreEqual(3, ce.CallCount, "解決するまでリトライする");
+            Assert.AreEqual(2, fw.CallCount, "リトライ間はフレーム待ちする");
         }
 
         // ------------------------------------------------------------
@@ -373,6 +394,58 @@ namespace Void2610.LiminalPalette.Tests
                 null, CancellationToken.None);
             Assert.IsFalse(result.Success);
             StringAssert.Contains("command", result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_PassesWhenCommandReachesExpected()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "wait" };
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n >= 3) ce.ReturnValue = "ready"; } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
+            Assert.GreaterOrEqual(fw.CallCount, 3, "一致前に複数回ポーリングしているはず");
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_TimesOut_Fails()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "never" };
+            var cts = new CancellationTokenSource();
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n > 1_000_000) cts.Cancel(); } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 0.05f) },
+                null, cts.Token);
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains("not satisfied within", result.Steps[0].Error);
+            StringAssert.Contains("ready", result.Steps[0].Error);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_NullExpected_PassesWhenSucceeds()
+        {
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "whatever" };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: null, timeoutSeconds: 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success);
+        }
+
+        [Test]
+        public async Task Execute_AssertCommandEventually_KeepsPollingWhileCommandFails_ThenSucceeds()
+        {
+            // AssertCommandReturns と異なり、コマンド失敗を即 fail にせずポーリング継続する契約を守っているか。
+            var ce = new FakeCommandExecutorWithValue { ShouldFail = true, ReturnValue = "ready" };
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n >= 2) ce.ShouldFail = false; } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 5f) },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
         }
 
         [Test]

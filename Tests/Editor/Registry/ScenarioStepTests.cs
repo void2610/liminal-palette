@@ -152,5 +152,42 @@ namespace Void2610.LiminalPalette.Tests
             Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertCommandReturns(""));
             Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertCommandReturns(null));
         }
+
+        [Test]
+        public void AssertCommandEventually_BuildsStep()
+        {
+            var step = ScenarioStep.AssertCommandEventually(
+                "Foo/Bar",
+                new Dictionary<string, object> { ["x"] = 1 },
+                expected: "ok",
+                timeoutSeconds: 3f,
+                description: "test");
+            Assert.AreEqual(ScenarioStepKind.AssertCommandEventually, step.Kind);
+            Assert.AreEqual("test", step.Description);
+            var s = (AssertCommandEventuallyStep)step;
+            Assert.AreEqual("Foo/Bar", s.CommandPath);
+            Assert.AreEqual("ok", s.Expected);
+            Assert.AreEqual(3f, s.TimeoutSeconds);
+            Assert.AreEqual(1, s.Args["x"]);
+        }
+
+        [Test]
+        public void AssertCommandEventually_NullExpected_Allowed()
+        {
+            var step = (AssertCommandEventuallyStep)ScenarioStep.AssertCommandEventually("Foo/Bar");
+            Assert.IsNull(step.Expected);
+            Assert.AreEqual(0, step.Args.Count);
+        }
+
+        [Test]
+        public void AssertCommandEventually_RejectsEmptyPathAndNonPositiveTimeout()
+        {
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertCommandEventually(""));
+            Assert.Throws<System.ArgumentException>(() => ScenarioStep.AssertCommandEventually(null));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: 0f));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: -1f));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: float.NaN));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: float.PositiveInfinity));
+        }
     }
 }

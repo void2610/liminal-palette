@@ -24,7 +24,11 @@ namespace Void2610.LiminalPalette.Runtime
         // SubsystemRegistration は Reload Domain off の Play Mode 開始でも必ず呼ばれる。
         // LiminalPaletteRuntime と同じ理由で static フィールドをリセットする。
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => _instance = null;
+        private static void ResetStatics()
+        {
+            _instance = null;
+            _suppressCount = 0;
+        }
 
         private UIDocument _document;
         private PanelSettings _panelSettings;
@@ -46,6 +50,31 @@ namespace Void2610.LiminalPalette.Runtime
 
         // 表示状態。実行中だけ true。OnDestroy で event を確実に解除するためのフラグも兼ねる。
         private bool _eventsSubscribed;
+
+        // 表示要求と抑制を分離して持つ。スクリーンショット等で一時的に隠しても、解除時に走行中表示へ復帰できる
+        private bool _visibleRequested;
+        private static int _suppressCount;
+
+        /// <summary>スクリーンショット撮影等でオーバーレイの写り込みを防ぐ抑制スコープ。多重呼び出しはカウントで合成する</summary>
+        public static IDisposable Suppress()
+        {
+            _suppressCount++;
+            _instance?.ApplyVisibility();
+            return new SuppressScope();
+        }
+
+        private sealed class SuppressScope : IDisposable
+        {
+            private bool _disposed;
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _suppressCount = Mathf.Max(0, _suppressCount - 1);
+                _instance?.ApplyVisibility();
+            }
+        }
 
         private void Awake()
         {
@@ -266,12 +295,19 @@ namespace Void2610.LiminalPalette.Runtime
 
         private void ShowOverlay()
         {
-            if (_root != null) _root.style.display = DisplayStyle.Flex;
+            _visibleRequested = true;
+            ApplyVisibility();
         }
 
         private void HideOverlay()
         {
-            if (_root != null) _root.style.display = DisplayStyle.None;
+            _visibleRequested = false;
+            ApplyVisibility();
+        }
+
+        private void ApplyVisibility()
+        {
+            if (_root != null) _root.style.display = _visibleRequested && _suppressCount == 0 ? DisplayStyle.Flex : DisplayStyle.None;
         }
     }
 }

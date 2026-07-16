@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Void2610.LiminalPalette.UI
+namespace Void2610.LiminalPalette
 {
     /// <summary>
     /// パレット経由で実行されたコマンド 1 回分の不変記録。

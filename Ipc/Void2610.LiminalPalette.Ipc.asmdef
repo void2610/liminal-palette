@@ -2,8 +2,7 @@
     "name": "Void2610.LiminalPalette.Ipc",
     "rootNamespace": "Void2610.LiminalPalette.Ipc",
     "references": [
-        "Void2610.LiminalPalette",
-        "Void2610.LiminalPalette.UI"
+        "Void2610.LiminalPalette"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

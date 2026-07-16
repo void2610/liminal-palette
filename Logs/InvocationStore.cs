@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Void2610.LiminalPalette.UI
+namespace Void2610.LiminalPalette
 {
     /// <summary>
     /// パレット経由で行われたコマンド実行の履歴を保持するシングルトン。

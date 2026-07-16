@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Void2610.LiminalPalette.Ipc.Json;
 using Void2610.LiminalPalette.Ipc.Server;
 using Void2610.LiminalPalette.Ipc.Threading;
-using Void2610.LiminalPalette.UI;
+using Void2610.LiminalPalette;
 
 namespace Void2610.LiminalPalette.Ipc.Endpoints
 {

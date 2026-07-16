@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using Void2610.LiminalPalette;
-using Void2610.LiminalPalette.UI;
 
 namespace Void2610.LiminalPalette.Ipc.Json
 {

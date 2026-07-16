@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Void2610.LiminalPalette.UI;
+using Void2610.LiminalPalette;
 
 namespace Void2610.LiminalPalette.Tests.UI
 {

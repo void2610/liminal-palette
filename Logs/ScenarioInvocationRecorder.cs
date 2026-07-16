@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Void2610.LiminalPalette.UI
+namespace Void2610.LiminalPalette
 {
     /// <summary>
     /// ScenarioResult を <see cref="InvocationStore"/> に書き出す薄いヘルパ。

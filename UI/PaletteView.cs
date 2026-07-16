@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Void2610.LiminalPalette;
 
-Void2610.LiminalPalette.UI
+namespace Void2610.LiminalPalette.UI
 {
     /// <summary>
     /// パレット本体の VisualElement。Editor / Runtime の双方でホスト先 (rootVisualElement / UIDocument) に追加して使う。

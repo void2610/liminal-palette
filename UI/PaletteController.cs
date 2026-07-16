@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Void2610.LiminalPalette;
 
-Void2610.LiminalPalette.UI
+namespace Void2610.LiminalPalette.UI
 {
     /// <summary>
     /// パレットの状態管理ロジック。UI から独立しているため EditMode テストで挙動を網羅できる。

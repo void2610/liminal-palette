@@ -13,8 +13,12 @@ namespace Void2610.LiminalPalette.Ipc.Auth
     /// </summary>
     public static class TokenStore
     {
+        // テストが実ユーザーのトークンを消さないよう、テスト時のみ保存先を差し替えられる
+        internal static string OverrideDirectoryForTest;
+
         public static string TokenDirectoryPath
-            => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".liminal-palette");
+            => OverrideDirectoryForTest
+               ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".liminal-palette");
 
         public static string TokenFilePath => Path.Combine(TokenDirectoryPath, "token");
 

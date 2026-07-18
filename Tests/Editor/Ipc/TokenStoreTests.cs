@@ -5,16 +5,24 @@ using Void2610.LiminalPalette.Ipc.Auth;
 namespace Void2610.LiminalPalette.Tests.Ipc
 {
     /// <summary>
-    /// TokenStore の単体テスト。実ファイルシステムに ~/.liminal-palette/token を作る経路なので、
-    /// 各テスト前後で必ず DeleteForTest して残骸を消す。
+    /// TokenStore の単体テスト。保存先を一時ディレクトリへ差し替えて実ユーザーのトークンに触れずに検証する。
     /// </summary>
     public sealed class TokenStoreTests
     {
         [SetUp]
-        public void SetUp() => TokenStore.DeleteForTest();
+        public void SetUp()
+        {
+            // 実ユーザーの ~/.liminal-palette/token を消さないよう一時ディレクトリへ差し替える
+            TokenStore.OverrideDirectoryForTest =
+                Path.Combine(Path.GetTempPath(), "lp-token-test-" + System.Guid.NewGuid().ToString("N"));
+        }
 
         [TearDown]
-        public void TearDown() => TokenStore.DeleteForTest();
+        public void TearDown()
+        {
+            TokenStore.DeleteForTest();
+            TokenStore.OverrideDirectoryForTest = null;
+        }
 
         [Test]
         public void LoadOrCreate_FirstCall_CreatesFile_AndReturnsToken()

@@ -29,6 +29,9 @@ namespace Void2610.LiminalPalette.Editor.Ipc
             {
                 if (!IpcSettings.EnableInEditor) return;
 
+                // AssetImportWorker が本体と同じ固定ポートを先取りし CLI が応答不能プロセスへ繋がるのを防ぐ
+                if (AssetDatabase.IsAssetImportWorkerProcess()) return;
+
                 // メインスレッド ID を Editor のメインスレッドとして登録。
                 MainThreadDispatcher.RegisterMainThread(Thread.CurrentThread.ManagedThreadId);
                 EditorApplication.update -= OnEditorUpdate; // 二重登録防止

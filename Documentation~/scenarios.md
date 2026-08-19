@@ -71,6 +71,30 @@ public static class CombatScenarios
 
 自動挿入されるステップの順序は、実ロード時が `LoadScene` → `ReadyWhen` → `Setup` → 本体、`ReuseScene` でロードを省略した時が `Setup` → `ReadyWhen` → 本体 (前シナリオの終了状態では `ReadyWhen` が成立しないため、先に `Setup` で既知の状態へ戻してから待つ)。`ReuseScene = true, Setup = "Run/StartNew"` のように組み合わせると、シーンを毎回ロードし直さずにゲーム側の初期化コマンドだけで各シナリオを既知の状態から始められる。
 
+### プリセット派生属性
+
+`LiminalScenarioAttribute` は継承できるため、多くのシナリオで同じプロパティを繰り返す場合は、
+コンストラクタで既定値を固定した派生属性をプロジェクト側で定義するとボイラープレートが消える
+(`ScenarioScanner` は基底型で属性を取得するので、派生属性もそのまま拾われる):
+
+```csharp
+// プロジェクト側で 1 回だけ定義
+public sealed class MainSceneScenarioAttribute : LiminalScenarioAttribute
+{
+    public MainSceneScenarioAttribute(string path) : base(path)
+    {
+        Scene = "MainScene";
+        ReadyWhen = "Game/State=WorldMap";
+        ReuseScene = true;
+        Setup = "Run/StartNew";
+    }
+}
+
+// 各シナリオはプリセット属性 1 行で済む
+[MainSceneScenario("Combat/EnemyTakesDamage")]
+public static IEnumerable<ScenarioStep> EnemyTakesDamage() { /* ... */ }
+```
+
 > **Note**: Production 除外はビルド単位の防御層 (asmdef defineConstraints + `ProductionGuard` + `LIMINAL_PALETTE_DISABLED` define) で行う。個別シナリオだけ除外したい場合は `#if DEVELOPMENT_BUILD` 等で対応する。
 
 ---

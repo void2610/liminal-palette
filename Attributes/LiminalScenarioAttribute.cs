@@ -8,9 +8,14 @@ namespace Void2610.LiminalPalette
     /// IEnumerable&lt;ScenarioStep&gt; もしくはそれを実装するコレクション)。
     ///
     /// インスタンスメソッドの場合は VContainer 経由で解決される (<see cref="LiminalCommandAttribute"/> と同じ流儀)。
+    ///
+    /// 継承してプロジェクト固有のプリセット属性を定義できる。コンストラクタで
+    /// <see cref="Scene"/> / <see cref="ReadyWhen"/> / <see cref="ReuseScene"/> / <see cref="Setup"/> 等の
+    /// 既定値を設定した派生クラスを作れば、全シナリオで同じプロパティを繰り返すボイラープレートが消える
+    /// (ScenarioScanner は基底型でこの属性を取得するため、派生属性もそのまま拾われる)。
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-    public sealed class LiminalScenarioAttribute : Attribute
+    public class LiminalScenarioAttribute : Attribute
     {
         /// <summary>シナリオの識別子。"/" 区切りで階層を表現する (例: "Combat/EnemyTakesDamage")。</summary>
         public string Path { get; }

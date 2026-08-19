@@ -501,6 +501,106 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public async Task ExecuteByPath_Setup_RunsAfterReadyWhenAndBeforeBody()
+        {
+            // Setup は ReadyWhen (条件成立) の後・本体の前に 1 回だけ Run される。
+            var registry = new ScenarioRegistry();
+            registry.Register(new ScenarioDescriptor(
+                path: "TestScenario/WithSetup",
+                description: "",
+                declaringType: null,
+                method: null,
+                isStatic: true,
+                stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                readyWhen: "ScenarioTest/Hp=100",
+                setup: "Test/Setup"));
+
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var result = await ex.ExecuteAsync(registry, "TestScenario/WithSetup", CancellationToken.None);
+
+            Assert.IsTrue(result.Success, result.Success ? null : result.Steps[result.FailedAtStep].Error);
+            Assert.AreEqual(3, result.Steps.Count, "AssertEventually + Setup + 本体 Run の 3 ステップ");
+            Assert.AreEqual(ScenarioStepKind.AssertEventually, result.Steps[0].Step.Kind);
+            Assert.AreEqual(ScenarioStepKind.Command, result.Steps[1].Step.Kind);
+            Assert.AreEqual("Test/Setup", ((CommandStep)result.Steps[1].Step).CommandPath, "Setup が本体より先に実行される");
+            Assert.AreEqual(2, ce.CallCount, "Setup と本体で Run が 2 回呼ばれる");
+        }
+
+        [Test]
+        public async Task ExecuteByPath_ReuseScene_SkipsLoadAndRunsSetupBeforeReadyWhen()
+        {
+            // Scene が既にアクティブ (SceneHook で偽装) なら LoadScene を省略し、Setup → ReadyWhen → 本体の順になる。
+            ScenarioExecutor.SceneHook.GetActiveSceneName = () => "MyScene";
+            try
+            {
+                var registry = new ScenarioRegistry();
+                registry.Register(new ScenarioDescriptor(
+                    path: "TestScenario/Reuse",
+                    description: "",
+                    declaringType: null,
+                    method: null,
+                    isStatic: true,
+                    stepsFactory: _ => new[] { ScenarioStep.Run("Test/NoArg") },
+                    scene: "MyScene",
+                    readyWhen: "ScenarioTest/Hp=100",
+                    reuseScene: true,
+                    setup: "Test/Setup"));
+
+                var ce = new FakeCommandExecutor();
+                var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+                var result = await ex.ExecuteAsync(registry, "TestScenario/Reuse", CancellationToken.None);
+
+                Assert.IsTrue(result.Success, result.Success ? null : result.Steps[result.FailedAtStep].Error);
+                Assert.AreEqual(3, result.Steps.Count, "Setup + AssertEventually + 本体 Run (LoadScene は省略)");
+                Assert.AreEqual("Test/Setup", ((CommandStep)result.Steps[0].Step).CommandPath, "再利用時は Setup が先");
+                Assert.AreEqual(ScenarioStepKind.AssertEventually, result.Steps[1].Step.Kind);
+                Assert.AreEqual(2, ce.CallCount);
+
+                // 別シーンがアクティブなら再利用せず、先頭に LoadScene が入る (EditMode では PlayMode 専用エラーで止まる)
+                ScenarioExecutor.SceneHook.GetActiveSceneName = () => "OtherScene";
+                var loaded = await ex.ExecuteAsync(registry, "TestScenario/Reuse", CancellationToken.None);
+                Assert.IsFalse(loaded.Success);
+                Assert.AreEqual(ScenarioStepKind.LoadScene, loaded.Steps[0].Step.Kind);
+            }
+            finally
+            {
+                ScenarioExecutor.SceneHook.ResetToDefault();
+            }
+        }
+
+        [Test]
+        public async Task Execute_LoadScene_SkipsWhenSceneAlreadyActiveAndSkipIfActive()
+        {
+            // skipIfActive=true で既にアクティブなシーン名なら、EditMode でもロードせず成功扱いになる
+            // (PlayMode 専用エラーより先に判定される)。アクティブシーン名は SceneHook で差し替える。
+            ScenarioExecutor.SceneHook.GetActiveSceneName = () => "ActiveScene";
+            try
+            {
+                var ce = new FakeCommandExecutor();
+                var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+                var result = await ex.ExecuteAsync(
+                    new[] { ScenarioStep.LoadScene("ActiveScene", skipIfActive: true), ScenarioStep.Run("Test/NoArg") },
+                    null, CancellationToken.None);
+
+                Assert.IsTrue(result.Success, result.Success ? null : result.Steps[result.FailedAtStep].Error);
+                Assert.AreEqual(ScenarioStepKind.LoadScene, result.Steps[0].Step.Kind);
+                Assert.AreEqual(1, ce.CallCount, "ロード省略後に本体 Run が呼ばれる");
+
+                // 別のシーンがアクティブなら省略されず、EditMode では PlayMode 専用エラーで失敗する
+                var other = await ex.ExecuteAsync(
+                    new[] { ScenarioStep.LoadScene("OtherScene", skipIfActive: true) },
+                    null, CancellationToken.None);
+                Assert.IsFalse(other.Success);
+                StringAssert.Contains("PlayMode", other.Steps[0].Error);
+            }
+            finally
+            {
+                ScenarioExecutor.SceneHook.ResetToDefault();
+            }
+        }
+
+        [Test]
         public async Task ExecuteByPath_InvalidReadyWhen_FailsWithoutRunningBody()
         {
             // '=' を含まない ReadyWhen は構成エラーとしてステップ実行前に失敗する。

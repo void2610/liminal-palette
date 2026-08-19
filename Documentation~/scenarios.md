@@ -63,6 +63,13 @@ public static class CombatScenarios
 |---|---|---|---|
 | `Path` | `string` | ✅ | "/" 区切り。Command と同じバリデーション (空・先頭/末尾 `/` 不可) |
 | `Description` | `string` | — | UI / `/api/v1/scenarios` で表示される説明文 |
+| `Scene` | `string` | — | 指定するとシナリオ本体の前に `SceneManager.LoadSceneAsync(Scene, Single)` を自動挿入する (PlayMode 専用) |
+| `ReuseScene` | `bool` | — | `Scene` が既にアクティブなら LoadScene を省略する。前のシナリオの状態が残るので `Setup` で初期化する前提 |
+| `ReadyWhen` | `string` | — | `"観測パス=期待値"`。Scene ロード後に `AssertEventually` を自動挿入し、成立まで本体を待つ |
+| `Setup` | `string` | — | `ReadyWhen` 成立後・本体の前に引数なしで実行するコマンド path (例: `"Run/StartNew"`) |
+| `TimeScale` | `float` | — | 0 より大きければ実行中だけ `Time.timeScale` を上書きし、終了時に必ず復元する |
+
+自動挿入されるステップの順序は、実ロード時が `LoadScene` → `ReadyWhen` → `Setup` → 本体、`ReuseScene` でロードを省略した時が `Setup` → `ReadyWhen` → 本体 (前シナリオの終了状態では `ReadyWhen` が成立しないため、先に `Setup` で既知の状態へ戻してから待つ)。`ReuseScene = true, Setup = "Run/StartNew"` のように組み合わせると、シーンを毎回ロードし直さずにゲーム側の初期化コマンドだけで各シナリオを既知の状態から始められる。
 
 > **Note**: Production 除外はビルド単位の防御層 (asmdef defineConstraints + `ProductionGuard` + `LIMINAL_PALETTE_DISABLED` define) で行う。個別シナリオだけ除外したい場合は `#if DEVELOPMENT_BUILD` 等で対応する。
 

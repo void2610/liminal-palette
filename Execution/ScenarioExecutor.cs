@@ -55,6 +55,7 @@ namespace Void2610.LiminalPalette
             ScenarioRunStepChanged = null;
             ScenarioRunFinished = null;
             TimeScaleHook.ResetToDefault();
+            SceneHook.ResetToDefault();
         }
 
         private readonly ICommandExecutor _commandExecutor;
@@ -154,13 +155,18 @@ namespace Void2610.LiminalPalette
                     // [LiminalScenario(Scene=...)] が付いていれば、本体ステップの前に LoadScene を差し込む。
                     // 利用側は EnterTestScene のような毎シナリオの定型コードを書かなくて済む。
                     // 復帰 (元シーンへ戻す) はしない仕様 — 最後にロードされたシーンがそのまま残る。
-                    if (!string.IsNullOrEmpty(descriptor.Scene))
-                    {
-                        stepList.Add(ScenarioStep.LoadScene(descriptor.Scene, $"auto: load {descriptor.Scene}"));
-                    }
+                    // ReuseScene=true で既にアクティブなら再ロードを省略し、代わりに Setup を先に走らせて既知の状態へ戻す
+                    // (前シナリオの終了状態では ReadyWhen が成立しないため、再利用時だけ Setup → ReadyWhen の順になる)。
+                    var reuseActiveScene = descriptor.ReuseScene
+                        && !string.IsNullOrEmpty(descriptor.Scene)
+                        && SceneHook.GetActiveSceneName() == descriptor.Scene;
+                    ScenarioStep setupStep = null;
+                    if (!string.IsNullOrEmpty(descriptor.Setup))
+                        setupStep = ScenarioStep.Run(descriptor.Setup, description: $"auto: setup {descriptor.Setup}");
+                    ScenarioStep readyStep = null;
                     if (!string.IsNullOrEmpty(descriptor.ReadyWhen))
                     {
-                        if (!TryParseReadyWhen(descriptor.ReadyWhen, out var readyStep, out var parseError))
+                        if (!TryParseReadyWhen(descriptor.ReadyWhen, out readyStep, out var parseError))
                         {
                             var step = ScenarioStep.Run("<n/a>");
                             return new ScenarioResult(
@@ -170,7 +176,20 @@ namespace Void2610.LiminalPalette
                                 failedAtStep: 0,
                                 path: scenarioPath);
                         }
-                        stepList.Add(readyStep);
+                    }
+
+                    if (reuseActiveScene)
+                    {
+                        if (setupStep != null) stepList.Add(setupStep);
+                        if (readyStep != null) stepList.Add(readyStep);
+                    }
+                    else
+                    {
+                        if (!string.IsNullOrEmpty(descriptor.Scene))
+                            stepList.Add(ScenarioStep.LoadScene(descriptor.Scene, $"auto: load {descriptor.Scene}"));
+                        // 実ロード時は準備完了 (ReadyWhen) を待ってから Setup を走らせる (DI 構築前にコマンドを叩かない)
+                        if (readyStep != null) stepList.Add(readyStep);
+                        if (setupStep != null) stepList.Add(setupStep);
                     }
                     foreach (var s in descriptor.StepsFactory(instance))
                     {
@@ -214,6 +233,14 @@ namespace Void2610.LiminalPalette
             {
                 _runLock.Release();
             }
+        }
+
+        /// <summary>LoadScene のスキップ判定が触る Unity API の差し替え点 (EditMode テストで検証するため)</summary>
+        internal static class SceneHook
+        {
+            public static Func<string> GetActiveSceneName = () => SceneManager.GetActiveScene().name;
+
+            public static void ResetToDefault() => GetActiveSceneName = () => SceneManager.GetActiveScene().name;
         }
 
         /// <summary>TimeScale wrap が触る Unity API の差し替え点 (EditMode テストで適用・復元を検証するため)</summary>
@@ -456,6 +483,10 @@ namespace Void2610.LiminalPalette
             // 既にキャンセル要求が来ている場合は LoadSceneAsync を呼ばずに伝搬する。
             // 呼んでしまうと「キャンセル後に意図しないシーン切替が発生」する問題を防ぐ。
             ct.ThrowIfCancellationRequested();
+
+            // 既に目的のシーンがアクティブなら再ロードしない (ReuseScene)。
+            if (step.SkipIfActive && SceneHook.GetActiveSceneName() == step.SceneName)
+                return StepResult.Ok(step);
 
             if (!Application.isPlaying)
                 return StepResult.Fail(step, "LoadScene step is only supported in PlayMode");

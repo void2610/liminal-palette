@@ -31,8 +31,14 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public string Scene { get; }
 
+        /// <summary>Scene が既にアクティブなら LoadScene を省略するか。詳細は <see cref="LiminalScenarioAttribute.ReuseScene"/> 参照。</summary>
+        public bool ReuseScene { get; }
+
         /// <summary>"観測パス=期待値" 形式の開始条件。詳細は <see cref="LiminalScenarioAttribute.ReadyWhen"/> 参照。</summary>
         public string ReadyWhen { get; }
+
+        /// <summary>ReadyWhen 成立後・本体前に実行するコマンド path。詳細は <see cref="LiminalScenarioAttribute.Setup"/> 参照。</summary>
+        public string Setup { get; }
 
         /// <summary>実行中の Time.timeScale 上書き値 (0 以下は未指定)。詳細は <see cref="LiminalScenarioAttribute.TimeScale"/> 参照。</summary>
         public float TimeScale { get; }
@@ -52,7 +58,9 @@ namespace Void2610.LiminalPalette
             Func<object, IEnumerable<ScenarioStep>> stepsFactory,
             string scene = "",
             string readyWhen = "",
-            float timeScale = 0f)
+            float timeScale = 0f,
+            bool reuseScene = false,
+            string setup = "")
         {
             Path = path;
             Description = description ?? "";
@@ -62,6 +70,8 @@ namespace Void2610.LiminalPalette
             Scene = scene ?? "";
             ReadyWhen = readyWhen ?? "";
             TimeScale = timeScale;
+            ReuseScene = reuseScene;
+            Setup = setup ?? "";
             StepsFactory = stepsFactory ?? throw new ArgumentNullException(nameof(stepsFactory));
         }
     }

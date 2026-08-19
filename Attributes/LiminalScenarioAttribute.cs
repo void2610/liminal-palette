@@ -26,8 +26,22 @@ namespace Void2610.LiminalPalette
         /// </summary>
         public string Scene { get; set; } = "";
 
+        /// <summary>
+        /// 任意。true にすると、<see cref="Scene"/> が既にアクティブなシーンなら LoadScene を省略する。
+        /// シーンの再ロードを毎回払わずに済む代わりに前のシナリオの状態が残るため、<see cref="Setup"/> で
+        /// ゲーム側の初期化コマンド (例: 新規ラン開始) を走らせて状態を戻す前提で使う。
+        /// </summary>
+        public bool ReuseScene { get; set; }
+
         /// <summary>任意。"観測パス=期待値" 形式 (例: "Game/State=WorldMap")。Scene ロード後に AssertEventually を自動挿入し、条件成立まで本体ステップの開始を遅延する。</summary>
         public string ReadyWhen { get; set; } = "";
+
+        /// <summary>
+        /// 任意。本体ステップの前に引数なしで実行するコマンド path (例: "Run/StartNew")。
+        /// 実ロード時は ReadyWhen 成立後、<see cref="ReuseScene"/> でロードを省略した時は ReadyWhen より先に走る
+        /// (前シナリオの終了状態では ReadyWhen が成立しないため)。シーンを使い回しつつ各シナリオを既知の状態から始めるための入口。
+        /// </summary>
+        public string Setup { get; set; } = "";
 
         /// <summary>任意。0 より大きければシナリオ実行中だけ Time.timeScale をこの値にし、終了時 (失敗・キャンセル含む) に必ず元の値へ復元する。</summary>
         public float TimeScale { get; set; }

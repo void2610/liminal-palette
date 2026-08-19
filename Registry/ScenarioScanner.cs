@@ -184,7 +184,9 @@ namespace Void2610.LiminalPalette
                 stepsFactory: factory,
                 scene: attr.Scene,
                 readyWhen: attr.ReadyWhen,
-                timeScale: attr.TimeScale);
+                timeScale: attr.TimeScale,
+                reuseScene: attr.ReuseScene,
+                setup: attr.Setup);
             return true;
         }
 

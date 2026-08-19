@@ -152,11 +152,11 @@ namespace Void2610.LiminalPalette
         /// 新シーンに登録された instance に解決される。
         /// PlayMode 専用 (Edit Mode では `Application.isPlaying == false` のためステップが失敗する)。
         /// </summary>
-        public static ScenarioStep LoadScene(string sceneName, string description = null)
+        public static ScenarioStep LoadScene(string sceneName, string description = null, bool skipIfActive = false)
         {
             if (string.IsNullOrEmpty(sceneName))
                 throw new ArgumentException("sceneName must not be null or empty", nameof(sceneName));
-            return new LoadSceneStep(sceneName, description);
+            return new LoadSceneStep(sceneName, description, skipIfActive);
         }
     }
 
@@ -271,10 +271,14 @@ namespace Void2610.LiminalPalette
     {
         public string SceneName { get; }
 
-        public LoadSceneStep(string sceneName, string description)
+        /// <summary>SceneName が既にアクティブなシーンならロードを省略して成功扱いにする。</summary>
+        public bool SkipIfActive { get; }
+
+        public LoadSceneStep(string sceneName, string description, bool skipIfActive = false)
             : base(ScenarioStepKind.LoadScene, description)
         {
             SceneName = sceneName;
+            SkipIfActive = skipIfActive;
         }
     }
 }

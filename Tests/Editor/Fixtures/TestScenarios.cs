@@ -35,6 +35,29 @@ namespace Void2610.LiminalPalette.Tests
             yield return ScenarioStep.Run("Test/Throws");
             yield return ScenarioStep.Run("Test/NoArg");
         }
+
+        [PresetScenario("TestScenario/Preset")]
+        public static IEnumerable<ScenarioStep> Preset()
+        {
+            yield break;
+        }
+    }
+
+    /// <summary>
+    /// LiminalScenarioAttribute を継承したプリセット属性の見本。
+    /// 利用側プロジェクトが Scene / ReadyWhen / ReuseScene / Setup 等の既定値を
+    /// コンストラクタで固定する派生属性を定義できることを検証するためのフィクスチャ。
+    /// </summary>
+    internal sealed class PresetScenarioAttribute : LiminalScenarioAttribute
+    {
+        public PresetScenarioAttribute(string path) : base(path)
+        {
+            Scene = "PresetScene";
+            ReadyWhen = "Game/State=Ready";
+            ReuseScene = true;
+            Setup = "Run/StartNew";
+            TimeScale = 20f;
+        }
     }
 
     // 不正なシグネチャの「シナリオもどき」メソッド。

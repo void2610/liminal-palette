@@ -67,6 +67,23 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public void Scan_FindsDerivedAttributeScenario_WithPresetValues()
+        {
+            // GetCustomAttribute<LiminalScenarioAttribute>() は派生属性のインスタンスも返すため、
+            // プリセット済み派生属性 (PresetScenarioAttribute) を付けたメソッドも Scan で拾われ、
+            // コンストラクタで固定した値が ScenarioDescriptor にそのまま反映される。
+            var asm = typeof(TestScenarios).Assembly;
+            var scenarios = ScenarioScanner.Scan(new[] { asm });
+            var preset = scenarios.FirstOrDefault(s => s.Path == "TestScenario/Preset");
+            Assert.IsNotNull(preset, "派生属性付きシナリオが Scan で拾われていない");
+            Assert.AreEqual("PresetScene", preset.Scene);
+            Assert.AreEqual("Game/State=Ready", preset.ReadyWhen);
+            Assert.IsTrue(preset.ReuseScene);
+            Assert.AreEqual("Run/StartNew", preset.Setup);
+            Assert.AreEqual(20f, preset.TimeScale);
+        }
+
+        [Test]
         public void TryBuildDescriptor_DefaultsSceneToEmpty()
         {
             var method = typeof(InvalidScenarioShapes)

@@ -174,6 +174,42 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             StringAssert.Contains("\"skipped\":1", res.Body);
         }
 
+        // ---------- 完了結果 (failures) ----------
+
+        [Test]
+        public async Task TestResult_Completed_WithFailures_IncludesFailuresArray()
+        {
+            TestRunnerBridge.Current = new FakeService
+            {
+                Status = new TestRunStatus(TestRunPhase.Completed, "Failed", 3, 2, 0, 0, 1.5, "PlayMode",
+                    new[]
+                    {
+                        new TestFailureInfo("My.Ns.FooTests.Bar", "Expected: 1\n  But was: 2"),
+                        new TestFailureInfo("My.Ns.FooTests.Baz", ""),
+                    }),
+            };
+            var res = await new TestResultEndpoint().HandleAsync(
+                Get("/api/v1/tests/result"), CancellationToken.None);
+            Assert.AreEqual(200, res.StatusCode);
+            StringAssert.Contains("\"failures\":[", res.Body);
+            StringAssert.Contains("\"name\":\"My.Ns.FooTests.Bar\"", res.Body);
+            StringAssert.Contains("But was: 2", res.Body);
+            StringAssert.Contains("\"name\":\"My.Ns.FooTests.Baz\"", res.Body);
+        }
+
+        [Test]
+        public async Task TestResult_Completed_WithoutFailures_OmitsFailuresArray()
+        {
+            TestRunnerBridge.Current = new FakeService
+            {
+                Status = new TestRunStatus(TestRunPhase.Completed, "Passed", 5, 0, 0, 0, 1.0, "EditMode"),
+            };
+            var res = await new TestResultEndpoint().HandleAsync(
+                Get("/api/v1/tests/result"), CancellationToken.None);
+            Assert.AreEqual(200, res.StatusCode);
+            StringAssert.DoesNotContain("failures", res.Body);
+        }
+
         private sealed class FakeService : ITestRunnerService
         {
             public bool StartSucceeds = true;

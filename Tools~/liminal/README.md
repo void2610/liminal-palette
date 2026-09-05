@@ -73,7 +73,7 @@ liminal test playmode --no-wait
 liminal test result
 ```
 
-`liminal test` は専用エンドポイント (`/api/v1/tests/run`, `/api/v1/tests/result`) を叩く。`exec` 経由のコマンドではなく、enterPlayModeOptions を書き換えずに Unity Test Runner を起動するため `ProjectSettings/EditorSettings.asset` の churn が出ない。`com.unity.test-framework` 未導入の場合は `501`。完了して `Passed` なら exit code 0、それ以外は 2。
+`liminal test` は専用エンドポイント (`/api/v1/tests/run`, `/api/v1/tests/result`) を叩く。`exec` 経由のコマンドではなく、enterPlayModeOptions を書き換えずに Unity Test Runner を起動するため `ProjectSettings/EditorSettings.asset` の churn が出ない。`com.unity.test-framework` 未導入の場合は `501`。完了して `Passed` なら exit code 0、それ以外は 2。失敗があれば失敗テストの full name とメッセージも表示する (先頭 30 件)。テスト実行中はエディタの音声出力を自動でミュートし、完了時に元へ戻す。
 
 ## グローバルオプション
 

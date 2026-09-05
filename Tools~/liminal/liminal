@@ -1224,6 +1224,16 @@ def _emit_test_status(args, body) -> None:
     print(f"  failed       : {_red(str(failed)) if failed else failed}")
     print(f"  skipped      : {body.get('skipped')}")
     print(f"  inconclusive : {body.get('inconclusive')}")
+    failures = body.get("failures") or []
+    if failures:
+        print()
+        for f in failures:
+            print(f"  {_red('✗')} {f.get('name', '?')}")
+            msg = (f.get("message") or "").strip()
+            for line in msg.splitlines():
+                print(f"      {_dim(line)}")
+    if failed and len(failures) < failed:
+        print(_dim(f"  (詳細は先頭 {len(failures)} 件のみ)"))
 
 
 def _test_exit_code(body) -> int:

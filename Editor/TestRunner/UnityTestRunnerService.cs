@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
@@ -29,6 +30,17 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         internal const string SkippedKey = "LiminalPalette.TestRunner.Skipped";
         internal const string InconclusiveKey = "LiminalPalette.TestRunner.Inconclusive";
         internal const string DurationKey = "LiminalPalette.TestRunner.Duration";
+        internal const string FailuresKey = "LiminalPalette.TestRunner.Failures";
+        internal const string MutedKey = "LiminalPalette.TestRunner.Muted";
+        internal const string MutePrevKey = "LiminalPalette.TestRunner.MutePrev";
+
+        // 失敗一覧の肥大でレスポンスと SessionState が膨れないよう上限を切る (超過分は件数だけ分かれば十分)
+        internal const int MaxFailures = 30;
+        internal const int MaxFailureMessageLength = 2000;
+
+        // SessionState は文字列の配列/リストを直接持てないため、制御文字 (RS/US) 区切りで失敗一覧を 1 キーに詰める
+        private const char FailureSeparator = '\u001e';
+        private const char FieldSeparator = '\u001f';
 
         private readonly TestRunnerApi _api;
 
@@ -57,6 +69,13 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             SessionState.SetBool(RunningKey, true);
             SessionState.SetString(ModeKey, displayMode);
             SessionState.EraseString(ResultKey);
+            SessionState.EraseString(FailuresKey);
+
+            // CLI 駆動のテスト実行はゲーム音を鳴らす意味が無いため、実行中だけエディタの出力段を落とす。
+            // 元値は SessionState に退避し、PlayMode の DomainReload を跨いでも RunFinished で復元できるようにする
+            SessionState.SetBool(MutePrevKey, EditorUtility.audioMasterMute);
+            SessionState.SetBool(MutedKey, true);
+            EditorUtility.audioMasterMute = true;
 
             try
             {
@@ -64,8 +83,10 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             }
             catch (System.Exception ex)
             {
-                // Execute が同期例外を投げたら走行状態を巻き戻して失敗を返す。
+                // Execute が同期例外を投げたら走行状態とミュートを巻き戻して失敗を返す (RunFinished は来ない)。
                 SessionState.SetBool(RunningKey, false);
+                EditorUtility.audioMasterMute = SessionState.GetBool(MutePrevKey, false);
+                SessionState.SetBool(MutedKey, false);
                 error = $"failed to start test run: {ex.Message}";
                 return false;
             }
@@ -91,7 +112,36 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
                 SessionState.GetInt(SkippedKey, 0),
                 SessionState.GetInt(InconclusiveKey, 0),
                 SessionState.GetFloat(DurationKey, 0f),
-                mode);
+                mode,
+                ReadFailures());
+        }
+
+        private static IReadOnlyList<TestFailureInfo> ReadFailures()
+        {
+            var raw = SessionState.GetString(FailuresKey, "");
+            if (string.IsNullOrEmpty(raw)) return System.Array.Empty<TestFailureInfo>();
+            var list = new List<TestFailureInfo>();
+            foreach (var entry in raw.Split(FailureSeparator))
+            {
+                if (entry.Length == 0) continue;
+                var sep = entry.IndexOf(FieldSeparator);
+                if (sep < 0) list.Add(new TestFailureInfo(entry, ""));
+                else list.Add(new TestFailureInfo(entry.Substring(0, sep), entry.Substring(sep + 1)));
+            }
+            return list;
+        }
+
+        private static void AppendFailure(string name, string message)
+        {
+            var raw = SessionState.GetString(FailuresKey, "");
+            // 上限超過はレスポンス肥大を避けて黙って切り捨てる (総数は failed カウントで分かる)
+            if (!string.IsNullOrEmpty(raw) && raw.Split(FailureSeparator).Length >= MaxFailures) return;
+            message ??= "";
+            if (message.Length > MaxFailureMessageLength) message = message.Substring(0, MaxFailureMessageLength) + "…";
+            name = (name ?? "").Replace(FailureSeparator, ' ').Replace(FieldSeparator, ' ');
+            message = message.Replace(FailureSeparator, ' ').Replace(FieldSeparator, ' ');
+            var entry = name + FieldSeparator + message;
+            SessionState.SetString(FailuresKey, string.IsNullOrEmpty(raw) ? entry : raw + FailureSeparator + entry);
         }
 
         /// <summary>
@@ -111,11 +161,24 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
                 SessionState.SetInt(InconclusiveKey, result.InconclusiveCount);
                 SessionState.SetFloat(DurationKey, (float)result.Duration);
                 SessionState.SetBool(RunningKey, false);
+
+                // 自分でミュートした実行だけ元値へ戻す (Test Runner ウィンドウ等の外部実行では触らない)
+                if (SessionState.GetBool(MutedKey, false))
+                {
+                    EditorUtility.audioMasterMute = SessionState.GetBool(MutePrevKey, false);
+                    SessionState.SetBool(MutedKey, false);
+                }
             }
 
             public void TestStarted(ITestAdaptor test) { }
 
-            public void TestFinished(ITestResultAdaptor result) { }
+            public void TestFinished(ITestResultAdaptor result)
+            {
+                // suite ノードは子の失敗を重複集計するため leaf (実テスト) だけ拾う
+                if (result.Test.HasChildren) return;
+                if (result.TestStatus != TestStatus.Failed) return;
+                AppendFailure(result.FullName, result.Message);
+            }
         }
     }
 

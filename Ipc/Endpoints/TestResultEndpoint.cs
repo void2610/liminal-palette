@@ -15,7 +15,8 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
     ///   - {"state":"idle"}                                   … 未実行 (結果なし)
     ///   - {"state":"running","mode":"PlayMode"}              … 実行中
     ///   - {"state":"completed","result":"Passed","mode":"PlayMode",
-    ///      "passed":N,"failed":N,"skipped":N,"inconclusive":N,"durationSeconds":X}
+    ///      "passed":N,"failed":N,"skipped":N,"inconclusive":N,"durationSeconds":X,
+    ///      "failures":[{"name":"...","message":"..."}]}   … failures は失敗があるときのみ (上限 30 件)
     ///
     /// 結果は実装側で SessionState に保存されるため、PlayMode テストの DomainReload を跨いでも
     /// polling で取得できる。<see cref="TestRunnerBridge.Current"/> 未登録時は 501。
@@ -64,6 +65,18 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                     w.WriteNumber("skipped", status.Skipped);
                     w.WriteNumber("inconclusive", status.Inconclusive);
                     w.WriteNumber("durationSeconds", status.DurationSeconds);
+                    if (status.Failures is { Count: > 0 })
+                    {
+                        w.BeginArray("failures");
+                        foreach (var f in status.Failures)
+                        {
+                            w.BeginObject();
+                            w.WriteString("name", f.Name);
+                            w.WriteString("message", f.Message);
+                            w.EndObject();
+                        }
+                        w.EndArray();
+                    }
                     break;
                 default:
                     w.WriteString("state", "idle");

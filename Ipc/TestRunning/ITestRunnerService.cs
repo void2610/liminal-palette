@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Void2610.LiminalPalette.Ipc.TestRunning
 {
     /// <summary>
@@ -28,6 +30,19 @@ namespace Void2610.LiminalPalette.Ipc.TestRunning
 
         /// <summary>直近の実行状態を返す。</summary>
         TestRunStatus GetStatus();
+    }
+
+    /// <summary>失敗したテスト 1 件の要約 (full name + 失敗メッセージ)。</summary>
+    public readonly struct TestFailureInfo
+    {
+        public readonly string Name;
+        public readonly string Message;
+
+        public TestFailureInfo(string name, string message)
+        {
+            Name = name ?? "";
+            Message = message ?? "";
+        }
     }
 
     /// <summary>テスト実行のフェーズ。</summary>
@@ -65,8 +80,18 @@ namespace Void2610.LiminalPalette.Ipc.TestRunning
         /// <summary>直近に実行した mode ("PlayMode" / "EditMode")。未実行なら空。</summary>
         public readonly string Mode;
 
+        /// <summary>失敗したテストの要約 (Completed かつ Failed 時のみ非空。件数上限あり)。</summary>
+        public readonly IReadOnlyList<TestFailureInfo> Failures;
+
         public TestRunStatus(TestRunPhase phase, string result, int passed, int failed,
             int skipped, int inconclusive, double durationSeconds, string mode)
+            : this(phase, result, passed, failed, skipped, inconclusive, durationSeconds, mode, null)
+        {
+        }
+
+        public TestRunStatus(TestRunPhase phase, string result, int passed, int failed,
+            int skipped, int inconclusive, double durationSeconds, string mode,
+            IReadOnlyList<TestFailureInfo> failures)
         {
             Phase = phase;
             Result = result ?? "";
@@ -76,6 +101,7 @@ namespace Void2610.LiminalPalette.Ipc.TestRunning
             Inconclusive = inconclusive;
             DurationSeconds = durationSeconds;
             Mode = mode ?? "";
+            Failures = failures ?? System.Array.Empty<TestFailureInfo>();
         }
 
         public static TestRunStatus Idle => new TestRunStatus(TestRunPhase.Idle, "", 0, 0, 0, 0, 0, "");

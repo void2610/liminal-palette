@@ -38,7 +38,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         internal const int MaxFailures = 30;
         internal const int MaxFailureMessageLength = 2000;
 
-        // SessionState は文字列 1 枠しか無いため、制御文字 (RS/US) 区切りで失敗一覧を 1 本に詰める
+        // SessionState は文字列の配列/リストを直接持てないため、制御文字 (RS/US) 区切りで失敗一覧を 1 キーに詰める
         private const char FailureSeparator = '\u001e';
         private const char FieldSeparator = '\u001f';
 
@@ -83,8 +83,10 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             }
             catch (System.Exception ex)
             {
-                // Execute が同期例外を投げたら走行状態を巻き戻して失敗を返す。
+                // Execute が同期例外を投げたら走行状態とミュートを巻き戻して失敗を返す (RunFinished は来ない)。
                 SessionState.SetBool(RunningKey, false);
+                EditorUtility.audioMasterMute = SessionState.GetBool(MutePrevKey, false);
+                SessionState.SetBool(MutedKey, false);
                 error = $"failed to start test run: {ex.Message}";
                 return false;
             }

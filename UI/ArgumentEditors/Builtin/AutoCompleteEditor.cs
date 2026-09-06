@@ -58,7 +58,7 @@ namespace Void2610.LiminalPalette.UI
             // 戻り値: 補完が実行されたらtrue
             Func<bool> tryComplete = () =>
             {
-                if (topMatchValue == null) return false;
+                if (topMatchValue == null || suggestionList.style.display == DisplayStyle.None) return false;
                 field.SetValueWithoutNotify(topMatchValue);
                 onChanged(topMatchValue);
                 suggestionList.style.display = DisplayStyle.None;

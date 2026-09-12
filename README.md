@@ -1,8 +1,66 @@
-# LiminalPalette
+<p align="center">
+  <img src="Documentation~/images/hero.png" alt="LiminalPalette — Unity commands for humans, tests & AI agents" width="100%">
+</p>
 
-VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグコンソール / コマンド実行ライブラリ。
+<p align="center">
+  <a href="https://github.com/void2610/liminal-palette/blob/main/package.json"><img alt="Version" src="https://img.shields.io/github/package-json/v/void2610/liminal-palette?label=version&color=3B82F6&style=flat-square"></a>
+  <a href="https://unity.com/releases/editor/whats-new/6000.3"><img alt="Unity 6000.3+" src="https://img.shields.io/badge/Unity-6000.3%2B-000000?logo=unity&logoColor=white&style=flat-square"></a>
+  <img alt="C# 9 / .NET Standard 2.1" src="https://img.shields.io/badge/C%23-9%20%2F%20.NET%20Standard%202.1-512BD4?logo=dotnet&logoColor=white&style=flat-square">
+  <img alt="UI Toolkit" src="https://img.shields.io/badge/UI-UI%20Toolkit-3B82F6?style=flat-square">
+  <a href="LICENSE.md"><img alt="License: MIT" src="https://img.shields.io/github/license/void2610/liminal-palette?color=FACC15&style=flat-square"></a>
+</p>
 
-`[LiminalCommand]` を付けた C# メソッドを **Editor / Runtime / HTTP API の 3 経路から統一的に実行できる**。AI Agent (Claude Code 等) や CLI / Discord bot から `curl` 一発でゲーム操作を自動化したいケースに特化している。
+<p align="center">
+  <a href="Documentation~/ipc.md"><img alt="HTTP API" src="https://img.shields.io/badge/HTTP%20API-localhost%20%2B%20Bearer-22C55E?style=flat-square"></a>
+  <a href="#ai-agent-連携-claude-code-skills"><img alt="Claude Code Skills" src="https://img.shields.io/badge/Claude%20Code-8%20skills%20bundled-D97757?logo=anthropic&logoColor=white&style=flat-square"></a>
+  <a href="Documentation~/scenarios.md"><img alt="Scenario Testing" src="https://img.shields.io/badge/Scenario-Unity%20Test%20Runner%20%2B%20CI-A855F7?style=flat-square"></a>
+  <a href="CHANGELOG.md"><img alt="Keep a Changelog" src="https://img.shields.io/badge/changelog-Keep%20a%20Changelog-E05735?logo=keepachangelog&logoColor=white&style=flat-square"></a>
+  <a href="https://github.com/void2610/liminal-palette/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/void2610/liminal-palette?style=flat-square&color=FACC15"></a>
+</p>
+
+<p align="center">
+  <b>VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグコンソール / コマンド実行ライブラリ。</b><br>
+  <code>[LiminalCommand]</code> を付けた C# メソッドを、<b>人間 (GUI) / AI Agent (HTTP API) / テスト (C# API)</b> の 3 経路から同じ名前で実行できる。
+</p>
+
+<p align="center">
+  <a href="#クイックスタート-4-ステップ">クイックスタート</a> ·
+  <a href="#3-つの入り口">3 つの入り口</a> ·
+  <a href="#できること">できること</a> ·
+  <a href="#インストール">インストール</a> ·
+  <a href="#ドキュメント">ドキュメント</a>
+</p>
+
+---
+
+## 3 つの入り口
+
+コマンドを 1 回書けば、ヒーロー画像の 3 経路すべてから同じ `Player/Health/Set` が呼べる。
+
+| 入り口 | 誰が使う | どう呼ぶ |
+|---|---|---|
+| **GUI** | 人間 | `Cmd/Ctrl + K` でパレットを開き、ファジー検索 → 引数入力 → Run。Editor / Play Mode の両方で動く |
+| **HTTP API** | AI Agent / CLI / Discord bot | `curl -X POST /api/v1/execute` 一発。Claude Code 向け Agent Skills と `liminal` CLI を同梱 |
+| **C# API** | テスト / CI | `[LiminalScenario]` でコマンドチェインを宣言し、Unity Test Runner や `liminal run` から実行 |
+
+```csharp
+[LiminalCommand("Player/Health/Set")]
+public void SetHealth(int value) => Hp.Value = value;
+```
+
+```bash
+# AI Agent / CLI から
+curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -X POST http://127.0.0.1:7610/api/v1/execute \
+     -d '{"path":"Player/Health/Set","args":{"value":"50"}}'
+```
+
+```csharp
+// テストから
+[UnityTest]
+public IEnumerator Run([ValueSource(nameof(Paths))] string path)
+    => LiminalPaletteTestRunner.RunScenario(path);
+```
 
 ---
 
@@ -11,26 +69,17 @@ VS Code のコマンドパレット風 UI を持つ、Unity 用のデバッグ�
 - **ファジー検索付きコマンドパレット** (Editor / Runtime 両対応、UI Toolkit 製)
 - **4 タブ構成**: Command (新規実行) / Scenario (コマンドチェイン実行) / Log (起動履歴の詳細閲覧) / History (再実行特化)。`Tab` / `Shift+Tab` でタブ巡回
 - **型解決済み引数 UI**: `int` / `float` / `string` / `bool` / `enum` / `Vector2/3/4` / `Color` / `[Flags] enum` / `UnityEngine.Object` 派生
-- **HTTP API**: ローカル localhost で `/api/v1/{health, commands, execute, logs, state, scenarios, scenarios/run}` を提供。Bearer トークン認証 + レートリミット
+- **観測フィールド**: `[LiminalObservableField]` を付けた `ReactiveProperty<T>` の現在値を UI に常時表示。R3 push 駆動で自動更新
+- **シナリオ (統合テスト)**: `[LiminalScenario]` で「スポーン → ダメージ → HP を Assert」のようなチェインを C# で宣言。`Scene` / `ReadyWhen` / `TimeScale` / `Setup` 属性でボイラープレートを削減
+- **HTTP API**: localhost で `/api/v1/{health, commands, execute, logs, state, scenarios, scenarios/run, tests/run, tests/result}` を提供。Bearer トークン認証 + レートリミット
+- **CLI `liminal`**: 依存ゼロの Python シングルファイル。`liminal run 'Battle/*' --report junit.xml` で CI からシナリオ実行、`liminal test playmode` で Unity Test Runner を起動
+- **AI Agent 連携**: Claude Code 向け Agent Skills を 8 個同梱。メニュー 1 つで利用側プロジェクトへインストール
 - **Production ビルド除外**: `defineConstraints` の三重防御で Player ビルドにシンボル混入なし
 - **拡張点**: `ITypeConverter` / `IParameterEditor` / `ICommandHistory` で利用側が拡張可能
 
 ---
 
-## 動作要件
-
-- Unity **6000.3** 以降 (UI Toolkit Runtime support 利用)
-- .NET Standard 2.1 / C# 9 以降
-- 入力: Legacy Input Manager / Input System Package のどちらでも動く (両方有効でも可)
-- **R3** ([Cysharp/R3](https://github.com/Cysharp/R3)) — `ReactiveProperty<T>` / `Observable<T>` 対応 (Phase 5a 以降必須)
-- **VContainer** ([hadashiA/VContainer](https://github.com/hadashiA/VContainer)) — インスタンスメソッドコマンドの解決 (Phase 5a 以降必須)
-- **UniTask** ([Cysharp/UniTask](https://github.com/Cysharp/UniTask)) — `UniTask` / `UniTask<T>` 戻り値コマンドの await (v0.9 以降必須)
-
-> Phase 4 までは外部依存ゼロだったが、Phase 5a で R3 + VContainer 必須に方針転換した。利用側のコード量を最小化する設計判断。
-
----
-
-## クイックスタート (3 ステップ)
+## クイックスタート (4 ステップ)
 
 ### 1. コマンドを書く
 
@@ -69,7 +118,7 @@ public class GameLifetimeScope : LifetimeScope
 - **Editor**: `Cmd/Ctrl + K` でパレットを開き、"Player Set" などで検索 → 引数欄上部に現在 HP が表示 → Run で実行。
 - **Play Mode** (ゲーム実行中): 同じ `Cmd/Ctrl + K` で半透明 overlay として開く。値は R3 push 駆動で自動更新。
 
-### 3. HTTP API で叩く (任意)
+### 4. HTTP API で叩く (任意)
 
 ```bash
 TOKEN=$(cat ~/.liminal-palette/token)
@@ -81,7 +130,33 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 # → {"success":true,"value":null,"durationMs":0.51,...}
 ```
 
-トークンは Editor 起動時に `~/.liminal-palette/token` へ自動生成される。
+トークンは Editor 起動時に `~/.liminal-palette/token` へ自動生成される。同梱の CLI なら `liminal exec Player/Health/Set value=100` で同じことができる ([Tools~/liminal/README.md](Tools~/liminal/README.md))。
+
+---
+
+## シナリオでテストする
+
+`[LiminalScenario]` を付けたメソッドが `ScenarioStep` を `yield return` すると、Scenario タブ / HTTP API / Unity Test Runner の全経路から同じチェインを実行できる。
+
+```csharp
+[LiminalScenario("Combat/EnemyTakesDamage", Scene = "Battle", ReadyWhen = "Game/State=InBattle")]
+public static IEnumerable<ScenarioStep> EnemyTakesDamage()
+{
+    yield return ScenarioStep.Run("Enemy/Spawn", new() { ["type"] = "Goblin" });
+    yield return ScenarioStep.AssertEquals("Enemy/Hp", 100);
+    yield return ScenarioStep.Run("Enemy/Damage", new() { ["amount"] = 30 });
+    yield return ScenarioStep.AssertEventually("Enemy/Hp", 70, timeoutSeconds: 2f);
+}
+```
+
+| 実行方法 | 使いどころ |
+|---|---|
+| Scenario タブ → **Run Scenario** | 手元で再現手順を 1 クリック再生 |
+| `liminal run 'Combat/*' --report junit.xml` | CI から HTTP 経由で一括実行。JUnit XML で結果を集計 |
+| `LiminalPaletteTestRunner.RunScenario(path)` | Unity Test Runner の `[UnityTest]` に載せて parametrized test 化 |
+| `POST /api/v1/tests/run` / `liminal test playmode` | Unity Test Runner 自体を外部から起動して結果を polling |
+
+詳細は [scenarios](Documentation~/scenarios.md) を参照。
 
 ---
 
@@ -101,21 +176,20 @@ skill ファイル本体は package 内の `AISkills~/` に同梱されており
 
 ---
 
-## ドキュメント
+## 動作要件
 
-詳細は `Documentation~/` 配下を参照:
-
-| 章 | 内容 |
+| 項目 | 要件 |
 |---|---|
-| [index](Documentation~/index.md) | ドキュメントのハブ + 全体構成図 |
-| [getting-started](Documentation~/getting-started.md) | インストール / Hello World / 最初の動作確認 |
-| [commands](Documentation~/commands.md) | `[LiminalCommand]` の全機能、引数の型、async、動的登録 |
-| [ui](Documentation~/ui.md) | Editor Window / Runtime UI / ショートカット / 入力ブロッカー |
-| [ipc](Documentation~/ipc.md) | HTTP API リファレンス + curl 例 + AI Agent 連携 |
-| [extensibility](Documentation~/extensibility.md) | `ITypeConverter` / `IParameterEditor` / `ICommandHistory` で利用側拡張 |
-| [asmdef](Documentation~/asmdef.md) | 8 つの asmdef 構成と依存ルール / `defineConstraints` |
-| [security](Documentation~/security.md) | localhost only / トークン / Production 除外 / レートリミット |
-| [troubleshooting](Documentation~/troubleshooting.md) | よくある問題と既知の制約 |
+| Unity | **6000.3** 以降 (UI Toolkit Runtime support 利用) |
+| 言語 | .NET Standard 2.1 / C# 9 以降 |
+| 入力 | Legacy Input Manager / Input System Package のどちらでも動く (両方有効でも可) |
+| [R3](https://github.com/Cysharp/R3) | 必須。`ReactiveProperty<T>` / `Observable<T>` 対応 |
+| [VContainer](https://github.com/hadashiA/VContainer) | 必須。インスタンスメソッドコマンドの解決 |
+| [UniTask](https://github.com/Cysharp/UniTask) | 必須。`UniTask` / `UniTask<T>` 戻り値コマンドの await |
+| [LitMotion](https://github.com/annulusgames/LitMotion) | 任意。導入時のみ `Anim/CompleteAll` / `Anim/CancelAll` コマンドが有効化 |
+| Test Framework | 任意。導入時のみ `/api/v1/tests/*` と `LiminalPaletteTestRunner` が有効化 |
+
+> Phase 4 までは外部依存ゼロだったが、Phase 5a で R3 + VContainer 必須に方針転換した。利用側のコード量を最小化する設計判断。
 
 ---
 
@@ -153,6 +227,33 @@ R3 と VContainer は Phase 5a 以降必須なので、利用側 manifest で別
 
 > 相対パスは利用側プロジェクトの `Packages/` フォルダから見て解決される。
 
+### C. CLI `liminal` (任意)
+
+```bash
+ln -s "$(pwd)/Tools~/liminal/liminal" ~/.local/bin/liminal
+liminal init   # cwd / ポート / トークン / Skills の状態をまとめて確認
+```
+
+---
+
+## ドキュメント
+
+詳細は `Documentation~/` 配下を参照:
+
+| 章 | 内容 |
+|---|---|
+| [index](Documentation~/index.md) | ドキュメントのハブ + 全体構成図 |
+| [getting-started](Documentation~/getting-started.md) | インストール / Hello World / 最初の動作確認 |
+| [commands](Documentation~/commands.md) | `[LiminalCommand]` の全機能、引数の型、async、動的登録 |
+| [scenarios](Documentation~/scenarios.md) | `[LiminalScenario]` によるコマンドチェイン / Assert / CI 統合テスト |
+| [ui](Documentation~/ui.md) | Editor Window / Runtime UI / ショートカット / 入力ブロッカー |
+| [ipc](Documentation~/ipc.md) | HTTP API リファレンス + curl 例 + AI Agent 連携 |
+| [integrations](Documentation~/integrations.md) | R3 / VContainer との統合方法 |
+| [extensibility](Documentation~/extensibility.md) | `ITypeConverter` / `IParameterEditor` / `ICommandHistory` で利用側拡張 |
+| [asmdef](Documentation~/asmdef.md) | asmdef 構成と依存ルール / `defineConstraints` |
+| [security](Documentation~/security.md) | localhost only / トークン / Production 除外 / レートリミット |
+| [troubleshooting](Documentation~/troubleshooting.md) | よくある問題と既知の制約 |
+| [CHANGELOG](CHANGELOG.md) | 変更履歴 (Keep a Changelog 形式) |
 
 ---
 

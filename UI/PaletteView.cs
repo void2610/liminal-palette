@@ -1319,17 +1319,32 @@ namespace Void2610.LiminalPalette.UI
                 || UnityEngine.Input.touchSupported;
         }
 
-        // 引数フローエディタの子孫 (TextField の input element など) すべてに FocusOutEvent を仕込む。
+        // 引数フローエディタの子孫を辿り、テキスト入力欄にだけ FocusOutEvent を仕込む。
+        // 本フックの目的はモバイル WebGL のソフトキーボード「完了」で確定させることなので、
+        // 対象はキーボードが開く要素に限る。EnumField 等のドロップダウンはパネル外のレイヤーに開いて
+        // フィールドを blur させるため、全要素にフックすると選択する前に次のステップへ進んでしまう。
         // VisualElement.Query<VisualElement>().ForEach は子孫を辿るユーティリティだが、最低限の依存で
         // 済むよう手書きの再帰で巡回する。
         private void HookFocusOutForParamFlow(VisualElement root)
         {
             if (root == null) return;
-            root.RegisterCallback<FocusOutEvent>(OnParamFlowEditorFocusOut);
+            if (IsTextInputField(root)) root.RegisterCallback<FocusOutEvent>(OnParamFlowEditorFocusOut);
             for (var i = 0; i < root.childCount; i++)
             {
                 HookFocusOutForParamFlow(root[i]);
             }
+        }
+
+        // TextField / IntegerField / FloatField 等、ソフトキーボードを開くテキスト入力欄かどうか。
+        // これらは型引数違いの TextInputBaseField<T> を共通の基底に持つので、基底を辿って判定する
+        // (具象型を列挙すると Unity 側の派生が増えたときに漏れる)。
+        internal static bool IsTextInputField(VisualElement el)
+        {
+            for (var t = el?.GetType(); t != null; t = t.BaseType)
+            {
+                if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(TextInputBaseField<>)) return true;
+            }
+            return false;
         }
 
         // 連続発火ガード: 物理 Enter (NavigationSubmit) と blur (FocusOut) が同一操作で

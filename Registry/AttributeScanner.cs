@@ -148,6 +148,9 @@ namespace Void2610.LiminalPalette
                 var paramAttr = pi.GetCustomAttribute<LiminalParamAttribute>();
                 var description = paramAttr != null ? paramAttr.Description : "";
                 var choices = paramAttr != null ? paramAttr.Choices : Array.Empty<string>();
+                // enum は明示指定が無ければ取りうる値で埋める。HTTP API / CLI のスキーマに選択肢が出ないと
+                // 呼び出し側 (特にエージェント) が値を推測するしかなくなるため。
+                if (choices.Length == 0 && pi.ParameterType.IsEnum) choices = Enum.GetNames(pi.ParameterType);
                 // Min/Max は float.NaN を「未指定」の Sentinel に使う (属性側のデフォルトと揃える)。
                 var min = paramAttr != null ? paramAttr.Min : float.NaN;
                 var max = paramAttr != null ? paramAttr.Max : float.NaN;

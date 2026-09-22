@@ -109,6 +109,13 @@ public class PaletteRuntimeSettings : ScriptableObject
 | `UnityEngine.Object` | `ObjectField` (ピッカー付き) | TextField + UnityObjectConverter (`@<entityID>` / `GameObject:<name>`) |
 | 任意型 | `FallbackTextEditor` | 同左 |
 
+### 引数フローの確定タイミング
+
+引数を 1 つずつ入力するフローでは、`Enter` (または「次へ / 実行」ボタン) で次のステップへ進む。
+加えて、モバイル WebGL のソフトキーボード「完了」を拾うため、**テキスト入力欄に限り** blur でも確定する。
+`EnumField` のようにドロップダウンをパネル外のレイヤーへ開く要素はこの対象から外している
+(開いた瞬間にフィールドが blur し、選択する前に次へ進んでしまうため)。
+
 ### 入力エラーの表示
 
 ユーザーが不正な値を入れた場合 (例: `byte` に 999 を入れる、`Color32` の文字列パースエラー):

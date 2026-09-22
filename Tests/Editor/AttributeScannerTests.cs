@@ -25,6 +25,35 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public void Scan_EnumParameter_FillsChoicesFromEnumNames()
+        {
+            // enum の取りうる値がスキーマに出ないと、CLI / エージェントが値を推測するしかなくなる。
+            var commands = AttributeScanner.Scan(new[] { typeof(TestCommands).Assembly });
+            var cmd = commands.First(c => c.Path == "Test/Enum");
+            var p = cmd.Parameters.First(x => x.Name == "choice");
+            CollectionAssert.AreEqual(new[] { "First", "Second", "Third" }, p.Choices);
+        }
+
+        [Test]
+        public void Scan_EnumParameter_KeepsExplicitChoices()
+        {
+            // [LiminalParam(Choices = ...)] で絞り込んだ場合は自動補完で上書きしない。
+            var commands = AttributeScanner.Scan(new[] { typeof(TestCommands).Assembly });
+            var cmd = commands.First(c => c.Path == "Test/EnumWithExplicitChoices");
+            var p = cmd.Parameters.First(x => x.Name == "choice");
+            CollectionAssert.AreEqual(new[] { "First" }, p.Choices);
+        }
+
+        [Test]
+        public void Scan_NonEnumParameter_LeavesChoicesEmpty()
+        {
+            var commands = AttributeScanner.Scan(new[] { typeof(TestCommands).Assembly });
+            var cmd = commands.First(c => c.Path == "Test/Int");
+            var p = cmd.Parameters.First(x => x.Name == "a");
+            CollectionAssert.IsEmpty(p.Choices);
+        }
+
+        [Test]
         public void Scan_IgnoresMethodsWithoutAttribute()
         {
             var asm = typeof(TestCommands).Assembly;

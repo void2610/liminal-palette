@@ -252,7 +252,7 @@ public string Damage(
 | プロパティ | 型 | 説明 |
 |---|---|---|
 | `Description` | `string` | UI / API 表示用の説明 |
-| `Choices` | `string[]` | UI ドロップダウン候補 (Core では検証しない、参考情報のみ) |
+| `Choices` | `string[]` | UI ドロップダウン候補 (Core では検証しない、参考情報のみ)。**enum 引数は未指定なら `Enum.GetNames` が自動で入る** ので、値を絞りたいときだけ明示する |
 | `Min` | `float` | 数値型パラメータの下限 (含む)。未指定なら下限なし |
 | `Max` | `float` | 数値型パラメータの上限 (含む)。未指定なら上限なし |
 

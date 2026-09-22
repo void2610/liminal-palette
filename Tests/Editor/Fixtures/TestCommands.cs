@@ -44,6 +44,21 @@ namespace Void2610.LiminalPalette.Tests
             await UniTask.Yield();
             return s.ToUpperInvariant();
         }
+
+        [LiminalCommand("Test/Enum", Description = "enum parameter command")]
+        public static string EnumCommand(TestChoice choice = TestChoice.Second) => choice.ToString();
+
+        [LiminalCommand("Test/EnumWithExplicitChoices", Description = "enum with explicit Choices")]
+        public static string EnumWithExplicitChoices(
+            [LiminalParam(Choices = new[] { "First" })] TestChoice choice = TestChoice.First) => choice.ToString();
+    }
+
+    // enum 引数のスキーマ生成を検証するためのフィクスチャ。
+    public enum TestChoice
+    {
+        First,
+        Second,
+        Third,
     }
 
     // 非属性メソッド: Scanner が無視することを確認する用途。

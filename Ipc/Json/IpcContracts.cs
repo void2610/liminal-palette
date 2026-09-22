@@ -124,6 +124,8 @@ namespace Void2610.LiminalPalette.Ipc.Json
             w.BeginObject();
             w.WriteString("path", inv.Path);
             w.WriteString("timestamp", FormatIso8601(inv.TimestampUtc));
+            // 手動実行と自動化由来 (ipc / scenario) は保持枠が別なので、取得側が区別できるよう経路も返す。
+            w.WriteString("origin", inv.Origin.ToString().ToLowerInvariant());
 
             // args (object: name → ToDisplayString された値)
             w.BeginObject("args");

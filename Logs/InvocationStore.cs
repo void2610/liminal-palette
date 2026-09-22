@@ -15,9 +15,12 @@ namespace Void2610.LiminalPalette
         /// <summary>自動化由来 (IPC / シナリオ) の保持上限。手動実行とは独立した枠で回す。</summary>
         public const int AutomatedCapacity = 200;
 
+        /// <summary>両枠を合わせた保持件数の上限。ログ取得 API の limit 上限もこれに合わせる。</summary>
+        public const int MaxRetained = Capacity + AutomatedCapacity;
+
         public static InvocationStore Instance { get; } = new InvocationStore();
 
-        private readonly List<CommandInvocation> _entries = new List<CommandInvocation>(Capacity + AutomatedCapacity);
+        private readonly List<CommandInvocation> _entries = new List<CommandInvocation>(MaxRetained);
         private readonly object _lock = new object();
 
         // 枠ごとの件数。溢れ判定のたびにリストを数え直さないためのカウンタ。

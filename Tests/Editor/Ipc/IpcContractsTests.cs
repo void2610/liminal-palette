@@ -124,6 +124,26 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             StringAssert.Contains("\"y\":\"hello\"", json);
             StringAssert.Contains("\"result\":{", json);
             StringAssert.Contains("\"success\":true", json);
+            StringAssert.Contains("\"origin\":\"user\"", json);
+        }
+
+        [Test]
+        public void WriteInvocation_WritesOriginForEachRoute()
+        {
+            foreach (var (origin, expected) in new[]
+                     {
+                         (InvocationOrigin.User, "user"),
+                         (InvocationOrigin.Ipc, "ipc"),
+                         (InvocationOrigin.Scenario, "scenario"),
+                     })
+            {
+                var inv = new CommandInvocation("Test/Run", null,
+                    CommandResult.Ok(null, Array.Empty<LogEntry>(), TimeSpan.Zero),
+                    new DateTime(2026, 4, 30, 0, 0, 0, DateTimeKind.Utc), origin);
+                var w = new JsonWriter();
+                IpcContracts.WriteInvocation(w, inv);
+                StringAssert.Contains($"\"origin\":\"{expected}\"", w.ToString());
+            }
         }
     }
 }

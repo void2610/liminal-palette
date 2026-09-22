@@ -40,11 +40,11 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 result = await MainThreadDispatcher.RunAsync(async () =>
                 {
                     var r = await LiminalPalette.ExecuteAsync(path, args, ct);
-                    // パレットの Log / History タブに記録 (UI 経路と同じ )。
+                    // パレットの Log タブに記録する。自動化経路なので History タブ (手打ちの再実行) には出さない。
                     // typedArgs 辞書は持っていないので文字列を object として詰める (UI 側で ToDisplayString される)。
                     var typed = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
                     foreach (var kv in args) typed[kv.Key] = kv.Value;
-                    InvocationStore.Instance.Record(path, typed, r);
+                    InvocationStore.Instance.Record(path, typed, r, InvocationOrigin.Ipc);
                     return r;
                 });
             }

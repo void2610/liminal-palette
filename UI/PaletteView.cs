@@ -435,17 +435,17 @@ namespace Void2610.LiminalPalette.UI
         }
 
         // InvocationStore から最新を新しい順に取り直す。検索クエリで Path / args 部分一致フィルタを適用する。
-        // History モードのときはシナリオ由来エントリ (個別ステップ + 集約) を除外する。
-        // Log モードではシナリオ由来も含めて全件表示する (詳細閲覧用途)。
+        // History モードのときは自動化由来エントリ (IPC / シナリオ) を除外する。
+        // Log モードでは自動化由来も含めて全件表示する (詳細閲覧用途)。
         private void RefreshInvocationSnapshot()
         {
             _invocationSnapshot.Clear();
             var entries = InvocationStore.Instance.Entries;
-            var hideFromScenario = _mode == ViewMode.History;
+            var hideAutomated = _mode == ViewMode.History;
             for (var i = entries.Count - 1; i >= 0; i--)
             {
                 var e = entries[i];
-                if (hideFromScenario && e.IsFromScenario) continue;
+                if (hideAutomated && e.IsAutomated) continue;
                 if (string.IsNullOrEmpty(_invocationQuery)
                     || (e.Path != null && e.Path.IndexOf(_invocationQuery, StringComparison.OrdinalIgnoreCase) >= 0))
                 {

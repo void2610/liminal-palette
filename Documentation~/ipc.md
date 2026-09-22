@@ -198,7 +198,7 @@ CLI が書き出す JSON には [`Documentation~/schemas/LiminalPalette.schema.j
 コマンド実行履歴を新しい順で返す。
 
 **Query parameters**:
-- `?limit=N`: 件数制限 (既定 50、上限 `InvocationStore.Capacity = 200`)
+- `?limit=N`: 件数制限 (既定 50、上限 `InvocationStore.MaxRetained = 400`)
 
 **Response 200**:
 ```json
@@ -207,6 +207,7 @@ CLI が書き出す JSON には [`Documentation~/schemas/LiminalPalette.schema.j
     {
       "path": "Test/Vector",
       "timestamp": "2026-04-30T12:34:56.789Z",
+      "origin": "user",
       "args": {
         "v": "(1, 2, 3)"
       },
@@ -225,6 +226,10 @@ CLI が書き出す JSON には [`Documentation~/schemas/LiminalPalette.schema.j
 ```
 
 `invocations[].result` は `/execute` のレスポンスと同じスキーマ。
+
+`invocations[].origin` は実行経路 (`user` = パレット UI / `ipc` = 本 API / `scenario` = シナリオ実行)。
+履歴は `user` と、それ以外の自動化由来とで **独立した保持枠** を持つ (各 200 件、合計 `MaxRetained = 400` 件)。
+E2E やシナリオの大量実行で手動実行の履歴が押し出されないようにするため。
 
 ### `GET /api/v1/state` (認証必須)
 

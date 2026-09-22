@@ -200,6 +200,32 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         }
 
         [Test]
+        public async Task Execute_RecordsInvocationAsIpcOrigin()
+        {
+            // HTTP 経由の実行が手動実行として記録されると、History タブに混入したうえ
+            // 手打ち履歴の保持枠を食い潰す。3 引数 Record への退行を検知するための回帰テスト。
+            InvocationStore.Instance.Clear();
+            try
+            {
+                var ep = new ExecuteCommandEndpoint();
+                var res = await ep.HandleAsync(PostJson("/api/v1/execute",
+                    "{\"path\":\"Test/Int\",\"args\":{\"a\":\"3\"}}"), CancellationToken.None);
+                Assert.AreEqual(200, res.StatusCode);
+
+                var entries = InvocationStore.Instance.Entries;
+                Assert.AreEqual(1, entries.Count);
+                Assert.AreEqual("Test/Int", entries[0].Path);
+                Assert.AreEqual(InvocationOrigin.Ipc, entries[0].Origin);
+                Assert.IsTrue(entries[0].IsAutomated, "HTTP 経由は自動化扱い (History タブから除外される)");
+                Assert.IsFalse(entries[0].IsFromScenario, "HTTP 経由はシナリオ由来ではない");
+            }
+            finally
+            {
+                InvocationStore.Instance.Clear();
+            }
+        }
+
+        [Test]
         public async Task Execute_RateLimit_Returns429AfterThreshold()
         {
             // 一時的にレートリミットを 2 に下げて、3 回目が 429 になることを確認。

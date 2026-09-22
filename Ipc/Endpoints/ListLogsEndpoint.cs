@@ -9,7 +9,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 {
     /// <summary>
     /// GET /api/v1/logs: 起動履歴 (InvocationStore) を新しい順で返す。
-    /// クエリ ?limit=N で件数制限 (既定 50、上限 InvocationStore.Capacity)。
+    /// クエリ ?limit=N で件数制限 (既定 50、上限 InvocationStore.MaxRetained)。
     /// </summary>
     public sealed class ListLogsEndpoint : IIpcEndpoint
     {
@@ -47,7 +47,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 if (int.TryParse(raw, System.Globalization.NumberStyles.Integer,
                     System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0)
                 {
-                    return Math.Min(v, InvocationStore.Capacity);
+                    return Math.Min(v, InvocationStore.MaxRetained);
                 }
             }
             return DefaultLimit;

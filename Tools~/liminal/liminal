@@ -1516,7 +1516,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("kvargs", nargs="*", help="key=value 形式の引数")
 
     sp = sub.add_parser("logs", help="実行履歴")
-    sp.add_argument("--limit", type=int, default=20, help="取得件数 (既定 20、上限 200)")
+    sp.add_argument("--limit", type=int, default=20, help="取得件数 (既定 20、上限 400)")
 
     sp = sub.add_parser("state", help="LiminalObservableField のスナップショット")
     sp.add_argument("path", nargs="?", help="単一フィールドの path。省略で全件")

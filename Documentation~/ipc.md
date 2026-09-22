@@ -67,7 +67,7 @@ curl -H "Authorization: Bearer $LP_TOKEN" ...
 ```json
 {
   "status": "ok",
-  "version": "0.4.0",
+  "version": "0.2.0",
   "mode": "editor",
   "projectName": "MyGame",
   "projectPath": "/Users/me/dev/MyGame",
@@ -452,7 +452,7 @@ H="Authorization: Bearer $TOKEN"
 
 # Health
 curl -s $BASE/api/v1/health
-# → {"status":"ok","version":"0.4.0","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
+# → {"status":"ok","version":"0.2.0","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
 
 # コマンド一覧 (Player/ 配下だけ)
 curl -s -H "$H" $BASE/api/v1/commands | jq '.commands[] | select(.path | startswith("Player/"))'

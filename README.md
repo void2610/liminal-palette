@@ -214,7 +214,7 @@ R3 と VContainer は Phase 5a 以降必須なので、利用側 manifest で別
 特定のリリースに固定したい場合はタグを付ける:
 
 ```json
-"com.void2610.liminal-palette": "https://github.com/void2610/liminal-palette.git#v0.1.0"
+"com.void2610.liminal-palette": "https://github.com/void2610/liminal-palette.git#v0.2.0"
 ```
 
 ### B. ローカルパス (パッケージ開発時)

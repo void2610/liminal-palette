@@ -29,3 +29,6 @@ Thumbs.db
 # Python (Tools~/lp/ 等のスクリプトが生成する中間ファイル)
 __pycache__/
 *.pyc
+
+# pr-review-fix 等が生成する作業ファイル
+outputs/

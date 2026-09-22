@@ -16,26 +16,31 @@ namespace Void2610.LiminalPalette
         public DateTime TimestampUtc { get; }
 
         /// <summary>
-        /// シナリオ実行 (各ステップ + シナリオ集約) 由来のエントリかどうか。
-        /// History タブは「過去に直接実行したコマンドを同じ引数で再実行する」ことを目的とするため、
-        /// シナリオ前提の状態を要求する個別ステップを再実行候補として並べると UX として混乱する。
-        /// → History タブはこのフラグが true のエントリを除外する。
-        /// Log タブはデバッグ用途で全件表示する (シナリオ由来も詳細閲覧したいケースがあるため)。
+        /// 実行経路。History タブは <see cref="InvocationOrigin.User"/> のみを再実行候補として並べ、
+        /// Log タブはデバッグ用途で全経路を表示する。
+        /// シナリオ前提の状態を要求する個別ステップや、自動化ツールが大量に叩くコマンドを
+        /// 手打ち履歴と同列に扱うと、再実行候補としても保持枠としても手打ちの記録を潰してしまう。
         /// </summary>
-        public bool IsFromScenario { get; }
+        public InvocationOrigin Origin { get; }
+
+        /// <summary>手動実行以外 (Ipc / Scenario) 由来かどうか。保持枠の振り分けに使う。</summary>
+        public bool IsAutomated => Origin != InvocationOrigin.User;
+
+        /// <summary>シナリオ実行由来かどうか。</summary>
+        public bool IsFromScenario => Origin == InvocationOrigin.Scenario;
 
         public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc)
-            : this(path, args, result, timestampUtc, isFromScenario: false)
+            : this(path, args, result, timestampUtc, InvocationOrigin.User)
         {
         }
 
-        public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc, bool isFromScenario)
+        public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc, InvocationOrigin origin)
         {
             Path = path ?? "";
             Args = args ?? new Dictionary<string, object>();
             Result = result;
             TimestampUtc = timestampUtc;
-            IsFromScenario = isFromScenario;
+            Origin = origin;
         }
     }
 }

@@ -59,7 +59,7 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void Record_DefaultRecord_NotMarkedAsFromScenario()
         {
-            // 通常のコマンド実行記録 (UI 経由 / HTTP 経由) は IsFromScenario=false のまま。
+            // 引数 3 つの Record は手動実行 (UI 経由) 扱い。HTTP 経由は InvocationOrigin.Ipc を明示する。
             InvocationStore.Instance.Record("Foo/Direct", null,
                 CommandResult.Ok(null, Array.Empty<LogEntry>(), TimeSpan.Zero));
             var entries = InvocationStore.Instance.Entries;

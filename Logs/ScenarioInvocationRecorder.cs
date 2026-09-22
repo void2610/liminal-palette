@@ -51,7 +51,7 @@ namespace Void2610.LiminalPalette
                 var sr = result.Steps[i];
                 if (sr.Step is CommandStep cs && sr.CommandResult != null)
                 {
-                    InvocationStore.Instance.Record(cs.CommandPath, cs.Args, sr.CommandResult, isFromScenario: true);
+                    InvocationStore.Instance.Record(cs.CommandPath, cs.Args, sr.CommandResult, InvocationOrigin.Scenario);
                 }
             }
 
@@ -60,7 +60,7 @@ namespace Void2610.LiminalPalette
             var rawPath = !string.IsNullOrEmpty(scenarioPath) ? scenarioPath : result.Path;
             var displayPath = string.IsNullOrEmpty(rawPath) ? AdHocPath : "Scenario/" + rawPath;
             var aggregate = BuildAggregate(result);
-            InvocationStore.Instance.Record(displayPath, EmptyArgs, aggregate, isFromScenario: true);
+            InvocationStore.Instance.Record(displayPath, EmptyArgs, aggregate, InvocationOrigin.Scenario);
         }
 
         // 引数辞書は毎回同じ空のものを渡す (InvocationStore 側でディフェンシブにコピーされるため共有 OK)。

@@ -40,6 +40,7 @@
 - CLI コマンド名を `lp` から `liminal` に変更 (`lp` は macOS の line printer ユーティリティと衝突するため)。`Tools~/lp/` → `Tools~/liminal/`、AI Skill 名も `lp-*` → `liminal-*` にリネーム。AISkillsInstaller の Uninstall は legacy `lp-*` ディレクトリも自動的に掃除する。
 
 ### Fixed
+- シナリオ / E2E 実行でユーザーがパレットから手で打ったコマンド履歴が押し出されて消えるバグを修正。`InvocationStore` は容量 200 の単一 FIFO を全経路で共有しており、History タブは表示時に `IsFromScenario` を除外していたものの保持枠は共有だったため、ステップ数の多いシナリオを数回回すだけで手打ちのエントリが古い側から捨てられていた。実行経路を表す `InvocationOrigin` (`User` / `Ipc` / `Scenario`) を導入し、手動実行 (`Capacity`) と自動化由来 (`AutomatedCapacity`) を独立した枠で trim するように変更。あわせて `ExecuteCommandEndpoint` (HTTP `/execute`) が手動実行として記録していたのを `InvocationOrigin.Ipc` に是正し、CLI / MCP / E2E ランナーからの実行が History タブに混入しないようにした。`CommandInvocation.IsFromScenario` と `Record(..., bool isFromScenario)` は互換のため残している (History タブの除外条件は新しい `IsAutomated`)。
 - `/api/v1/health` が HTTP ワーカースレッドから `Application.productName` / `Application.dataPath` を呼び 500 になるバグを修正 (#5)。Editor / Runtime bootstrap がメインスレッドで取得済みの値を `HealthEndpoint` のコンストラクタに渡すように変更。
 
 ## [0.1.0] - 2026-05-06

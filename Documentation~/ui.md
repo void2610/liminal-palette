@@ -66,14 +66,27 @@ public class PaletteRuntimeSettings : ScriptableObject
 - 各行: timestamp / Path / 引数 / Success/Error
 - 行を選択すると下部に詳細 (引数全件 + Debug.Log 全件 + StackTrace) が出る
 - 検索ボックスで Path / 引数の部分一致絞り込み
-- **シナリオ由来エントリも全件表示** (個別 Command ステップ + `Scenario/<path>` の集約)
+- **自動化由来エントリも全件表示** (HTTP `/execute` 経由 + 個別 Command ステップ + `Scenario/<path>` の集約)
 
 ### History タブ (再実行特化)
 
 - Log タブと同じデータソースだが、**選択した行をそのまま再実行** することに特化
 - 引数欄は表示せず (前回の引数を再利用)
 - Run Command で前回と同じ引数で実行される
-- **シナリオ由来エントリは除外**: 前提状態を欠いた単独再実行の混乱を避けるため (シナリオの再実行は Scenario タブから行う)
+- **自動化由来エントリは除外**: 前提状態を欠いた単独再実行の混乱を避けるため (シナリオの再実行は Scenario タブから行う)
+
+### 実行経路と保持枠 (`InvocationOrigin`)
+
+`InvocationStore` は記録を実行経路で分類し、**手動実行と自動化由来を独立した容量で保持する**。
+
+| `InvocationOrigin` | 記録元 | Log タブ | History タブ | 保持上限 |
+|---|---|---|---|---|
+| `User` | パレット UI からの実行 | 表示 | 表示 | `InvocationStore.Capacity` (200) |
+| `Ipc` | HTTP `/api/v1/execute` (CLI / MCP / E2E ランナー) | 表示 | 除外 | `InvocationStore.AutomatedCapacity` (200) |
+| `Scenario` | シナリオの各ステップ + 集約 | 表示 | 除外 | 同上 (`Ipc` と共有) |
+
+枠を分けているのは、E2E やシナリオの大量実行で手打ちのコマンド履歴が FIFO で押し出されるのを防ぐため。
+`CommandInvocation.IsFromScenario` は互換のため残っているが、History タブの除外条件は `IsAutomated` (= `Origin != User`)。
 
 ---
 

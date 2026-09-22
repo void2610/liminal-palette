@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-22
+
 ### Added
 - Editor メニュー `Tools > LiminalPalette > Install CLI... / Uninstall CLI` を追加 (`Editor/CliInstaller.cs`)。Rust 実装の [liminal-cli](https://github.com/void2610/liminal-cli) のビルド済みバイナリを GitHub Releases から取得し、プラットフォームを判定して `~/.local/bin/liminal` に配置する。パッケージに同梱しないのは、プラットフォーム別に 3MB 強あり、git URL 配布の本パッケージに入れると全利用者が全履歴を clone することになるため (AI Skills が同梱ファイルのコピーなのとは対照的に、こちらはネットワークが要る)。`~/.local/bin` が PATH に無ければダイアログで設定方法を案内する。
 

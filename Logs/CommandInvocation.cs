@@ -34,6 +34,12 @@ namespace Void2610.LiminalPalette
         {
         }
 
+        /// <summary>互換用オーバーロード。true は <see cref="InvocationOrigin.Scenario"/> として扱う。</summary>
+        public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc, bool isFromScenario)
+            : this(path, args, result, timestampUtc, isFromScenario ? InvocationOrigin.Scenario : InvocationOrigin.User)
+        {
+        }
+
         public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc, InvocationOrigin origin)
         {
             Path = path ?? "";

@@ -33,6 +33,14 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         internal const string FailuresKey = "LiminalPalette.TestRunner.Failures";
         internal const string MutedKey = "LiminalPalette.TestRunner.Muted";
         internal const string MutePrevKey = "LiminalPalette.TestRunner.MutePrev";
+        internal const string HeartbeatKey = "LiminalPalette.TestRunner.Heartbeat";
+
+        /// <summary>
+        /// Running=true のまま、この秒数どのコールバックも来なければ「中断された残骸」と見なす。
+        /// テスト 1 件ごとに TestStarted / TestFinished が来るので、実行中なら必ず更新され続ける。
+        /// 実測 (PlayMode 53 件で 155 秒) に対して十分な余裕を取り、単体で長いテストを誤検知しない値にする。
+        /// </summary>
+        internal const double StaleAfterSeconds = 300.0;
 
         // 失敗一覧の肥大でレスポンスと SessionState が膨れないよう上限を切る (超過分は件数だけ分かれば十分)
         internal const int MaxFailures = 30;
@@ -49,12 +57,58 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             _api = api;
         }
 
-        public bool TryStartRun(string mode, string filter, out string error)
+        // 実行が生きている印。開始時と各コールバックで更新する。
+        internal static void Beat() =>
+            SessionState.SetString(HeartbeatKey, System.DateTime.UtcNow.Ticks.ToString());
+
+        // Running=true なのに一定時間どのコールバックも来ていないか。
+        private static bool IsStale()
+        {
+            if (!SessionState.GetBool(RunningKey, false)) return false;
+            var raw = SessionState.GetString(HeartbeatKey, "");
+            // 開始時に必ず打つので、印が無い = 旧版が残した状態。復旧対象にする。
+            if (!long.TryParse(raw, out var ticks)) return true;
+            var elapsed = (System.DateTime.UtcNow - new System.DateTime(ticks, System.DateTimeKind.Utc)).TotalSeconds;
+            return elapsed > StaleAfterSeconds;
+        }
+
+        /// <summary>
+        /// 中断された実行の残骸を倒す。RunFinished が来ないまま終わった場合 (Test Runner ウィンドウでの
+        /// キャンセル、Editor のクラッシュ等) に Running=true が残り続け、以降の実行が全部弾かれるため。
+        /// 倒した場合 true。
+        /// </summary>
+        internal static bool RecoverIfStale()
+        {
+            if (!IsStale()) return false;
+            ForceClearRunning();
+            Debug.LogWarning(
+                "[LiminalPalette] 中断されたテスト実行の状態を検出したため解除しました " +
+                $"({StaleAfterSeconds} 秒以上コールバックがありません)。");
+            return true;
+        }
+
+        // 走行状態とミュートを強制的に巻き戻す。
+        private static void ForceClearRunning()
+        {
+            SessionState.SetBool(RunningKey, false);
+            if (SessionState.GetBool(MutedKey, false))
+            {
+                EditorUtility.audioMasterMute = SessionState.GetBool(MutePrevKey, false);
+                SessionState.SetBool(MutedKey, false);
+            }
+        }
+
+        public bool TryStartRun(string mode, string filter, bool force, out string error)
         {
             error = null;
+            // force は利用者が明示的に「残骸を無視して始める」と言った場合の逃げ道。
+            if (force) ForceClearRunning();
+            else RecoverIfStale();
+
             if (SessionState.GetBool(RunningKey, false))
             {
-                error = "a test run is already in progress; poll GET /api/v1/tests/result";
+                error = "a test run is already in progress; poll GET /api/v1/tests/result "
+                    + "(中断された状態が残っている場合は force=true で解除できます)";
                 return false;
             }
 
@@ -67,6 +121,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
 
             // Execute 前に走行状態を確定させる (polling が即 running を観測できるように)。
             SessionState.SetBool(RunningKey, true);
+            Beat();
             SessionState.SetString(ModeKey, displayMode);
             SessionState.EraseString(ResultKey);
             SessionState.EraseString(FailuresKey);
@@ -96,6 +151,8 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
 
         public TestRunStatus GetStatus()
         {
+            // 結果の polling でも残骸を倒す。ここで倒さないと `test result` が running を返し続ける。
+            RecoverIfStale();
             var mode = SessionState.GetString(ModeKey, "");
             if (SessionState.GetBool(RunningKey, false))
                 return TestRunStatus.Running(mode);
@@ -150,7 +207,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         /// </summary>
         internal sealed class ResultCallbacks : ICallbacks
         {
-            public void RunStarted(ITestAdaptor testsToRun) { }
+            public void RunStarted(ITestAdaptor testsToRun) => Beat();
 
             public void RunFinished(ITestResultAdaptor result)
             {
@@ -170,10 +227,12 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
                 }
             }
 
-            public void TestStarted(ITestAdaptor test) { }
+            // テスト 1 件ごとに打つ。単体で長いテストでも生存が伝わる。
+            public void TestStarted(ITestAdaptor test) => Beat();
 
             public void TestFinished(ITestResultAdaptor result)
             {
+                Beat();
                 // suite ノードは子の失敗を重複集計するため leaf (実テスト) だけ拾う
                 if (result.Test.HasChildren) return;
                 if (result.TestStatus != TestStatus.Failed) return;

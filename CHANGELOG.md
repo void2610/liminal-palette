@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-22
+
+### Fixed
+- テスト実行が中断されると `SessionState` の `LiminalPalette.TestRunner.Running` が true のまま残り、以降 `POST /api/v1/tests/run` が「既に実行中」で弾かれ続ける問題を修正。Test Runner ウィンドウでのキャンセルや Editor のクラッシュで `RunFinished` が来なかった場合、手動で SessionState を書き換えるまで復旧できなかった。実行中は各コールバック (`RunStarted` / `TestStarted` / `TestFinished`) でハートビートを打ち、`Running=true` なのに 300 秒どれも来ていなければ「中断された残骸」と見なして自動で倒す (実測 PlayMode 53 件 155 秒に対し十分な余裕を取り、単体で長いテストを誤検知しない)。倒した際は警告ログを出す。
+
+### Added
+- `POST /api/v1/tests/run` の body に `force` (bool、既定 false) を追加。ハートビートの猶予を待たずに残骸を無視して開始できる。CLI からは `liminal test editmode --force`。
+
+### Changed
+- **Breaking**: `ITestRunnerService.TryStartRun` のシグネチャに `bool force` を追加した (`TryStartRun(string mode, string filter, bool force, out string error)`)。本インターフェースの実装は `com.unity.test-framework` 導入時のみコンパイルされる Editor サブ asmdef 内に限られるため、影響は同梱実装のみ。
+
 ## [0.4.0] - 2026-09-22
 
 ### Removed

@@ -26,7 +26,9 @@ namespace Void2610.LiminalPalette.Ipc.TestRunning
         /// <paramref name="filter"/> はテスト full name の正規表現 (空 / null で全件)。
         /// 前回の実行が未完了なら開始せず false を返し <paramref name="error"/> を埋める。
         /// </summary>
-        bool TryStartRun(string mode, string filter, out string error);
+        /// <paramref name="force"/> が true なら、中断された実行の残骸 (Running=true のまま
+        /// RunFinished が来なかった状態) を無視して開始する。
+        bool TryStartRun(string mode, string filter, bool force, out string error);
 
         /// <summary>直近の実行状態を返す。</summary>
         TestRunStatus GetStatus();

@@ -12,9 +12,10 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
     /// <summary>
     /// POST /api/v1/tests/run: Unity Test Runner を起動する (認証必須、編集時専用)。
     ///
-    /// Body: {"mode": "playmode" | "editmode", "filter": "&lt;regex&gt;"}
+    /// Body: {"mode": "playmode" | "editmode", "filter": "&lt;regex&gt;", "force": true}
     ///   - mode: 必須。"playmode" / "editmode" (大文字小文字無視)。
     ///   - filter: 任意。テスト full name の正規表現 (空 / 省略で全件)。
+    ///   - force: 任意。中断された実行の残骸を無視して開始する (既定 false)。
     ///
     /// 即リターンし、結果は GET /api/v1/tests/result を polling して取得する。
     /// enterPlayModeOptions を一切書き換えないため、外部 MCP ブリッジ (uLoopMCP 等) の
@@ -41,7 +42,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 return IpcResponse.Json(501, ErrorBody(
                     "Test Runner is unavailable. Install com.unity.test-framework and run from the Unity Editor."));
 
-            if (!TryParseBody(request.Body, out var mode, out var filter, out var parseErr))
+            if (!TryParseBody(request.Body, out var mode, out var filter, out var force, out var parseErr))
                 return IpcResponse.BadRequest(parseErr);
 
             bool started;
@@ -51,7 +52,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 var captured = new string[1];
                 started = await MainThreadDispatcher.RunAsync(() =>
                 {
-                    var ok = service.TryStartRun(mode, filter, out var err);
+                    var ok = service.TryStartRun(mode, filter, force, out var err);
                     captured[0] = err;
                     return Task.FromResult(ok);
                 });
@@ -90,10 +91,11 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 
         // body を JSON として読み、{mode, filter} を取り出す。
         // mode は必須で "playmode" / "editmode" に正規化。それ以外は 400。
-        internal static bool TryParseBody(string body, out string mode, out string filter, out string parseErr)
+        internal static bool TryParseBody(string body, out string mode, out string filter, out bool force, out string parseErr)
         {
             mode = null;
             filter = "";
+            force = false;
             parseErr = null;
 
             if (string.IsNullOrEmpty(body))
@@ -109,6 +111,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 
                 string modeLocal = null;
                 string filterLocal = "";
+                var forceLocal = false;
 
                 while (true)
                 {
@@ -128,6 +131,15 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                             if (valueToken != JsonToken.String) { parseErr = "'filter' must be string or null"; return false; }
                             filterLocal = r.StringValue;
                             break;
+                        case "force":
+                            if (valueToken == JsonToken.Null) { forceLocal = false; break; }
+                            if (valueToken != JsonToken.True && valueToken != JsonToken.False)
+                            {
+                                parseErr = "'force' must be bool or null";
+                                return false;
+                            }
+                            forceLocal = valueToken == JsonToken.True;
+                            break;
                         default:
                             SkipValue(r, valueToken);
                             break;
@@ -144,6 +156,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 
                 mode = normalized;
                 filter = filterLocal ?? "";
+                force = forceLocal;
                 return true;
             }
             catch (Exception ex)

@@ -210,17 +210,59 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             StringAssert.DoesNotContain("failures", res.Body);
         }
 
+        [Test]
+        public async Task RunTests_force_をサービスまで渡す()
+        {
+            var fake = new FakeService();
+            TestRunnerBridge.Current = fake;
+            var ep = new RunTestsEndpoint();
+
+            var res = await ep.HandleAsync(
+                new IpcRequest("POST", "/api/v1/tests/run", null, null,
+                    "{\"mode\":\"editmode\",\"force\":true}"),
+                CancellationToken.None);
+
+            Assert.AreEqual(200, res.StatusCode);
+            Assert.IsTrue(fake.LastForce, "force が渡っていない");
+        }
+
+        [Test]
+        public async Task RunTests_force_省略時は_false()
+        {
+            var fake = new FakeService();
+            TestRunnerBridge.Current = fake;
+            var ep = new RunTestsEndpoint();
+
+            await ep.HandleAsync(
+                new IpcRequest("POST", "/api/v1/tests/run", null, null, "{\"mode\":\"editmode\"}"),
+                CancellationToken.None);
+
+            Assert.IsFalse(fake.LastForce);
+        }
+
+        [Test]
+        public void RunTests_force_が_bool_でなければ_400()
+        {
+            var ok = RunTestsEndpoint.TryParseBody(
+                "{\"mode\":\"editmode\",\"force\":\"yes\"}",
+                out _, out _, out _, out var err);
+            Assert.IsFalse(ok);
+            StringAssert.Contains("force", err);
+        }
+
         private sealed class FakeService : ITestRunnerService
         {
             public bool StartSucceeds = true;
             public TestRunStatus Status = TestRunStatus.Idle;
             public string LastMode;
             public string LastFilter;
+            public bool LastForce;
 
-            public bool TryStartRun(string mode, string filter, out string error)
+            public bool TryStartRun(string mode, string filter, bool force, out string error)
             {
                 LastMode = mode;
                 LastFilter = filter;
+                LastForce = force;
                 if (!StartSucceeds)
                 {
                     error = "already running";

@@ -130,7 +130,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 # → {"success":true,"value":null,"durationMs":0.51,...}
 ```
 
-トークンは Editor 起動時に `~/.liminal-palette/token` へ自動生成される。同梱の CLI なら `liminal exec Player/Health/Set value=100` で同じことができる ([Tools~/liminal/README.md](Tools~/liminal/README.md))。
+トークンは Editor 起動時に `~/.liminal-palette/token` へ自動生成される。CLI なら `liminal exec Player/Health/Set value=100` で同じことができる ([liminal-cli](https://github.com/void2610/liminal-cli))。
 
 ---
 
@@ -229,10 +229,16 @@ R3 と VContainer は Phase 5a 以降必須なので、利用側 manifest で別
 
 ### C. CLI `liminal` (任意)
 
+Editor メニュー `Tools > LiminalPalette > Install CLI...` で
+[liminal-cli](https://github.com/void2610/liminal-cli) のビルド済みバイナリを
+`~/.local/bin/liminal` に入れる。手動で入れる場合は
+[Releases](https://github.com/void2610/liminal-cli/releases/latest) から直接取得してもよい。
+
 ```bash
-ln -s "$(pwd)/Tools~/liminal/liminal" ~/.local/bin/liminal
 liminal init   # cwd / ポート / トークン / Skills の状態をまとめて確認
 ```
+
+> 同梱の Python 版 (`Tools~/liminal/liminal`) は**非推奨**。次のリリースで削除する。
 
 ---
 

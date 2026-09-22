@@ -1,4 +1,15 @@
-# `liminal` — LiminalPalette CLI
+# `liminal` — LiminalPalette CLI (非推奨)
+
+> **この Python 実装は非推奨です。次のリリースで削除します。**
+>
+> 後継は Rust 実装の [liminal-cli](https://github.com/void2610/liminal-cli) で、
+> 外から見える振る舞い (引数 / 出力 / ファイル形式 / exit code) は同じです。
+> Editor メニュー `Tools > LiminalPalette > Install CLI...` で入ります。
+>
+> 移行後に変わる点:
+> - 引数エラーの exit code が 2 → **1** (2 は「サーバには届いたが失敗」専用になった)
+> - HTTP エラーがサーバのメッセージ付きで出る (`HTTP 401: token が一致しません`)
+> - `--json` がサーバのレスポンスをそのまま返す (新しいフィールドが落ちない)
 
 LiminalPalette の HTTP API (`/api/v1/*`) を叩くシングルファイル CLI。
 

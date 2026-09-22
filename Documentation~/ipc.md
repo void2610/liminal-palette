@@ -591,17 +591,16 @@ static void TweakIpcLimits()
 
 ## 専用 CLI
 
-`Tools~/liminal/liminal` に Python 3 標準ライブラリ製のシングルファイル CLI を同梱。
-`chmod +x` するか PATH に symlink すれば `liminal health` / `liminal exec` / `liminal logs` 等が使える。
+[liminal-cli](https://github.com/void2610/liminal-cli) (Rust 実装の単体バイナリ) を使う。
+Editor メニュー `Tools > LiminalPalette > Install CLI...` で `~/.local/bin/liminal` に入る。
 
 ```bash
-ln -s "$(pwd)/Tools~/liminal/liminal" ~/.local/bin/liminal
 liminal health
 liminal exec Player/HP/Heal amount=10
 liminal logs --limit 10 --json | jq '.invocations[].path'
 ```
 
-詳細は [Tools~/liminal/README.md](../Tools~/liminal/README.md)。
+同梱の Python 版 (`Tools~/liminal/liminal`) は非推奨で、次のリリースで削除する。
 
 ---
 

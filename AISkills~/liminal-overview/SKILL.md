@@ -17,14 +17,14 @@ LiminalPalette (LP) は Unity プロジェクトに `[LiminalCommand]` で登録
 
 ## 前提: `liminal` CLI
 
-LP リポジトリ同梱の `Tools~/liminal/liminal` (Python 3 標準ライブラリのみ、依存ゼロ) を PATH に通しておく。
+[liminal-cli](https://github.com/void2610/liminal-cli) のバイナリを PATH に通しておく。
+Unity の Editor メニュー `Tools > LiminalPalette > Install CLI...` で `~/.local/bin/liminal` に入る。
 
 ```bash
-ln -s "<liminal-palette-package-path>/Tools~/liminal/liminal" ~/.local/bin/liminal
 liminal health   # → ok ... が出れば設定 OK
 ```
 
-詳細: `Tools~/liminal/README.md`。
+詳細: liminal-cli の README。
 
 | 自動化される項目 | 出所 |
 |---|---|
@@ -141,7 +141,7 @@ HTTP status 別の対処:
 ## See also
 
 - LP 本体ドキュメント: `Documentation~/{ipc,scenarios,security,commands}.md`
-- CLI 詳細: `Tools~/liminal/README.md`
+- CLI 詳細: [liminal-cli](https://github.com/void2610/liminal-cli)
 - 個別 skill: `/liminal-find-port`, `/liminal-list-commands`, `/liminal-execute`, `/liminal-get-state`, `/liminal-get-logs`, `/liminal-list-scenarios`, `/liminal-run-scenario`
 - references/
   - [ports.md](references/ports.md) — Editor/Play Mode/Build のポート割り当てと両稼働の判別

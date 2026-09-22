@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+- Editor メニュー `Tools > LiminalPalette > Install CLI... / Uninstall CLI` を追加 (`Editor/CliInstaller.cs`)。Rust 実装の [liminal-cli](https://github.com/void2610/liminal-cli) のビルド済みバイナリを GitHub Releases から取得し、プラットフォームを判定して `~/.local/bin/liminal` に配置する。パッケージに同梱しないのは、プラットフォーム別に 3MB 強あり、git URL 配布の本パッケージに入れると全利用者が全履歴を clone することになるため (AI Skills が同梱ファイルのコピーなのとは対照的に、こちらはネットワークが要る)。`~/.local/bin` が PATH に無ければダイアログで設定方法を案内する。
+
+### Deprecated
+- 同梱の Python 製 CLI (`Tools~/liminal/liminal`) を非推奨にした。**次のリリースで削除する**。後継は liminal-cli で、外から見える振る舞い (引数 / 出力 / ファイル形式 / exit code) は揃えてある。移行で変わるのは 3 点: 引数エラーの exit code が 2 → 1 (2 は「サーバには届いたが失敗」専用になった)、HTTP エラーがサーバのメッセージ付きで表示される、`--json` がレスポンスを型に落とさず中継するため新しいフィールドが落ちない。README / `Documentation~/ipc.md` / AI Skill `liminal-overview` の案内も Rust 版に向けた。
+
 ## [0.2.0] - 2026-09-22
 
 0.1.0 に続く最初の正式リリース。これまで `package.json` の version だけが 0.6.0 まで進み、git タグ・GitHub Release・CHANGELOG の節がいずれも作られていなかったため、**採番を 0.2.0 に是正**したうえで 0.1.0 以降の変更をすべて本節に確定させる。以降は各リリースでタグを切る。

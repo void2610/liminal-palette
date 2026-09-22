@@ -990,6 +990,18 @@ def cmd_init(args):
     print(_green("init complete"))
 
 
+def _param_sig(p):
+    """1 引数のシグネチャ表記。choices があれば型名の代わりに候補を並べる。"""
+    choices = p.get("choices") or []
+    # 動的候補は {value, displayName} 形式、静的候補は文字列。
+    values = [c.get("value") if isinstance(c, dict) else c for c in choices]
+    values = [str(v) for v in values if v]
+    # 候補が多いと 1 行に収まらないので、その場合は型名のままにする。
+    if values and len(values) <= 6:
+        return f"{p.get('name')}:{'|'.join(values)}"
+    return f"{p.get('name')}:{p.get('type')}"
+
+
 def cmd_commands(args, base_url, token):
     status, body = _request("GET", f"{base_url}/api/v1/commands", token)
     _check_status(status, body)
@@ -1007,7 +1019,7 @@ def cmd_commands(args, base_url, token):
         path = c.get("path", "")
         desc = c.get("description") or ""
         params = c.get("parameters", []) or []
-        sig = ", ".join(f"{p.get('name')}:{p.get('type')}" for p in params)
+        sig = ", ".join(_param_sig(p) for p in params)
         if sig:
             sig = f" ({sig})"
         line = f"  {_cyan(path.ljust(width))}  {desc}{_dim(sig)}"

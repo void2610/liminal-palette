@@ -104,7 +104,7 @@ unset LP_TOKEN   # → ~/.liminal-palette/token から最新を読み直す
 
 - async コマンドは Task 完了まで待つ。`isAsync: true` のコマンドはそうなる
 - メインスレッドが詰まっている (Editor で重い処理が走っている)
-- `liminal` のタイムアウトは現状 10 秒固定 (`Tools~/liminal/liminal` 内 `TIMEOUT_SEC`)。長時間 async を扱うなら値を上げる
+- `liminal` の HTTP タイムアウトは 10 秒固定 (discovery 中の probe だけ 0.4 秒)。長時間 async を扱う場合は [liminal-cli](https://github.com/void2610/liminal-cli) 側の変更が要る
 
 ### 200 だが `success: false` で `error: null`
 

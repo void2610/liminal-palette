@@ -304,7 +304,15 @@ static void TweakRateLimit() {
 
 1. `liminal exec ... --json` の `error` 本文を読む
 2. Editor Console を確認 (LP がスタックトレースを出している可能性)
-3. LP の GitHub Issue で報告 (再現手順付き)
+3. curl で同じ endpoint を直接叩き、CLI を介さなくても再現するか確かめる
+   ```bash
+   TOKEN=$(cat ~/.liminal-palette/token)
+   curl -s -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"path":"Foo/Bar","args":{}}' http://127.0.0.1:7610/api/v1/execute | jq
+   ```
+4. 報告先を切り分ける (再現手順付き)
+   - curl でも再現する → [liminal-palette](https://github.com/void2610/liminal-palette) (サーバ側)
+   - curl では正常で `liminal` 経由だけおかしい → [liminal-cli](https://github.com/void2610/liminal-cli) (CLI 側)
 
 ---
 
@@ -317,7 +325,7 @@ static void TweakRateLimit() {
 | `Liminal Palette サーバーが見つかりません` | LP が listener を立てていない | Editor 起動確認 / `liminal health` で再スキャン |
 | `urlopen error: timed out` | サーバが応答しない (Domain Reload 中 / メインスレッド詰まり) | 数秒待って再実行 |
 
-`liminal` の HTTP タイムアウトは 10 秒固定 (`Tools~/liminal/liminal` 内 `TIMEOUT_SEC`)。長時間 async は値を上げる必要あり。
+`liminal` の HTTP タイムアウトは 10 秒固定 (discovery 中の probe だけ 0.4 秒)。長時間 async を扱う場合は [liminal-cli](https://github.com/void2610/liminal-cli) 側の変更が要る。
 
 ---
 

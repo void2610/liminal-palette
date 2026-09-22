@@ -199,3 +199,16 @@ done
 - `/liminal-execute` — ここで発見した `path` を実行
 - `/liminal-list-scenarios` — scenarios 一覧 (別 endpoint)
 - examples: [jq-recipes.md](examples/jq-recipes.md) — 検索 / フィルタ / 集計の jq パターン集
+
+---
+
+## `liminal` コマンド自体の不具合
+
+`liminal` は本パッケージとは別の [liminal-cli](https://github.com/void2610/liminal-cli) リポジトリにある
+Rust 製の単体バイナリ。出力の整形 / 引数の解釈 / exit code がおかしい場合はそちらへ。
+サーバ (Unity 側) の応答自体がおかしい場合は liminal-palette へ。
+
+```bash
+liminal --version   # 版と出自を表示する
+liminal doctor      # 切り分けに要る情報を一望する
+```

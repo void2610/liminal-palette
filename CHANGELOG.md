@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-22
+
+### Removed
+- **同梱の Python 製 CLI (`Tools~/liminal/liminal`, 1469 行) を削除した。** 後継は [liminal-cli](https://github.com/void2610/liminal-cli) (Rust 実装の単体バイナリ)。外から見える振る舞い (引数 / 出力 / ファイル形式 / exit code) は揃えてあるが、3 点だけ変わる: 引数エラーの exit code が 2 → 1 (2 は「サーバには届いたが失敗」専用)、HTTP エラーにサーバ側のメッセージが付く、`--json` がレスポンスを型に落とさず中継するので新しいフィールドが落ちない。`Tools~/liminal/README.md` は移行案内として残してあり、旧手順で張った symlink が壊れた場合の直し方もそこに書いた。
+
+### Added
+- `Documentation~/troubleshooting.md` に「CLI (`liminal`) 系」節を追加。CLI は別リポジトリにあるため、症状ごとに「サーバ側か CLI 側か」を切り分ける表と、curl で切り分ける手順、報告先の対応表を置いた。
+- CLI を使う AI Skill 7 個 (`liminal-execute` / `find-port` / `get-logs` / `get-state` / `list-commands` / `list-scenarios` / `run-scenario`) の末尾に、CLI 自体の不具合の報告先を追記。`liminal-overview` にしか導線が無く、個別 Skill から辿れなかったため。
+
+### Changed
+- `liminal-execute/references/error-handling.md` の報告先を「curl でも再現するなら liminal-palette、`liminal` 経由だけなら liminal-cli」に切り分けた。CLI 由来の不具合まで本リポジトリに誘導していたため。
+- AI Skill 内の CLI タイムアウトの記述を Rust 版の実値に更新 (本体 10 秒 / discovery の probe のみ 0.4 秒)。削除済みファイルの定数名を参照していた。
+
 ## [0.3.0] - 2026-09-22
 
 ### Added

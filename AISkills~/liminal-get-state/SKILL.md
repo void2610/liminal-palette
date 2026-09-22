@@ -239,3 +239,16 @@ liminal --port 7611 state --json | jq '.fields[] | select(.value != null)'
 - `/liminal-run-scenario` — execute + assert_equals を 1 リクエストに
 - examples: [verify-patterns.md](examples/verify-patterns.md) — bash での検証パターン集
 - LP 本体: `Documentation~/commands.md` の `[LiminalObservableField]` セクション
+
+---
+
+## `liminal` コマンド自体の不具合
+
+`liminal` は本パッケージとは別の [liminal-cli](https://github.com/void2610/liminal-cli) リポジトリにある
+Rust 製の単体バイナリ。出力の整形 / 引数の解釈 / exit code がおかしい場合はそちらへ。
+サーバ (Unity 側) の応答自体がおかしい場合は liminal-palette へ。
+
+```bash
+liminal --version   # 版と出自を表示する
+liminal doctor      # 切り分けに要る情報を一望する
+```

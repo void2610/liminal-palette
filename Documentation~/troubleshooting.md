@@ -375,6 +375,43 @@ UI / Editor / Runtime.InputSystem / Runtime.Ipc は `autoReferenced: false` ま�
 
 ---
 
+## CLI (`liminal`) 系
+
+CLI は**別リポジトリ**にある。バグを踏んだらまず「サーバ側か CLI 側か」を切り分ける。
+
+```bash
+liminal --version   # 版と出自 (github.com/void2610/liminal-cli) が出る
+liminal doctor      # CLI の版 / トークン / 検出状況 / 生存ポートを一望
+```
+
+| 症状 | 切り分け | 直す先 |
+|---|---|---|
+| `liminal: command not found` | `ls -l $(which liminal)` で壊れた symlink なら旧 Python 版を指している | Editor メニュー `Tools > LiminalPalette > Install CLI...` で入れ直す |
+| `HTTP 401: ...` | トークン不一致。`liminal doctor` の Token 節を見る | `~/.liminal-palette/token` |
+| `Liminal Palette サーバーが見つかりません` | Unity が起動しているか、`liminal doctor` の Live probe を見る | 本リポジトリ (サーバ側) |
+| `複数の Unity プロジェクトが起動中です` | 仕様。`--project` / `--mode` で対象を指定する | — |
+| コマンドの実行結果がおかしい (`success:false`、値が違う) | `/api/v1/execute` を curl で直接叩いて同じ結果か確認 | 同じなら**本リポジトリ**、違うなら CLI |
+| 出力の整形・引数・exit code がおかしい | curl では正しい | [liminal-cli](https://github.com/void2610/liminal-cli) |
+
+curl での切り分け:
+
+```bash
+TOKEN=$(cat ~/.liminal-palette/token)
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7610/api/v1/health | jq
+```
+
+これが正しく返るならサーバ側は健全で、原因は CLI 側にある。
+
+> 旧 Python 版 (`Tools~/liminal/liminal`) は v0.4.0 で削除した。後継は
+> [liminal-cli](https://github.com/void2610/liminal-cli) (Rust 実装の単体バイナリ)。
+
+---
+
 ## サポート
 
-解決しない場合は GitHub Issue を立てる。
+解決しない場合は GitHub Issue を立てる。報告先はレイヤで分かれる。
+
+| 対象 | リポジトリ |
+|---|---|
+| Unity パッケージ / パレット UI / HTTP API / シナリオ | [liminal-palette](https://github.com/void2610/liminal-palette) |
+| `liminal` コマンドの引数・出力・exit code | [liminal-cli](https://github.com/void2610/liminal-cli) |

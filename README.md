@@ -238,7 +238,7 @@ Editor メニュー `Tools > LiminalPalette > Install CLI...` で
 liminal init   # cwd / ポート / トークン / Skills の状態をまとめて確認
 ```
 
-> 同梱の Python 版 (`Tools~/liminal/liminal`) は**非推奨**。次のリリースで削除する。
+> 旧 Python 版 (`Tools~/liminal/liminal`) は v0.4.0 で削除した。
 
 ---
 

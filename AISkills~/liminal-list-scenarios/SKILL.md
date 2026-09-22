@@ -202,3 +202,16 @@ liminal --port 7611 scenarios --json | jq -r '.scenarios[].path'
 - `/liminal-list-commands` — シナリオ内 `command` ステップで使う `[LiminalCommand]` の発見
 - `/liminal-get-state` — シナリオ内 `assert_equals` で使う `[LiminalObservableField]` の現在値
 - LP 本体: `Documentation~/scenarios.md`
+
+---
+
+## `liminal` コマンド自体の不具合
+
+`liminal` は本パッケージとは別の [liminal-cli](https://github.com/void2610/liminal-cli) リポジトリにある
+Rust 製の単体バイナリ。出力の整形 / 引数の解釈 / exit code がおかしい場合はそちらへ。
+サーバ (Unity 側) の応答自体がおかしい場合は liminal-palette へ。
+
+```bash
+liminal --version   # 版と出自を表示する
+liminal doctor      # 切り分けに要る情報を一望する
+```

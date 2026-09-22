@@ -16,7 +16,7 @@ namespace Void2610.LiminalPalette
         /// パッケージのバージョン。`/api/v1/health` が返す値でもある。
         /// package.json の version と手で揃える (Runtime から package.json を読む手段が無いため)。
         /// </summary>
-        public const string Version = "0.3.0";
+        public const string Version = "0.4.0";
 
         /// <summary>共有レジストリ。動的登録 / 検索を行いたい場合に使用する。</summary>
         public static ICommandRegistry Registry => CommandRegistry.Default;

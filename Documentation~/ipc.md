@@ -600,7 +600,8 @@ liminal exec Player/HP/Heal amount=10
 liminal logs --limit 10 --json | jq '.invocations[].path'
 ```
 
-同梱の Python 版 (`Tools~/liminal/liminal`) は非推奨で、次のリリースで削除する。
+旧 Python 版 (`Tools~/liminal/liminal`) は v0.4.0 で削除した。
+切り分けと報告先は [troubleshooting.md](troubleshooting.md) の「CLI (`liminal`) 系」を参照。
 
 ---
 

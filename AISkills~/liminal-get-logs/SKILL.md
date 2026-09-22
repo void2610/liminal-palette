@@ -210,3 +210,16 @@ liminal --port 7611 logs --limit 10 --json | jq -r '.invocations[] | "[R] " + .p
 - `/liminal-execute` — 履歴に記録されるコマンドを実行
 - `/liminal-run-scenario` — シナリオ内コマンドも履歴に記録される
 - examples: [jq-queries.md](examples/jq-queries.md) — フィルタ / 集計 / レポート用 jq パターン集
+
+---
+
+## `liminal` コマンド自体の不具合
+
+`liminal` は本パッケージとは別の [liminal-cli](https://github.com/void2610/liminal-cli) リポジトリにある
+Rust 製の単体バイナリ。出力の整形 / 引数の解釈 / exit code がおかしい場合はそちらへ。
+サーバ (Unity 側) の応答自体がおかしい場合は liminal-palette へ。
+
+```bash
+liminal --version   # 版と出自を表示する
+liminal doctor      # 切り分けに要る情報を一望する
+```

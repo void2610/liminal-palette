@@ -25,7 +25,7 @@ liminal logs --limit 50
 
 | 引数 | 既定 | 上限 | 説明 |
 |---|---|---|---|
-| `--limit N` | 20 | 200 (`InvocationStore.Capacity`) | 取得件数。新しい順 |
+| `--limit N` | 20 | 400 (`InvocationStore.MaxRetained`) | 取得件数。新しい順 |
 
 出力例 (装飾付き):
 
@@ -51,11 +51,11 @@ liminal logs --limit 200 --json \
   | jq '.invocations[] | select(.result.success == false) | {path, error: .result.error, args}'
 ```
 
-### シナリオ外の直接実行のみ
+### 手動実行 (パレット UI) のみ
 
 ```bash
-liminal logs --limit 200 --json \
-  | jq -r '.invocations[] | select(.isFromScenario != true) | .path'
+liminal logs --limit 400 --json \
+  | jq -r '.invocations[] | select(.origin == "user") | .path'
 ```
 
 ### 直近 1 件の `result.value`
@@ -84,7 +84,7 @@ liminal logs --limit 200 --json \
       "path": "Test/Vector",
       "timestamp": "2026-04-30T12:34:56.789Z",
       "args": {"v": "(1, 2, 3)"},
-      "isFromScenario": false,
+      "origin": "user",
       "result": {
         "success": true,
         "value": "(2.00, 4.00, 6.00)",
@@ -106,7 +106,7 @@ liminal logs --limit 200 --json \
 | `invocations[].path` | 実行されたコマンドの path |
 | `invocations[].timestamp` | UTC ISO 8601 |
 | `invocations[].args` | 実行時の引数 (string 化済み)。**リトライに使える** |
-| `invocations[].isFromScenario` | シナリオ内ステップとして実行されたか |
+| `invocations[].origin` | 実行経路。`user` (パレット UI) / `ipc` (本 API) / `scenario` (シナリオ内ステップ・集約) |
 | `invocations[].result` | `liminal exec` のレスポンスと**同一スキーマ** (success, value, error, exceptionType, stackTrace, durationMs, logs) |
 | `total` | Store 内の総件数 (limit と独立) |
 | `limit` | 実際に返した件数の上限 |
@@ -136,14 +136,15 @@ liminal exec "$PATH_FAIL" value=50
 
 ---
 
-## シナリオ実行との関係
+## 実行経路との関係
 
-シナリオ (`liminal run`) 内で `command` ステップとして実行されたコマンドも `InvocationStore` に **`isFromScenario: true`** で記録される。
+すべての記録は実行経路 `origin` を持つ。シナリオ (`liminal run`) 内の `command` ステップは `scenario`、`liminal exec` や MCP 経由の HTTP 実行は `ipc`、パレット UI からの手動実行は `user`。
 
 | 用途 | フィルタ |
 |---|---|
-| 直接実行のみ (UI / `liminal exec` 経由) | `select(.isFromScenario != true)` |
-| シナリオ内ステップのみ | `select(.isFromScenario == true)` |
+| 手動実行のみ (パレット UI) | `select(.origin == "user")` |
+| CLI / MCP 経由のみ | `select(.origin == "ipc")` |
+| シナリオ内ステップのみ | `select(.origin == "scenario")` |
 | シナリオ集約 (シナリオ全体を 1 行で見る) | path が `Scenario/<シナリオ path>` 形式の行を探す (LP 側でシナリオ実行ごとに集約レコードも記録される) |
 
 ---
@@ -152,13 +153,13 @@ liminal exec "$PATH_FAIL" value=50
 
 ### Capacity
 
-`InvocationStore` のリングバッファは **200 件で固定**。古いものから消える。長時間プレイで履歴を全部取りたい場合は **定期的に `liminal logs` を取って外部に保存**するパターン。
+`InvocationStore` は **手動実行 (`origin == "user"`) 200 件と、自動化由来 (`ipc` / `scenario`) 200 件を独立した枠で保持**する (合計最大 400 件)。枠ごとに古いものから消えるので、シナリオや E2E をいくら流しても手動実行の履歴は押し出されない。長時間プレイで履歴を全部取りたい場合は **定期的に `liminal logs` を取って外部に保存**するパターン。
 
 ```bash
 # 定期 dump
 mkdir -p /tmp/lp-logs
 while true; do
-  liminal logs --limit 200 --json > "/tmp/lp-logs/$(date +%Y%m%d-%H%M%S).json"
+  liminal logs --limit 400 --json > "/tmp/lp-logs/$(date +%Y%m%d-%H%M%S).json"
   sleep 60
 done
 ```
@@ -200,7 +201,7 @@ liminal --port 7611 logs --limit 10 --json | jq -r '.invocations[] | "[R] " + .p
 | 症状 | 状況 | 対処 |
 |---|---|---|
 | HTTP 401 | Token 不一致 | `~/.liminal-palette/token` 再生成 |
-| `--limit` を 200 超で送った | サーバ側で 200 にクランプ (エラーにはならない) | そのままで OK |
+| `--limit` を 400 超で送った | サーバ側で 400 にクランプ (エラーにはならない) | そのままで OK |
 
 ---
 

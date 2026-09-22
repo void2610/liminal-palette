@@ -86,6 +86,8 @@ public class PaletteRuntimeSettings : ScriptableObject
 | `Scenario` | シナリオの各ステップ + 集約 | 表示 | 除外 | 同上 (`Ipc` と共有) |
 
 枠を分けているのは、E2E やシナリオの大量実行で手打ちのコマンド履歴が FIFO で押し出されるのを防ぐため。
+合計の保持上限は `InvocationStore.MaxRetained` (400)。`GET /api/v1/logs` の `limit` 上限もこれに揃えてあり、
+レスポンスの `invocations[].origin` から経路を判別できる ([ipc.md](ipc.md))。
 `CommandInvocation.IsFromScenario` は互換のため残っているが、History タブの除外条件は `IsAutomated` (= `Origin != User`)。
 
 ---

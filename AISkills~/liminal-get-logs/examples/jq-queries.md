@@ -112,18 +112,24 @@
 .invocations[] | select(.timestamp > "2026-05-07T00:00:00Z")
 ```
 
-## scenarios 関連
+## 実行経路 (origin) 関連
 
 ### シナリオ内コマンドだけ
 
 ```jq
-.invocations[] | select(.isFromScenario == true)
+.invocations[] | select(.origin == "scenario")
 ```
 
-### 直接実行のみ
+### 手動実行 (パレット UI) のみ
 
 ```jq
-.invocations[] | select(.isFromScenario != true)
+.invocations[] | select(.origin == "user")
+```
+
+### CLI / MCP 経由のみ
+
+```jq
+.invocations[] | select(.origin == "ipc")
 ```
 
 ### シナリオ集約レコード (path が `Scenario/...` のもの)

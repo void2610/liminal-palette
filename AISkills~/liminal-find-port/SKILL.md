@@ -27,7 +27,7 @@ liminal health
 
 ```
 ok  http://127.0.0.1:7610
-  version       : 0.4.0
+  version       : 0.2.0
   mode          : editor
   projectName   : MyGame
   projectPath   : /Users/me/dev/MyGame
@@ -134,7 +134,7 @@ liminal --base-url http://127.0.0.1:7611 state                       # Play Mode
 `--json` 無しなら整形済み、`--json` 付きなら以下が返る:
 
 ```json
-{"status":"ok","version":"0.4.0","mode":"editor","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
+{"status":"ok","version":"0.2.0","mode":"editor","projectName":"MyGame","projectPath":"/Users/me/dev/MyGame","commandCount":356}
 ```
 
 | フィールド | 用途 |

@@ -53,6 +53,15 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         }
 
         [Test]
+        public async Task Health_ReportsPackageVersion()
+        {
+            // 以前は package.json と無関係な固定文字列を返しており、利用側が誤ったバージョンを掴んでいた。
+            var ep = new HealthEndpoint("editor", "TestProject", "/tmp/TestProject");
+            var res = await ep.HandleAsync(Get("/api/v1/health"), CancellationToken.None);
+            StringAssert.Contains($"\"version\":\"{LiminalPalette.Version}\"", res.Body);
+        }
+
+        [Test]
         public async Task Health_ReturnsProjectIdentityFromConstructor()
         {
             // bootstrap (メインスレッド) で取得した projectName / projectPath を

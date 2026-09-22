@@ -7,7 +7,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 {
     /// <summary>
     /// GET /api/v1/health: 認証不要の生存確認。
-    /// 戻り値: {"status":"ok","version":"0.4.0","mode":"editor|runtime","projectName":"...","projectPath":"...","commandCount":N}
+    /// 戻り値: {"status":"ok","version":"<package version>","mode":"editor|runtime","projectName":"...","projectPath":"...","commandCount":N}
     /// projectName / projectPath は同一マシンで複数 Unity プロジェクトが
     /// 同時起動しているときに CLI 側がポートとプロジェクトを紐付けるために使う。
     /// mode は同一プロジェクト内で Editor / Runtime (Play Mode) listener を区別するためのフラグ。
@@ -44,7 +44,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
             var w = new JsonWriter();
             w.BeginObject();
             w.WriteString("status", "ok");
-            w.WriteString("version", "0.4.0");
+            w.WriteString("version", LiminalPalette.Version);
             w.WriteString("mode", _mode);
             w.WriteString("projectName", _projectName);
             w.WriteString("projectPath", _projectPath);

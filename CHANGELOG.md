@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-22
+
+0.1.0 に続く最初の正式リリース。これまで `package.json` の version だけが 0.6.0 まで進み、git タグ・GitHub Release・CHANGELOG の節がいずれも作られていなかったため、**採番を 0.2.0 に是正**したうえで 0.1.0 以降の変更をすべて本節に確定させる。以降は各リリースでタグを切る。
+
 ### Added
 - `GET /api/v1/tests/result` の completed レスポンスに `failures` 配列 (失敗テストの full name + メッセージ、先頭 30 件・メッセージ 2000 字上限) を追加。`liminal test` も失敗一覧を表示する。外部 MCP ブリッジの run-tests を置き換えるのに必要な「どのテストがなぜ落ちたか」を polling API だけで取得できる
 - `POST /api/v1/tests/run` で開始したテスト実行中は `EditorUtility.audioMasterMute` を立て、完了時に元値へ復元する (DomainReload 跨ぎは SessionState で保持)。CLI 駆動のテストで音を鳴らさない処理を利用側プロジェクトが書かなくてよくなった。Test Runner ウィンドウ等の外部実行では触らない
@@ -40,6 +44,8 @@
 - CLI コマンド名を `lp` から `liminal` に変更 (`lp` は macOS の line printer ユーティリティと衝突するため)。`Tools~/lp/` → `Tools~/liminal/`、AI Skill 名も `lp-*` → `liminal-*` にリネーム。AISkillsInstaller の Uninstall は legacy `lp-*` ディレクトリも自動的に掃除する。
 
 ### Fixed
+- `/api/v1/health` が `package.json` と無関係な固定文字列 `"0.4.0"` を返していたのを修正。`LiminalPalette.Version` 定数を参照するようにした (Runtime から package.json を読む手段が無いため、リリース時は定数と package.json を揃える)。
+- インストール手順が存在しないリポジトリ (`void2610-org/liminal-palette`) と存在しないタグ (`v0.5.0`) を案内していたのを修正。
 - enum を引数に取る `[LiminalCommand]` が、パレットの引数入力フローで既定値でしか実行できなかったバグを修正。引数フローはモバイル WebGL のソフトキーボード「完了」を拾うためエディタ内の全要素に `FocusOutEvent` を仕掛けていたが、`EnumField` はドロップダウンをパネル外のレイヤーに開くためフィールド自体が blur し、選択肢をタップする前に「次へ / 実行」まで進んでいた。blur による確定をテキスト入力欄 (`TextInputBaseField<T>` 派生) に限定し、ドロップダウンや Toggle を開いても確定しないようにした。
 - enum 引数の `Choices` が `[LiminalParam]` で明示したときしか埋まらず、`GET /api/v1/commands` / `liminal commands` に取りうる値が出ていなかったのを修正。未指定の enum は `Enum.GetNames` で自動補完する (明示した場合は上書きしない)。あわせて `liminal commands` の表示を `type:ReportResultType` から `type:CorrectUp|RawUp|Nonsense|Failure` のように候補入りにした (候補 7 件以上は従来どおり型名)。
 - シナリオ / E2E 実行でユーザーがパレットから手で打ったコマンド履歴が押し出されて消えるバグを修正。`InvocationStore` は容量 200 の単一 FIFO を全経路で共有しており、History タブは表示時に `IsFromScenario` を除外していたものの保持枠は共有だったため、ステップ数の多いシナリオを数回回すだけで手打ちのエントリが古い側から捨てられていた。実行経路を表す `InvocationOrigin` (`User` / `Ipc` / `Scenario`) を導入し、手動実行 (`Capacity`) と自動化由来 (`AutomatedCapacity`) を独立した枠で trim するように変更。あわせて `ExecuteCommandEndpoint` (HTTP `/execute`) が手動実行として記録していたのを `InvocationOrigin.Ipc` に是正し、CLI / MCP / E2E ランナーからの実行が History タブに混入しないようにした。`CommandInvocation.IsFromScenario` / `Record(..., bool isFromScenario)` / `CommandInvocation(..., bool isFromScenario)` は互換のため残している (History タブの除外条件は新しい `IsAutomated`)。あわせて `GET /api/v1/logs` の `limit` 上限を新しい合計保持上限 `InvocationStore.MaxRetained` (400) に引き上げ、レスポンスに実行経路 `invocations[].origin` (`user` / `ipc` / `scenario`) を追加した。AI Skill `liminal-get-logs` のドキュメントが存在しない `isFromScenario` フィールドでのフィルタを案内していたのもあわせて修正。

@@ -42,7 +42,7 @@ git URL で導入可能:
 // Packages/manifest.json
 {
   "dependencies": {
-    "com.void2610.liminal-palette": "https://github.com/void2610-org/liminal-palette.git#v0.5.0"
+    "com.void2610.liminal-palette": "https://github.com/void2610/liminal-palette.git#v0.2.0"
   }
 }
 ```
@@ -143,7 +143,7 @@ TOKEN=$(cat ~/.liminal-palette/token)
 
 # 動作確認 (認証不要)
 curl -s http://127.0.0.1:7610/api/v1/health
-# → {"status":"ok","version":"0.4.0","commandCount":...}
+# → {"status":"ok","version":"0.2.0","commandCount":...}
 
 # コマンド一覧 (認証必須)
 curl -s -H "Authorization: Bearer $TOKEN" \

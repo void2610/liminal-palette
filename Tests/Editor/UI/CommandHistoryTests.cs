@@ -91,18 +91,18 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void 本番キーを汚さない()
         {
-            EditorPrefs.SetString(EditorCommandHistory.PrefsKey, "USER-DATA");
-            try
-            {
-                var h = new EditorCommandHistory(_key);
-                h.Record("A");
-                h.Clear();
-                Assert.AreEqual("USER-DATA", EditorPrefs.GetString(EditorCommandHistory.PrefsKey, ""));
-            }
-            finally
-            {
-                EditorPrefs.DeleteKey(EditorCommandHistory.PrefsKey);
-            }
+            // 本番キーには書き込みも削除もしない。観測するだけ。
+            // (以前はここで SetString / DeleteKey しており、テストを回すたびに
+            //  利用者の「最近使ったコマンド」が実際に消えていた)
+            const string sentinel = "\u0000__absent__";
+            var before = EditorPrefs.GetString(EditorCommandHistory.PrefsKey, sentinel);
+
+            var h = new EditorCommandHistory(_key);
+            h.Record("A");
+            h.Clear();
+
+            var after = EditorPrefs.GetString(EditorCommandHistory.PrefsKey, sentinel);
+            Assert.AreEqual(before, after, "本番キーが変化している");
         }
 
         [Test]
@@ -154,22 +154,16 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void 本番キーを汚さない()
         {
-            UnityEngine.PlayerPrefs.SetString(PlayerPrefsCommandHistory.PrefsKey, "USER-DATA");
-            UnityEngine.PlayerPrefs.Save();
-            try
-            {
-                var h = new PlayerPrefsCommandHistory(_key);
-                h.Record("A");
-                h.Clear();
-                Assert.AreEqual(
-                    "USER-DATA",
-                    UnityEngine.PlayerPrefs.GetString(PlayerPrefsCommandHistory.PrefsKey, ""));
-            }
-            finally
-            {
-                UnityEngine.PlayerPrefs.DeleteKey(PlayerPrefsCommandHistory.PrefsKey);
-                UnityEngine.PlayerPrefs.Save();
-            }
+            // EditorCommandHistoryTests と同じく、本番キーは観測するだけ。
+            const string sentinel = "\u0000__absent__";
+            var before = UnityEngine.PlayerPrefs.GetString(PlayerPrefsCommandHistory.PrefsKey, sentinel);
+
+            var h = new PlayerPrefsCommandHistory(_key);
+            h.Record("A");
+            h.Clear();
+
+            var after = UnityEngine.PlayerPrefs.GetString(PlayerPrefsCommandHistory.PrefsKey, sentinel);
+            Assert.AreEqual(before, after, "本番キーが変化している");
         }
 
         [Test]

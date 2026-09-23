@@ -78,7 +78,11 @@ namespace Void2610.LiminalPalette.Tests.UI
             foreach (var p in paths) reg.Register(MakeDescriptor(p));
             var exec = new FakeExecutor();
             var hist = new InMemoryCommandHistory();
-            return (new PaletteController(reg, exec, hist), reg, exec, hist);
+            var c = new PaletteController(reg, exec, hist);
+            // 実行記録は専用ストアへ。既定 (InvocationStore.Instance) のままだと
+            // テストのダミー実行が利用者の Log / History タブと保存領域に混ざる。
+            c.UseInvocationStoreForTest(new InvocationStore());
+            return (c, reg, exec, hist);
         }
 
         // ---- Tests ----

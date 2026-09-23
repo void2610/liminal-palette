@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- **「本番キーを汚さない」ことを確かめるテスト自身が本番キーを消していた問題を修正。** `EditorPrefs.SetString(本番キー, "USER-DATA")` してから `finally` で `DeleteKey` しており、テストを 1 回回すだけで利用者の「最近使ったコマンド」と Log / History の保存が消えていた。本番キーには**書き込みも削除もせず、前後で値が変化しないことを観測するだけ**に変更 (`EditorCommandHistory` / `PlayerPrefsCommandHistory` / `EditorPrefsInvocationStorage` の 3 箇所)。
+- `PaletteControllerTests` のダミー実行が `InvocationStore.Instance` (Editor の Log / History タブが参照する実ストア) に手動実行として記録され、保存領域に混入していた問題を修正。`PaletteController.UseInvocationStoreForTest` で書き出し先を差し替えられるようにし、テストは専用インスタンスを使う。
+
 ### Added
 - **Log / History タブの記録が Editor 再起動を跨いで残るようになった。** `InvocationStore` は永続化を持たない static シングルトンだったため、Unity の domain reload (スクリプト再コンパイル / Play Mode の出入り / テスト実行) のたびに中身が消えていた。E2E を回すと履歴が消えるのも、再起動すると空になるのも根本原因はこれ。`IInvocationStorage` を追加して保存先を注入できるようにし、Editor では `EditorPrefs` に保存する (`EditorPrefsInvocationStorage`、`[InitializeOnLoad]` で domain reload のたびに繋ぎ直す)。
   - 保存するのは **手動実行 (`InvocationOrigin.User`) のみ**。自動化由来を混ぜると E2E を 1 回回すだけで保存先が埋まる。

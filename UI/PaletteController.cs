@@ -63,6 +63,16 @@ namespace Void2610.LiminalPalette.UI
         /// <summary>注入された履歴。タブの "history" フィルタで View 側から参照する。</summary>
         public ICommandHistory History => _history;
 
+        // 実行記録の書き出し先。既定は InvocationStore.Instance。
+        private InvocationStore _invocations;
+
+        /// <summary>
+        /// 実行記録の書き出し先を差し替える (テスト用)。
+        /// 実ストアは Editor の Log / History タブが参照しているので、テストが書くと利用者の記録に混ざる。
+        /// </summary>
+        internal void UseInvocationStoreForTest(InvocationStore store)
+            => _invocations = store ?? throw new ArgumentNullException(nameof(store));
+
         public PaletteController(ICommandRegistry registry, ICommandExecutor executor, ICommandHistory history)
             : this(registry, executor, history, baseFilter: null)
         {
@@ -82,6 +92,8 @@ namespace Void2610.LiminalPalette.UI
             _executor = executor ?? throw new ArgumentNullException(nameof(executor));
             _history = history ?? throw new ArgumentNullException(nameof(history));
             _baseFilter = baseFilter;
+            // 既定は実ストア。テストは専用インスタンスを差し込んで、利用者の Log / History を汚さない。
+            _invocations = InvocationStore.Instance;
 
             // 初期表示として全件を計算しておく。
             RecomputeResults();
@@ -175,7 +187,7 @@ namespace Void2610.LiminalPalette.UI
 
             var result = await _executor.ExecuteAsync(invocation.Path, stringArgs, ct);
             LastResult = result;
-            InvocationStore.Instance.Record(invocation.Path, invocation.Args, result);
+            _invocations.Record(invocation.Path, invocation.Args, result);
             _history.Record(invocation.Path);
             RecomputeResults();
             StateChanged?.Invoke();
@@ -192,7 +204,7 @@ namespace Void2610.LiminalPalette.UI
             LastResult = result;
 
             // パレットの Log / History タブに実行記録を蓄積する (パレット経由実行のみが対象)。
-            InvocationStore.Instance.Record(path, typedArgs, result);
+            _invocations.Record(path, typedArgs, result);
 
             // 成否に関わらず履歴に記録する。エラーでも「最近何を試したか」を残しておく方が UX として有用。
             _history.Record(path);

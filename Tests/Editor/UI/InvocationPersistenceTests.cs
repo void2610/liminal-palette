@@ -123,21 +123,17 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void 本番キーを汚さない()
         {
-            EditorPrefs.SetString(EditorPrefsInvocationStorage.PrefsKey, "USER-DATA");
-            try
-            {
-                var s = new InvocationStore();
-                s.AttachStorage(Storage());
-                s.Record("A", null, Ok(), InvocationOrigin.User);
-                s.Clear();
+            // 本番キーには書き込みも削除もしない。観測するだけ。
+            const string sentinel = "\u0000__absent__";
+            var before = EditorPrefs.GetString(EditorPrefsInvocationStorage.PrefsKey, sentinel);
 
-                Assert.AreEqual("USER-DATA",
-                    EditorPrefs.GetString(EditorPrefsInvocationStorage.PrefsKey, ""));
-            }
-            finally
-            {
-                EditorPrefs.DeleteKey(EditorPrefsInvocationStorage.PrefsKey);
-            }
+            var store = new InvocationStore();
+            store.AttachStorage(Storage());
+            store.Record("A", null, Ok(), InvocationOrigin.User);
+            store.Clear();
+
+            var after = EditorPrefs.GetString(EditorPrefsInvocationStorage.PrefsKey, sentinel);
+            Assert.AreEqual(before, after, "本番キーが変化している");
         }
     }
 }

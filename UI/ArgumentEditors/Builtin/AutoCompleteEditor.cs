@@ -37,6 +37,18 @@ namespace Void2610.LiminalPalette.UI
             Action<object> onChanged,
             string initialText,
             Func<string, object> convert)
+            => Build(param, onChanged, initialText, convert, null);
+
+        /// <summary>
+        /// 複数値 ([Flags] enum) 用。候補の絞り込みと確定を「カンマ区切りの最後の区画」に対して行い、
+        /// 確定した Enter を消費する (次のステップへ進ませない) ことで、続けて値を足せるようにする。
+        /// </summary>
+        internal VisualElement Build(
+            ParameterDescriptor param,
+            Action<object> onChanged,
+            string initialText,
+            Func<string, object> convert,
+            MultiValueTextPolicy multi)
         {
             var root = new VisualElement();
             root.style.flexDirection = FlexDirection.Column;
@@ -65,12 +77,14 @@ namespace Void2610.LiminalPalette.UI
             field.RegisterValueChangedCallback(e =>
             {
                 Notify(e.newValue);
-                topMatchValue = RebuildSuggestions(suggestionList, field, param, e.newValue, Notify);
+                topMatchValue = RebuildSuggestions(
+                    suggestionList, field, param, FilterTextOf(multi, e.newValue), Notify, multi);
             });
 
             // フォーカス取得時に候補表示
             field.RegisterCallback<FocusInEvent>(_ =>
-                topMatchValue = RebuildSuggestions(suggestionList, field, param, field.value, Notify));
+                topMatchValue = RebuildSuggestions(
+                    suggestionList, field, param, FilterTextOf(multi, field.value), Notify, multi));
 
             // フォーカス喪失時に候補非表示（少し遅延してクリックを拾えるようにする）
             field.RegisterCallback<FocusOutEvent>(_ =>
@@ -78,17 +92,30 @@ namespace Void2610.LiminalPalette.UI
 
             // PaletteViewからEnter時に呼ばれる補完確定関数
             // 戻り値: 補完が実行されたらtrue
-            Func<bool> tryComplete = () =>
+            // 確定処理。複数値の場合は最後の区画だけ置き換え、続きを打てる形にする。
+            bool Complete()
             {
                 if (topMatchValue == null || suggestionList.style.display == DisplayStyle.None) return false;
-                field.SetValueWithoutNotify(topMatchValue);
-                Notify(topMatchValue);
+                var newText = multi == null
+                    ? topMatchValue
+                    : multi.Apply(field.value, topMatchValue);
+                field.SetValueWithoutNotify(newText);
+                Notify(newText);
                 suggestionList.style.display = DisplayStyle.None;
                 topMatchValue = null;
                 return true;
-            };
+            }
 
-            root.userData = tryComplete;
+            if (multi == null)
+            {
+                // 従来どおり: 確定しても Enter はフローに渡し、そのまま次のステップへ進む。
+                root.userData = (Func<bool>)Complete;
+            }
+            else
+            {
+                // 確定したら Enter を消費する。もう一度 Enter を押すと次のステップへ進む。
+                root.userData = (TryCompleteAndConsume)(() => Complete());
+            }
 
             root.Add(field);
             root.Add(suggestionList);
@@ -98,9 +125,13 @@ namespace Void2610.LiminalPalette.UI
         /// <summary>
         /// 候補リストを再構築する。候補が1件だけならそのvalueを返す。
         /// </summary>
+        // 絞り込みに使う文字列。複数値なら「最後の区画」だけを見る。
+        private static string FilterTextOf(MultiValueTextPolicy multi, string text)
+            => multi == null ? text : multi.LastSegment(text);
+
         private static string RebuildSuggestions(
             ScrollView list, TextField field, ParameterDescriptor param,
-            string filter, Action<string> notify)
+            string filter, Action<string> notify, MultiValueTextPolicy multi)
         {
             list.Clear();
 
@@ -151,8 +182,9 @@ namespace Void2610.LiminalPalette.UI
                 var capturedValue = item.Value;
                 label.RegisterCallback<MouseDownEvent>(e =>
                 {
-                    field.SetValueWithoutNotify(capturedValue);
-                    notify(capturedValue);
+                    var newText = multi == null ? capturedValue : multi.Apply(field.value, capturedValue);
+                    field.SetValueWithoutNotify(newText);
+                    notify(newText);
                     list.style.display = DisplayStyle.None;
                     e.StopPropagation();
                 });
@@ -164,6 +196,31 @@ namespace Void2610.LiminalPalette.UI
 
             // 候補があれば先頭のvalueを返す
             return matchedItems.Count > 0 ? matchedItems[0].Value : null;
+        }
+
+        /// <summary>
+        /// カンマ区切りで複数値を打つときの区画の扱い。
+        /// </summary>
+        internal sealed class MultiValueTextPolicy
+        {
+            private const string Separator = ", ";
+
+            /// <summary>絞り込みに使う「最後の区画」。</summary>
+            internal string LastSegment(string text)
+            {
+                if (string.IsNullOrEmpty(text)) return "";
+                var i = text.LastIndexOf(',');
+                return i < 0 ? text.Trim() : text.Substring(i + 1).Trim();
+            }
+
+            /// <summary>最後の区画を候補で置き換え、続きを打てるよう区切りを足す。</summary>
+            internal string Apply(string text, string candidate)
+            {
+                if (string.IsNullOrEmpty(text)) return candidate + Separator;
+                var i = text.LastIndexOf(',');
+                var head = i < 0 ? "" : text.Substring(0, i + 1) + " ";
+                return head + candidate + Separator;
+            }
         }
 
         // string パラメータの初期テキスト。既定値が無ければ空。

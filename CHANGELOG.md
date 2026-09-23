@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Changed
+- **enum / [Flags] enum の引数を、既存の文字列候補と同じ「打って絞り込み → Enter で確定」に統一した。** `EnumField` のドロップダウンも `EnumFlagsField` も Toggle 列も、いずれもマウス無しでは操作できず、キーボードのホームポジションから手を離さずに操作するというパレット全体の前提から外れていた。矢印キーでの選択移動は足さない (選択の移動は絞り込みで代替するのが既存の規約)。
+  - `[Flags]` はカンマ区切りで複数値を打つ (`Fire, Ice`)。絞り込みと確定は「最後の区画」に対して行い、確定した Enter は消費して次のステップへ進まない (1 回目の Enter で進むと 2 つ目を選べないため)。もう一度 Enter を押すと次へ進む。単一値の enum / string は従来どおり確定と同時に次へ進む。
+  - 確定時に文字列を enum に戻すので、型付き実行経路はそのまま使える。打ちかけの文字列は値として通知しない。
+
 ### Fixed
 - **「本番キーを汚さない」ことを確かめるテスト自身が本番キーを消していた問題を修正。** `EditorPrefs.SetString(本番キー, "USER-DATA")` してから `finally` で `DeleteKey` しており、テストを 1 回回すだけで利用者の「最近使ったコマンド」と Log / History の保存が消えていた。本番キーには**書き込みも削除もせず、前後で値が変化しないことを観測するだけ**に変更 (`EditorCommandHistory` / `PlayerPrefsCommandHistory` / `EditorPrefsInvocationStorage` の 3 箇所)。
 - `PaletteControllerTests` のダミー実行が `InvocationStore.Instance` (Editor の Log / History タブが参照する実ストア) に手動実行として記録され、保存領域に混入していた問題を修正。`PaletteController.UseInvocationStoreForTest` で書き出し先を差し替えられるようにし、テストは専用インスタンスを使う。

@@ -54,10 +54,10 @@ namespace Void2610.LiminalPalette.UI
                 return new AutoCompleteEditorAdapter(_autoCompleteEditor, param);
             }
 
-            // enum も同じ「打って絞り込む」UI に載せる。EnumField のドロップダウンは
-            // マウスでしか開けず、パレットのキーボード操作の前提から外れるため。
-            // [Flags] はビット和の編集が要るので従来どおり専用エディタに任せる。
-            if (IsPlainEnum(param.Type))
+            // enum は同じ「打って絞り込む」UI に載せる。EnumField のドロップダウンも
+            // EnumFlagsField も Toggle 列も、いずれもマウス無しでは操作できず、
+            // パレットのキーボード操作の前提から外れるため。
+            if (param.Type != null && param.Type.IsEnum)
             {
                 return new EnumAutoCompleteAdapter(_autoCompleteEditor, param);
             }
@@ -65,8 +65,8 @@ namespace Void2610.LiminalPalette.UI
             return Resolve(param.Type);
         }
 
-        private static bool IsPlainEnum(Type t)
-            => t != null && t.IsEnum && !t.IsDefined(typeof(FlagsAttribute), inherit: false);
+        private static bool IsFlagsEnum(Type t)
+            => t != null && t.IsEnum && t.IsDefined(typeof(FlagsAttribute), inherit: false);
 
         /// <summary>type を扱える最初のエディタを返す。Fallback が末尾にあるため null は返らない。</summary>
         public static IParameterEditor Resolve(Type type)
@@ -121,10 +121,16 @@ namespace Void2610.LiminalPalette.UI
                 _param = param;
             }
 
-            public bool CanHandle(Type type) => IsPlainEnum(type);
+            public bool CanHandle(Type type) => type != null && type.IsEnum;
 
             public UnityEngine.UIElements.VisualElement Build(ParameterDescriptor param, Action<object> onChanged)
-                => _editor.Build(_param, onChanged, InitialText(_param), raw => Parse(_param.Type, raw));
+                => _editor.Build(
+                    _param,
+                    onChanged,
+                    InitialText(_param),
+                    raw => Parse(_param.Type, raw),
+                    // [Flags] は値を続けて足せるよう、カンマ区切りの区画単位で確定する
+                    IsFlagsEnum(_param.Type) ? new AutoCompleteEditor.MultiValueTextPolicy() : null);
 
             // 既定値があればその名前、無ければ先頭の値の名前を初期表示にする。
             private static string InitialText(ParameterDescriptor param)
@@ -138,14 +144,21 @@ namespace Void2610.LiminalPalette.UI
             }
 
             // 打ちかけの文字列は null を返して「まだ確定していない」ことを示す。
+            // [Flags] は "Fire, Ice" のようなカンマ区切りを Enum.Parse がそのまま解釈する。
+            // 末尾の区切りは打ちかけなので落としてから渡す。
             private static object Parse(Type enumType, string raw)
             {
-                if (string.IsNullOrEmpty(raw)) return null;
+                var text = (raw ?? "").Trim().TrimEnd(',').Trim();
+                if (text.Length == 0) return null;
                 try
                 {
-                    return Enum.Parse(enumType, raw, ignoreCase: true);
+                    return Enum.Parse(enumType, text, ignoreCase: true);
                 }
                 catch (ArgumentException)
+                {
+                    return null;
+                }
+                catch (OverflowException)
                 {
                     return null;
                 }

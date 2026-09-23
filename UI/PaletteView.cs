@@ -1359,9 +1359,16 @@ namespace Void2610.LiminalPalette.UI
             try
             {
                 // AutoComplete エディタが先頭候補で確定可能なら拾う (旧 Enter ハンドラと同じ救済)。
+                // 値を続けて足す UI ([Flags]) は確定で Enter を消費し、この場では次へ進まない。
                 for (var j = 0; j < _paramFlowEditorHost.childCount; j++)
                 {
-                    if (_paramFlowEditorHost[j].userData is Func<bool> tryComplete && tryComplete())
+                    var editorData = _paramFlowEditorHost[j].userData;
+                    if (editorData is TryCompleteAndConsume consume)
+                    {
+                        if (consume()) return;
+                        break;
+                    }
+                    if (editorData is Func<bool> tryComplete && tryComplete())
                         break;
                 }
 

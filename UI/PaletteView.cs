@@ -1315,7 +1315,16 @@ namespace Void2610.LiminalPalette.UI
             schedule.Execute(() =>
             {
                 var f = FindFocusableDescendant(_paramFlowEditorHost);
-                f?.Focus();
+                if (f == null) return;
+                f.Focus();
+
+                // TextField は focus で全選択になる。そのまま打つと確定済みの内容ごと消えるので、
+                // 選択を解いてキャレットを末尾に置く (続きを足す UI では上書きされては困る)。
+                if (f is TextField tf)
+                {
+                    var end = tf.value?.Length ?? 0;
+                    tf.SelectRange(end, end);
+                }
             }).ExecuteLater(0);
         }
 

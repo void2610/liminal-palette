@@ -75,6 +75,25 @@ public class PaletteRuntimeSettings : ScriptableObject
 - Run Command で前回と同じ引数で実行される
 - **自動化由来エントリは除外**: 前提状態を欠いた単独再実行の混乱を避けるため (シナリオの再実行は Scenario タブから行う)
 
+### 記録の永続化
+
+`InvocationStore` は static シングルトンなので、Unity の domain reload (スクリプト再コンパイル /
+Play Mode の出入り / テスト実行) のたびにメモリ上の内容が消える。
+そのため **手動実行 (`InvocationOrigin.User`) だけを `EditorPrefs` に保存**し、
+起動と domain reload のたびに復元する (`EditorPrefsInvocationStorage` + `[InitializeOnLoad]`)。
+
+| | 保存する | 理由 |
+|---|---|---|
+| 手動実行 | ○ (直近 100 件) | 再実行したいのはこれ |
+| `Ipc` / `Scenario` 由来 | × | E2E を 1 回回すだけで保存先が埋まる |
+| path / 引数 / 時刻 / 成否 / 所要時間 / エラー文 | ○ | 再実行と一覧表示に要る |
+| ログ本文 / スタックトレース | × | 肥大するうえ再実行に要らない |
+
+復元したエントリは引数が文字列に落ちるため、型付きバインド (`ExecuteWithTypedArgsAsync`) では弾かれる。
+`CommandInvocation.IsRestored` で識別し、再実行は文字列経路 (`ExecuteAsync` + TypeConverter) を通す。
+
+> Runtime (Play Mode / Player) 側は保存しない。セッションが短命で、保存する意味が薄いため。
+
 ### 実行経路と保持枠 (`InvocationOrigin`)
 
 `InvocationStore` は記録を実行経路で分類し、**手動実行と自動化由来を独立した容量で保持する**。

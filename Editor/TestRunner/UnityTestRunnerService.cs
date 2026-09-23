@@ -125,6 +125,13 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             SessionState.SetString(ModeKey, displayMode);
             SessionState.EraseString(ResultKey);
             SessionState.EraseString(FailuresKey);
+            // 件数 / 所要時間も必ず捨てる。ここを残すと、実行が中断されて RunFinished が来なかった場合に
+            // 前回の数字が新しい実行の結果として読めてしまう (mode だけ新しく、中身は前回という混ざり方をする)。
+            SessionState.EraseInt(PassedKey);
+            SessionState.EraseInt(FailedKey);
+            SessionState.EraseInt(SkippedKey);
+            SessionState.EraseInt(InconclusiveKey);
+            SessionState.EraseFloat(DurationKey);
 
             // CLI 駆動のテスト実行はゲーム音を鳴らす意味が無いため、実行中だけエディタの出力段を落とす。
             // 元値は SessionState に退避し、PlayMode の DomainReload を跨いでも RunFinished で復元できるようにする

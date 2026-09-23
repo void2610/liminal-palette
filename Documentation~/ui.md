@@ -121,12 +121,36 @@ Play Mode の出入り / テスト実行) のたびにメモリ上の内容が�
 | `float` / `double` | `FloatField` / `DoubleField` | 同左 |
 | `string` | `TextField` | 同左 |
 | `bool` | `Toggle` | 同左 |
-| `enum` (通常) | `EnumField` | 同左 |
-| `enum` (`[Flags]`) | `EnumFlagsField` | 各値ごとの Toggle 列 |
+| `enum` (通常) | 候補リスト (打って絞り込み) | 同左 |
+| `enum` (`[Flags]`) | 候補リスト (カンマ区切りで複数選択) | 同左 |
 | `Vector2/3/4` | `VectorXField` | 同左 |
 | `Color` / `Color32` | `ColorField` (UnityEditor 専用) | Slider 4 本 (R/G/B/A) + プレビュー |
 | `UnityEngine.Object` | `ObjectField` (ピッカー付き) | TextField + UnityObjectConverter (`@<entityID>` / `GameObject:<name>`) |
 | 任意型 | `FallbackTextEditor` | 同左 |
+
+### 選択肢のある引数 (enum / 候補付き string)
+
+パレットは**キーボードのホームポジションから手を離さずに操作できる**ことを前提にしている。
+選択の移動は矢印キーではなく **打って絞り込む** ことで行う。
+
+```
+fi          → Fire に絞り込まれる
+Enter       → 確定
+```
+
+`enum` もドロップダウン (`EnumField` / `EnumFlagsField`) ではなくこの UI に載せている。
+ドロップダウンはマウスでしか開けず、Enter は「次へ / 実行」に使われているため開く手段が無い。
+
+**`[Flags]` はカンマ区切りで複数選ぶ**。絞り込みと確定は「最後の区画」に対して行う。
+
+```
+fi + Enter   → "Fire, "        ← 確定しても次のステップへ進まない
+ic + Enter   → "Fire, Ice, "
+Enter        → 実行            ← 打ちかけが無いので確定ではなく実行になる
+```
+
+単一値 (通常の enum / string) は従来どおり **Enter 1 回で確定と同時に次へ進む**。
+複数値だけ「打ちかけがあれば確定、無ければ実行」という規則で Enter を振り分ける。
 
 ### 引数フローの確定タイミング
 

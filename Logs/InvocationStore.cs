@@ -27,6 +27,12 @@ namespace Void2610.LiminalPalette
         private int _userCount;
         private int _automatedCount;
 
+        /// <summary>手動実行だけを保存する件数の上限。保存領域を膨らませないため保持上限より小さくする。</summary>
+        public const int PersistedCapacity = 100;
+
+        // 永続化先 (未設定ならメモリのみ)。自動化由来は保存しない。
+        private IInvocationStorage _storage;
+
         /// <summary>追加 / クリア時に発火。UI 側で itemsSource を更新する。</summary>
         public event Action Changed;
 
@@ -47,6 +53,33 @@ namespace Void2610.LiminalPalette
         /// 利用者の Log / History タブの内容が実際に消える。
         /// </summary>
         internal InvocationStore() { }
+
+        /// <summary>
+        /// 永続化先を設定し、保存済みの手動実行を復元する。
+        /// Editor 起動時に一度だけ呼ぶ想定 (Runtime では呼ばない)。
+        ///
+        /// InvocationStore は static シングルトンなので、Unity の domain reload
+        /// (スクリプト再コンパイル / Play Mode 出入り / テスト実行) で中身が毎回消える。
+        /// 保存しておかないと Log / History タブは実用にならない。
+        /// </summary>
+        public void AttachStorage(IInvocationStorage storage)
+        {
+            _storage = storage;
+            if (storage == null) return;
+
+            var restored = InvocationSerializer.Deserialize(storage.Read());
+            lock (_lock)
+            {
+                // 復元分は既存より古いので前に積む。時系列の並びを保つ。
+                for (var i = restored.Count - 1; i >= 0; i--)
+                {
+                    _entries.Insert(0, restored[i]);
+                    _userCount++;
+                }
+                TrimOverflow(false);
+            }
+            Changed?.Invoke();
+        }
 
         /// <summary>1 回の実行を記録する。args は CommandExecutor に渡された型解決済み辞書を想定。</summary>
         public void Record(string path, IReadOnlyDictionary<string, object> args, CommandResult result)
@@ -74,6 +107,8 @@ namespace Void2610.LiminalPalette
                 else _userCount++;
                 TrimOverflow(entry.IsAutomated);
             }
+            // 保存するのは手動実行のみ。自動化由来を混ぜると、E2E を回すだけで保存先が埋まる。
+            if (!entry.IsAutomated) Persist();
             Changed?.Invoke();
         }
 
@@ -90,7 +125,32 @@ namespace Void2610.LiminalPalette
                 _userCount = 0;
                 _automatedCount = 0;
             }
+            _storage?.Delete();
             Changed?.Invoke();
+        }
+
+        // 手動実行の直近分を保存する。失敗は握り潰す (履歴のために実行を止めない)。
+        private void Persist()
+        {
+            if (_storage == null) return;
+            List<CommandInvocation> users;
+            lock (_lock)
+            {
+                users = new List<CommandInvocation>();
+                for (var i = _entries.Count - 1; i >= 0 && users.Count < PersistedCapacity; i--)
+                {
+                    if (!_entries[i].IsAutomated) users.Add(_entries[i]);
+                }
+                users.Reverse();
+            }
+            try
+            {
+                _storage.Write(InvocationSerializer.Serialize(users));
+            }
+            catch
+            {
+                // 保存できなくても実行自体は成立させる
+            }
         }
 
         // 追加した側の枠だけが溢れうるので、その枠の最古から上限まで捨てる。

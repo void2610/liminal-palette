@@ -155,7 +155,31 @@ namespace Void2610.LiminalPalette.UI
                 StateChanged?.Invoke();
                 return Task.FromResult(LastResult);
             }
+            // 保存から復元したエントリは引数が文字列に落ちているので、型付き経路では弾かれる。
+            // 文字列経路 (TypeConverter 経由) を通して元の型に戻す。
+            if (invocation.IsRestored)
+            {
+                return RunFromStringArgsAsync(invocation, ct);
+            }
             return RunAsync(invocation.Path, invocation.Args, ct);
+        }
+
+        // 復元エントリ専用の再実行。文字列辞書に直して ExecuteAsync に渡す。
+        private async Task<CommandResult> RunFromStringArgsAsync(CommandInvocation invocation, CancellationToken ct)
+        {
+            var stringArgs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in invocation.Args)
+            {
+                stringArgs[kv.Key] = kv.Value as string ?? kv.Value?.ToString() ?? "";
+            }
+
+            var result = await _executor.ExecuteAsync(invocation.Path, stringArgs, ct);
+            LastResult = result;
+            InvocationStore.Instance.Record(invocation.Path, invocation.Args, result);
+            _history.Record(invocation.Path);
+            RecomputeResults();
+            StateChanged?.Invoke();
+            return result;
         }
 
         // 実行 + 履歴記録 + 状態通知を 1 つにまとめた本体。新規実行 (ExecuteSelectedAsync) と

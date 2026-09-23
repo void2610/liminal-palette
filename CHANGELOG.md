@@ -4,6 +4,13 @@
 
 ## [Unreleased]
 
+### Added
+- **Log / History タブの記録が Editor 再起動を跨いで残るようになった。** `InvocationStore` は永続化を持たない static シングルトンだったため、Unity の domain reload (スクリプト再コンパイル / Play Mode の出入り / テスト実行) のたびに中身が消えていた。E2E を回すと履歴が消えるのも、再起動すると空になるのも根本原因はこれ。`IInvocationStorage` を追加して保存先を注入できるようにし、Editor では `EditorPrefs` に保存する (`EditorPrefsInvocationStorage`、`[InitializeOnLoad]` で domain reload のたびに繋ぎ直す)。
+  - 保存するのは **手動実行 (`InvocationOrigin.User`) のみ**。自動化由来を混ぜると E2E を 1 回回すだけで保存先が埋まる。
+  - 保存するのは path / 引数 / 時刻 / 成否 / 所要時間 / エラー文だけで、ログ本文とスタックトレースは捨てる (肥大するうえ再実行に要らない)。
+  - 保存件数は `InvocationStore.PersistedCapacity` (100) まで。保持上限 (200) より小さくして EditorPrefs を膨らませない。
+  - 復元したエントリは引数が文字列に落ちるため、型付きバインド (`ExecuteWithTypedArgsAsync`) では弾かれる。`CommandInvocation.IsRestored` で識別し、再実行は文字列経路 (`ExecuteAsync` + TypeConverter) を通す。
+
 ### Fixed
 - **テストスイートが利用者の実データを消していた問題を修正。** EditMode テストは Editor と同じプロセス / 同じ `EditorPrefs` を共有するため、`CommandHistoryTests` の `SetUp` / `TearDown` が `EditorPrefs.DeleteKey(EditorCommandHistory.PrefsKey)` で**本番キーそのもの**を消していた。E2E (テスト実行) の後に Editor を再起動すると「最近使ったコマンド」が空になるのはこれが原因。`PlayerPrefs` 側 (Runtime の履歴) も同様。`EditorCommandHistory` / `PlayerPrefsCommandHistory` にキーを差し替える internal コンストラクタを足し、テストは毎回ユニークなテスト専用キーを使うようにした (`TokenStore.OverrideDirectoryForTest` と同じ流儀)。本番キーを汚さないことを確かめる回帰テストも追加。
 - 同じ理由で、テストが `InvocationStore.Instance` (Editor の Log / History タブが参照している実ストア) を `Clear()` しており、テスト実行のたびに利用者の実行記録が消えていた。`InvocationStore` に internal コンストラクタを足してテストは専用インスタンスを使うようにし、`ScenarioInvocationRecorder.Record` にも書き出し先を差し替える internal オーバーロードを追加。エンドポイント経由のテストは実ストアに書かざるを得ないため、`Clear()` をやめて差分だけを検証する形に変えた。

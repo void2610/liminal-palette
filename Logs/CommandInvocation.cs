@@ -29,6 +29,13 @@ namespace Void2610.LiminalPalette
         /// <summary>シナリオ実行由来かどうか。</summary>
         public bool IsFromScenario => Origin == InvocationOrigin.Scenario;
 
+        /// <summary>
+        /// 保存から復元したエントリか。復元時は引数が文字列に落ちているので、
+        /// 再実行は型付き経路ではなく文字列経路 (TypeConverter 経由) を通す必要がある。
+        /// ログ / スタックトレースも保存していないため空になる。
+        /// </summary>
+        public bool IsRestored { get; }
+
         public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc)
             : this(path, args, result, timestampUtc, InvocationOrigin.User)
         {
@@ -41,7 +48,13 @@ namespace Void2610.LiminalPalette
         }
 
         public CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc, InvocationOrigin origin)
+            : this(path, args, result, timestampUtc, origin, false)
         {
+        }
+
+        internal CommandInvocation(string path, IReadOnlyDictionary<string, object> args, CommandResult result, DateTime timestampUtc, InvocationOrigin origin, bool restored)
+        {
+            IsRestored = restored;
             Path = path ?? "";
             Args = args ?? new Dictionary<string, object>();
             Result = result;

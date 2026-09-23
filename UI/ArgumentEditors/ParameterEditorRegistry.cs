@@ -44,7 +44,7 @@ namespace Void2610.LiminalPalette.UI
 
         /// <summary>
         /// ParameterDescriptor を見て最適なエディタを返す。
-        /// string型でChoices/DynamicChoicesがある場合はAutoCompleteEditorを優先。
+        /// 候補を持つ string / enum は AutoCompleteEditor を優先する。
         /// </summary>
         public static IParameterEditor Resolve(ParameterDescriptor param)
         {
@@ -53,8 +53,20 @@ namespace Void2610.LiminalPalette.UI
             {
                 return new AutoCompleteEditorAdapter(_autoCompleteEditor, param);
             }
+
+            // enum も同じ「打って絞り込む」UI に載せる。EnumField のドロップダウンは
+            // マウスでしか開けず、パレットのキーボード操作の前提から外れるため。
+            // [Flags] はビット和の編集が要るので従来どおり専用エディタに任せる。
+            if (IsPlainEnum(param.Type))
+            {
+                return new EnumAutoCompleteAdapter(_autoCompleteEditor, param);
+            }
+
             return Resolve(param.Type);
         }
+
+        private static bool IsPlainEnum(Type t)
+            => t != null && t.IsEnum && !t.IsDefined(typeof(FlagsAttribute), inherit: false);
 
         /// <summary>type を扱える最初のエディタを返す。Fallback が末尾にあるため null は返らない。</summary>
         public static IParameterEditor Resolve(Type type)
@@ -92,6 +104,52 @@ namespace Void2610.LiminalPalette.UI
 
             public UnityEngine.UIElements.VisualElement Build(ParameterDescriptor param, Action<object> onChanged)
                 => _editor.Build(_param, onChanged);
+        }
+
+        /// <summary>
+        /// enum を AutoCompleteEditor に載せるアダプタ。
+        /// 表示は候補名、確定値は enum に戻して渡す (型付き実行経路がそのまま使えるように)。
+        /// </summary>
+        private sealed class EnumAutoCompleteAdapter : IParameterEditor
+        {
+            private readonly AutoCompleteEditor _editor;
+            private readonly ParameterDescriptor _param;
+
+            public EnumAutoCompleteAdapter(AutoCompleteEditor editor, ParameterDescriptor param)
+            {
+                _editor = editor;
+                _param = param;
+            }
+
+            public bool CanHandle(Type type) => IsPlainEnum(type);
+
+            public UnityEngine.UIElements.VisualElement Build(ParameterDescriptor param, Action<object> onChanged)
+                => _editor.Build(_param, onChanged, InitialText(_param), raw => Parse(_param.Type, raw));
+
+            // 既定値があればその名前、無ければ先頭の値の名前を初期表示にする。
+            private static string InitialText(ParameterDescriptor param)
+            {
+                if (param.HasDefault && param.DefaultValue != null)
+                {
+                    return param.DefaultValue.ToString();
+                }
+                var values = Enum.GetValues(param.Type);
+                return values.Length > 0 ? values.GetValue(0).ToString() : "";
+            }
+
+            // 打ちかけの文字列は null を返して「まだ確定していない」ことを示す。
+            private static object Parse(Type enumType, string raw)
+            {
+                if (string.IsNullOrEmpty(raw)) return null;
+                try
+                {
+                    return Enum.Parse(enumType, raw, ignoreCase: true);
+                }
+                catch (ArgumentException)
+                {
+                    return null;
+                }
+            }
         }
 
         /// <summary>登録済みエディタをすべて削除する (テスト向け)。Reset 後は ResetToDefaults() で再登録すること。</summary>

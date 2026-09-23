@@ -147,6 +147,11 @@ namespace Void2610.LiminalPalette
             {
                 _storage.Write(InvocationSerializer.Serialize(users));
             }
+            catch (ProductionStateViolationException)
+            {
+                // 門番の指摘は握り潰さない。テストを落として気づけるようにする。
+                throw;
+            }
             catch
             {
                 // 保存できなくても実行自体は成立させる

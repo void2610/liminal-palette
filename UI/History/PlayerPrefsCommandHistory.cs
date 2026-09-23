@@ -53,6 +53,7 @@ namespace Void2610.LiminalPalette.UI
 
         public void Clear()
         {
+            GuardProductionKey();
             _inner.Clear();
             PlayerPrefs.DeleteKey(_prefsKey);
             // Clear はユーザー操作 (履歴消去) なので即時永続化させる。テスト側からも明示確認できる。
@@ -61,6 +62,12 @@ namespace Void2610.LiminalPalette.UI
 
         public bool Contains(string path) => _inner.Contains(path);
         public int IndexOf(string path) => _inner.IndexOf(path);
+
+        // 本番キーへの書き込み / 削除はテスト実行中に限り止める (読み取りは許可)。
+        private void GuardProductionKey()
+        {
+            if (_prefsKey == PrefsKey) ProductionStateGuard.ThrowIfTestRun("PlayerPrefs: " + PrefsKey);
+        }
 
         private void Load()
         {
@@ -79,6 +86,7 @@ namespace Void2610.LiminalPalette.UI
         // 現在の RecentPaths を PlayerPrefs に書き込む。Save() は呼ばない (バッチ flush に委ねる)。
         private void WriteCurrentToPrefs()
         {
+            GuardProductionKey();
             var paths = _inner.RecentPaths;
             if (paths.Count == 0)
             {

@@ -28,6 +28,7 @@ namespace Void2610.LiminalPalette.Editor
 
         public void Write(string raw)
         {
+            GuardProductionKey();
             if (string.IsNullOrEmpty(raw))
             {
                 EditorPrefs.DeleteKey(_prefsKey);
@@ -36,7 +37,17 @@ namespace Void2610.LiminalPalette.Editor
             EditorPrefs.SetString(_prefsKey, raw);
         }
 
-        public void Delete() => EditorPrefs.DeleteKey(_prefsKey);
+        public void Delete()
+        {
+            GuardProductionKey();
+            EditorPrefs.DeleteKey(_prefsKey);
+        }
+
+        // 本番キーへの書き込み / 削除はテスト実行中に限り止める (読み取りは許可)。
+        private void GuardProductionKey()
+        {
+            if (_prefsKey == PrefsKey) ProductionStateGuard.ThrowIfTestRun("EditorPrefs: " + PrefsKey);
+        }
     }
 
     /// <summary>

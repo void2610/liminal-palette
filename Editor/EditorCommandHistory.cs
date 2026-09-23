@@ -43,12 +43,19 @@ namespace Void2610.LiminalPalette.Editor
 
         public void Clear()
         {
+            GuardProductionKey();
             _inner.Clear();
             EditorPrefs.DeleteKey(_prefsKey);
         }
 
         public bool Contains(string path) => _inner.Contains(path);
         public int IndexOf(string path) => _inner.IndexOf(path);
+
+        // 本番キーへの書き込み / 削除はテスト実行中に限り止める (読み取りは許可)。
+        private void GuardProductionKey()
+        {
+            if (_prefsKey == PrefsKey) ProductionStateGuard.ThrowIfTestRun("EditorPrefs: " + PrefsKey);
+        }
 
         private void Load()
         {
@@ -66,6 +73,7 @@ namespace Void2610.LiminalPalette.Editor
 
         private void Save()
         {
+            GuardProductionKey();
             var paths = _inner.RecentPaths;
             if (paths.Count == 0)
             {

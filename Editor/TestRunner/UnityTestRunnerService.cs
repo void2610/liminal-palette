@@ -207,7 +207,13 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         /// </summary>
         internal sealed class ResultCallbacks : ICallbacks
         {
-            public void RunStarted(ITestAdaptor testsToRun) => Beat();
+            public void RunStarted(ITestAdaptor testsToRun)
+            {
+                Beat();
+                // テスト中は利用者の永続データを書き換えさせない。
+                // Test Runner ウィンドウから起動された実行でもここを通る。
+                ProductionStateGuard.TestRunInProgress = true;
+            }
 
             public void RunFinished(ITestResultAdaptor result)
             {
@@ -218,6 +224,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
                 SessionState.SetInt(InconclusiveKey, result.InconclusiveCount);
                 SessionState.SetFloat(DurationKey, (float)result.Duration);
                 SessionState.SetBool(RunningKey, false);
+                ProductionStateGuard.TestRunInProgress = false;
 
                 // 自分でミュートした実行だけ元値へ戻す (Test Runner ウィンドウ等の外部実行では触らない)
                 if (SessionState.GetBool(MutedKey, false))
@@ -228,7 +235,12 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             }
 
             // テスト 1 件ごとに打つ。単体で長いテストでも生存が伝わる。
-            public void TestStarted(ITestAdaptor test) => Beat();
+            public void TestStarted(ITestAdaptor test)
+            {
+                Beat();
+                // PlayMode の DomainReload で static が飛ぶので、毎テストで立て直す。
+                ProductionStateGuard.TestRunInProgress = true;
+            }
 
             public void TestFinished(ITestResultAdaptor result)
             {

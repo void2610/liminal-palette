@@ -19,7 +19,7 @@ namespace Void2610.LiminalPalette.Tests.UI
 
         private static CommandResult Ok() => CommandResult.Ok(null, Array.Empty<LogEntry>(), TimeSpan.Zero);
 
-        private static void Record(string path, InvocationOrigin origin)
+        private void Record(string path, InvocationOrigin origin)
             => _store.Record(path, null, Ok(), origin);
 
         [Test]

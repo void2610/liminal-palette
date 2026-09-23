@@ -96,6 +96,11 @@ namespace Void2610.LiminalPalette.UI
             bool Complete()
             {
                 if (topMatchValue == null || suggestionList.style.display == DisplayStyle.None) return false;
+
+                // 複数値で「打ちかけの区画が無い」= 確定するものが無いので Enter は実行に回す。
+                // 確定直後は focus が戻って候補が再表示されるため、これが無いと
+                // 最後の Enter が先頭候補 (None 等) の確定に食われて実行できない。
+                if (multi != null && multi.LastSegment(field.value).Length == 0) return false;
                 var newText = multi == null
                     ? topMatchValue
                     : multi.Apply(field.value, topMatchValue);

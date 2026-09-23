@@ -73,18 +73,22 @@ namespace Void2610.LiminalPalette.UI
             // フィルタ後の先頭候補を保持（候補リスト表示中のみ有効）
             string topMatchValue = null;
 
+            // 現在のテキストから候補を組み直す。複数値なら「最後の区画」で絞り込む。
+            void Rebuild(string text)
+            {
+                topMatchValue = RebuildSuggestions(
+                    suggestionList, field, param, FilterTextOf(multi, text), Notify, multi);
+            }
+
             // テキスト変更時にフィルタ + onChanged
             field.RegisterValueChangedCallback(e =>
             {
                 Notify(e.newValue);
-                topMatchValue = RebuildSuggestions(
-                    suggestionList, field, param, FilterTextOf(multi, e.newValue), Notify, multi);
+                Rebuild(e.newValue);
             });
 
             // フォーカス取得時に候補表示
-            field.RegisterCallback<FocusInEvent>(_ =>
-                topMatchValue = RebuildSuggestions(
-                    suggestionList, field, param, FilterTextOf(multi, field.value), Notify, multi));
+            field.RegisterCallback<FocusInEvent>(_ => Rebuild(field.value));
 
             // フォーカス喪失時に候補非表示（少し遅延してクリックを拾えるようにする）
             field.RegisterCallback<FocusOutEvent>(_ =>
@@ -106,8 +110,18 @@ namespace Void2610.LiminalPalette.UI
                     : multi.Apply(field.value, topMatchValue);
                 field.SetValueWithoutNotify(newText);
                 Notify(newText);
-                suggestionList.style.display = DisplayStyle.None;
-                topMatchValue = null;
+
+                if (multi == null)
+                {
+                    suggestionList.style.display = DisplayStyle.None;
+                    topMatchValue = null;
+                    return true;
+                }
+
+                // 複数値は続けて次を選ぶので候補を出したままにする。
+                // SetValueWithoutNotify では再構築が走らず、focus も外れない (= FocusIn も来ない) ため、
+                // ここで明示的に組み直さないと候補が消えたままになる。
+                Rebuild(field.value);
                 return true;
             }
 

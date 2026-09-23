@@ -41,7 +41,12 @@ namespace Void2610.LiminalPalette
             get { lock (_lock) return _entries.Count; }
         }
 
-        private InvocationStore() { }
+        /// <summary>
+        /// テストは <see cref="Instance"/> ではなくこのコンストラクタで専用インスタンスを作る。
+        /// EditMode テストは Editor と同じプロセスで動くため、Instance を Clear すると
+        /// 利用者の Log / History タブの内容が実際に消える。
+        /// </summary>
+        internal InvocationStore() { }
 
         /// <summary>1 回の実行を記録する。args は CommandExecutor に渡された型解決済み辞書を想定。</summary>
         public void Record(string path, IReadOnlyDictionary<string, object> args, CommandResult result)

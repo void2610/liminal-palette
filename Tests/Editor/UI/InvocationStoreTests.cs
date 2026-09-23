@@ -10,16 +10,17 @@ namespace Void2610.LiminalPalette.Tests.UI
     /// </summary>
     public sealed class InvocationStoreTests
     {
-        [SetUp]
-        public void SetUp() => InvocationStore.Instance.Clear();
+        // Instance は Editor の Log / History タブが参照している実ストア。
+        // ここを Clear すると利用者の記録が実際に消えるので、テストは専用インスタンスを使う。
+        private InvocationStore _store;
 
-        [TearDown]
-        public void TearDown() => InvocationStore.Instance.Clear();
+        [SetUp]
+        public void SetUp() => _store = new InvocationStore();
 
         private static CommandResult Ok() => CommandResult.Ok(null, Array.Empty<LogEntry>(), TimeSpan.Zero);
 
         private static void Record(string path, InvocationOrigin origin)
-            => InvocationStore.Instance.Record(path, null, Ok(), origin);
+            => _store.Record(path, null, Ok(), origin);
 
         [Test]
         public void AutomatedFlood_DoesNotEvictUserEntries()
@@ -30,7 +31,7 @@ namespace Void2610.LiminalPalette.Tests.UI
                 Record($"Auto/{i}", i % 2 == 0 ? InvocationOrigin.Ipc : InvocationOrigin.Scenario);
             }
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             var userEntries = new System.Collections.Generic.List<CommandInvocation>();
             foreach (var e in entries)
             {
@@ -48,7 +49,7 @@ namespace Void2610.LiminalPalette.Tests.UI
                 Record($"Auto/{i}", InvocationOrigin.Scenario);
             }
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(InvocationStore.AutomatedCapacity, entries.Count);
             Assert.AreEqual("Auto/5", entries[0].Path, "自動化枠は最古から捨てられる");
         }
@@ -62,7 +63,7 @@ namespace Void2610.LiminalPalette.Tests.UI
                 Record($"User/{i}", InvocationOrigin.User);
             }
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(InvocationStore.Capacity + 1, entries.Count);
             Assert.AreEqual("Auto/Keep", entries[0].Path, "手動実行が溢れても自動化由来は残る");
             Assert.AreEqual("User/3", entries[1].Path, "手動枠は最古から捨てられる");
@@ -75,7 +76,7 @@ namespace Void2610.LiminalPalette.Tests.UI
             Record("B", InvocationOrigin.Scenario);
             Record("C", InvocationOrigin.User);
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(new[] { "A", "B", "C" }, new[] { entries[0].Path, entries[1].Path, entries[2].Path });
         }
 
@@ -86,7 +87,7 @@ namespace Void2610.LiminalPalette.Tests.UI
             Record("I", InvocationOrigin.Ipc);
             Record("S", InvocationOrigin.Scenario);
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.IsFalse(entries[0].IsAutomated);
             Assert.IsFalse(entries[0].IsFromScenario);
             Assert.IsTrue(entries[1].IsAutomated, "IPC は自動化扱い");
@@ -99,10 +100,10 @@ namespace Void2610.LiminalPalette.Tests.UI
         public void Clear_ResetsPerOriginCounts()
         {
             for (var i = 0; i < InvocationStore.Capacity; i++) Record($"User/{i}", InvocationOrigin.User);
-            InvocationStore.Instance.Clear();
+            _store.Clear();
 
             Record("User/After", InvocationOrigin.User);
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(1, entries.Count, "Clear 後は枠のカウントもリセットされる");
             Assert.AreEqual("User/After", entries[0].Path);
         }

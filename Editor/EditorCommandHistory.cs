@@ -15,12 +15,21 @@ namespace Void2610.LiminalPalette.Editor
         // EditorPrefs のキー。プロジェクト共通だが namespace で衝突を避ける。
         public const string PrefsKey = "Void2610.LiminalPalette.History";
 
+        // 実際に読み書きするキー。テストは専用キーを渡して利用者の履歴を壊さないようにする
+        // (EditMode テストは Editor と同じ EditorPrefs を共有するため、本番キーを消すと実害が出る)。
+        private readonly string _prefsKey;
+
         private const char Separator = '';
 
         private readonly InMemoryCommandHistory _inner = new InMemoryCommandHistory();
 
-        public EditorCommandHistory()
+        public EditorCommandHistory() : this(PrefsKey)
         {
+        }
+
+        internal EditorCommandHistory(string prefsKey)
+        {
+            _prefsKey = prefsKey;
             Load();
         }
 
@@ -35,7 +44,7 @@ namespace Void2610.LiminalPalette.Editor
         public void Clear()
         {
             _inner.Clear();
-            EditorPrefs.DeleteKey(PrefsKey);
+            EditorPrefs.DeleteKey(_prefsKey);
         }
 
         public bool Contains(string path) => _inner.Contains(path);
@@ -43,7 +52,7 @@ namespace Void2610.LiminalPalette.Editor
 
         private void Load()
         {
-            var raw = EditorPrefs.GetString(PrefsKey, "");
+            var raw = EditorPrefs.GetString(_prefsKey, "");
             if (string.IsNullOrEmpty(raw)) return;
 
             var parts = raw.Split(Separator);
@@ -60,13 +69,13 @@ namespace Void2610.LiminalPalette.Editor
             var paths = _inner.RecentPaths;
             if (paths.Count == 0)
             {
-                EditorPrefs.DeleteKey(PrefsKey);
+                EditorPrefs.DeleteKey(_prefsKey);
                 return;
             }
             // string.Join で十分。string.Concat でも可だが Separator を 1 文字なので Join の方が自然。
             var arr = new string[paths.Count];
             for (var i = 0; i < paths.Count; i++) arr[i] = paths[i];
-            EditorPrefs.SetString(PrefsKey, string.Join(Separator.ToString(), arr));
+            EditorPrefs.SetString(_prefsKey, string.Join(Separator.ToString(), arr));
         }
     }
 }

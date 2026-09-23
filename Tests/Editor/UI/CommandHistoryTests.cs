@@ -75,22 +75,45 @@ namespace Void2610.LiminalPalette.Tests.UI
 
     public sealed class EditorCommandHistoryTests
     {
-        // 各テスト前後で EditorPrefs を綺麗にしておく。テストキー漏れは他テストや実プロジェクトに影響するため。
+        // 本番キーは絶対に触らない。EditMode テストは Editor と同じ EditorPrefs を共有するため、
+        // 本番キーを消すと利用者の「最近使ったコマンド」が実際に消える (Editor 再起動で発覚する)。
+        private string _key;
+
         [SetUp]
-        public void SetUp() => EditorPrefs.DeleteKey(EditorCommandHistory.PrefsKey);
+        public void SetUp()
+        {
+            _key = "Void2610.LiminalPalette.History.Test." + System.Guid.NewGuid().ToString("N");
+        }
 
         [TearDown]
-        public void TearDown() => EditorPrefs.DeleteKey(EditorCommandHistory.PrefsKey);
+        public void TearDown() => EditorPrefs.DeleteKey(_key);
+
+        [Test]
+        public void 本番キーを汚さない()
+        {
+            EditorPrefs.SetString(EditorCommandHistory.PrefsKey, "USER-DATA");
+            try
+            {
+                var h = new EditorCommandHistory(_key);
+                h.Record("A");
+                h.Clear();
+                Assert.AreEqual("USER-DATA", EditorPrefs.GetString(EditorCommandHistory.PrefsKey, ""));
+            }
+            finally
+            {
+                EditorPrefs.DeleteKey(EditorCommandHistory.PrefsKey);
+            }
+        }
 
         [Test]
         public void Record_PersistsAcrossInstances()
         {
-            var h1 = new EditorCommandHistory();
+            var h1 = new EditorCommandHistory(_key);
             h1.Record("Player/Health/Set");
             h1.Record("Enemy/Spawn");
 
             // 別インスタンスで読み戻し。
-            var h2 = new EditorCommandHistory();
+            var h2 = new EditorCommandHistory(_key);
             Assert.AreEqual(2, h2.RecentPaths.Count);
             Assert.AreEqual("Enemy/Spawn", h2.RecentPaths[0]);
             Assert.AreEqual("Player/Health/Set", h2.RecentPaths[1]);
@@ -99,10 +122,10 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void Clear_RemovesPrefsKey()
         {
-            var h = new EditorCommandHistory();
+            var h = new EditorCommandHistory(_key);
             h.Record("A");
             h.Clear();
-            Assert.IsFalse(EditorPrefs.HasKey(EditorCommandHistory.PrefsKey));
+            Assert.IsFalse(EditorPrefs.HasKey(_key));
         }
     }
 
@@ -112,29 +135,51 @@ namespace Void2610.LiminalPalette.Tests.UI
     /// </summary>
     public sealed class PlayerPrefsCommandHistoryTests
     {
-        // テスト前後で PlayerPrefs を綺麗にしておく。
+        // EditorCommandHistoryTests と同じ理由で本番キーは触らない。
+        private string _key;
+
         [SetUp]
         public void SetUp()
         {
-            UnityEngine.PlayerPrefs.DeleteKey(PlayerPrefsCommandHistory.PrefsKey);
-            UnityEngine.PlayerPrefs.Save();
+            _key = "Void2610.LiminalPalette.History.Test." + System.Guid.NewGuid().ToString("N");
         }
 
         [TearDown]
         public void TearDown()
         {
-            UnityEngine.PlayerPrefs.DeleteKey(PlayerPrefsCommandHistory.PrefsKey);
+            UnityEngine.PlayerPrefs.DeleteKey(_key);
             UnityEngine.PlayerPrefs.Save();
+        }
+
+        [Test]
+        public void 本番キーを汚さない()
+        {
+            UnityEngine.PlayerPrefs.SetString(PlayerPrefsCommandHistory.PrefsKey, "USER-DATA");
+            UnityEngine.PlayerPrefs.Save();
+            try
+            {
+                var h = new PlayerPrefsCommandHistory(_key);
+                h.Record("A");
+                h.Clear();
+                Assert.AreEqual(
+                    "USER-DATA",
+                    UnityEngine.PlayerPrefs.GetString(PlayerPrefsCommandHistory.PrefsKey, ""));
+            }
+            finally
+            {
+                UnityEngine.PlayerPrefs.DeleteKey(PlayerPrefsCommandHistory.PrefsKey);
+                UnityEngine.PlayerPrefs.Save();
+            }
         }
 
         [Test]
         public void Record_PersistsAcrossInstances()
         {
-            var h1 = new PlayerPrefsCommandHistory();
+            var h1 = new PlayerPrefsCommandHistory(_key);
             h1.Record("Player/Health/Set");
             h1.Record("Enemy/Spawn");
 
-            var h2 = new PlayerPrefsCommandHistory();
+            var h2 = new PlayerPrefsCommandHistory(_key);
             Assert.AreEqual(2, h2.RecentPaths.Count);
             Assert.AreEqual("Enemy/Spawn", h2.RecentPaths[0]);
             Assert.AreEqual("Player/Health/Set", h2.RecentPaths[1]);
@@ -143,22 +188,22 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void Clear_RemovesPrefsKey()
         {
-            var h = new PlayerPrefsCommandHistory();
+            var h = new PlayerPrefsCommandHistory(_key);
             h.Record("A");
             h.Clear();
-            Assert.IsFalse(UnityEngine.PlayerPrefs.HasKey(PlayerPrefsCommandHistory.PrefsKey));
+            Assert.IsFalse(UnityEngine.PlayerPrefs.HasKey(_key));
         }
 
         [Test]
         public void Record_RespectsMaxEntriesAcrossInstances()
         {
-            var h1 = new PlayerPrefsCommandHistory();
+            var h1 = new PlayerPrefsCommandHistory(_key);
             for (var i = 0; i < InMemoryCommandHistory.MaxEntries + 3; i++)
             {
                 h1.Record($"P{i}");
             }
 
-            var h2 = new PlayerPrefsCommandHistory();
+            var h2 = new PlayerPrefsCommandHistory(_key);
             Assert.AreEqual(InMemoryCommandHistory.MaxEntries, h2.RecentPaths.Count);
             Assert.AreEqual($"P{InMemoryCommandHistory.MaxEntries + 2}", h2.RecentPaths[0]);
         }
@@ -166,7 +211,7 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void IndexOf_IsCaseInsensitive()
         {
-            var h = new PlayerPrefsCommandHistory();
+            var h = new PlayerPrefsCommandHistory(_key);
             h.Record("Foo/Bar");
             Assert.AreEqual(0, h.IndexOf("foo/bar"));
             Assert.IsTrue(h.Contains("FOO/BAR"));

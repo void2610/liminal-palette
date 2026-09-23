@@ -38,6 +38,10 @@ namespace Void2610.LiminalPalette
         /// (result.Path が non-null ならそちらが優先される)。
         /// </param>
         public static void Record(ScenarioResult result, string scenarioPath = null)
+            => Record(result, scenarioPath, InvocationStore.Instance);
+
+        /// <summary>書き出し先を差し替えられる版。テストが実ストアを汚さないために使う。</summary>
+        internal static void Record(ScenarioResult result, string scenarioPath, InvocationStore store)
         {
             if (result == null) return;
             // 実際に走らなかったケース (= 既に他シナリオが実行中で弾かれた) は記録しない。
@@ -51,7 +55,7 @@ namespace Void2610.LiminalPalette
                 var sr = result.Steps[i];
                 if (sr.Step is CommandStep cs && sr.CommandResult != null)
                 {
-                    InvocationStore.Instance.Record(cs.CommandPath, cs.Args, sr.CommandResult, InvocationOrigin.Scenario);
+                    store.Record(cs.CommandPath, cs.Args, sr.CommandResult, InvocationOrigin.Scenario);
                 }
             }
 
@@ -60,7 +64,7 @@ namespace Void2610.LiminalPalette
             var rawPath = !string.IsNullOrEmpty(scenarioPath) ? scenarioPath : result.Path;
             var displayPath = string.IsNullOrEmpty(rawPath) ? AdHocPath : "Scenario/" + rawPath;
             var aggregate = BuildAggregate(result);
-            InvocationStore.Instance.Record(displayPath, EmptyArgs, aggregate, InvocationOrigin.Scenario);
+            store.Record(displayPath, EmptyArgs, aggregate, InvocationOrigin.Scenario);
         }
 
         // 引数辞書は毎回同じ空のものを渡す (InvocationStore 側でディフェンシブにコピーされるため共有 OK)。

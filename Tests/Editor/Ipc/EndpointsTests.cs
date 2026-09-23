@@ -213,25 +213,23 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         {
             // HTTP 経由の実行が手動実行として記録されると、History タブに混入したうえ
             // 手打ち履歴の保持枠を食い潰す。3 引数 Record への退行を検知するための回帰テスト。
-            InvocationStore.Instance.Clear();
-            try
-            {
-                var ep = new ExecuteCommandEndpoint();
-                var res = await ep.HandleAsync(PostJson("/api/v1/execute",
-                    "{\"path\":\"Test/Int\",\"args\":{\"a\":\"3\"}}"), CancellationToken.None);
-                Assert.AreEqual(200, res.StatusCode);
+            //
+            // エンドポイントは InvocationStore.Instance (Editor の Log / History タブが参照している
+            // 実ストア) に書くため、Clear してはいけない。差分だけを見る。
+            var before = InvocationStore.Instance.Count;
 
-                var entries = InvocationStore.Instance.Entries;
-                Assert.AreEqual(1, entries.Count);
-                Assert.AreEqual("Test/Int", entries[0].Path);
-                Assert.AreEqual(InvocationOrigin.Ipc, entries[0].Origin);
-                Assert.IsTrue(entries[0].IsAutomated, "HTTP 経由は自動化扱い (History タブから除外される)");
-                Assert.IsFalse(entries[0].IsFromScenario, "HTTP 経由はシナリオ由来ではない");
-            }
-            finally
-            {
-                InvocationStore.Instance.Clear();
-            }
+            var ep = new ExecuteCommandEndpoint();
+            var res = await ep.HandleAsync(PostJson("/api/v1/execute",
+                "{\"path\":\"Test/Int\",\"args\":{\"a\":\"3\"}}"), CancellationToken.None);
+            Assert.AreEqual(200, res.StatusCode);
+
+            var entries = InvocationStore.Instance.Entries;
+            Assert.AreEqual(before + 1, entries.Count, "実行が 1 件記録されていない");
+            var added = entries[entries.Count - 1];
+            Assert.AreEqual("Test/Int", added.Path);
+            Assert.AreEqual(InvocationOrigin.Ipc, added.Origin);
+            Assert.IsTrue(added.IsAutomated, "HTTP 経由は自動化扱い (History タブから除外される)");
+            Assert.IsFalse(added.IsFromScenario, "HTTP 経由はシナリオ由来ではない");
         }
 
         [Test]

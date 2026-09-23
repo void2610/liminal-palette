@@ -21,13 +21,21 @@ namespace Void2610.LiminalPalette.UI
         // PlayerPrefs のキー。プロジェクト共通だが namespace で衝突を避ける。
         public const string PrefsKey = "Void2610.LiminalPalette.History";
 
+        // 実際に読み書きするキー。テストは専用キーを渡して利用者の履歴を壊さないようにする。
+        private readonly string _prefsKey;
+
         // Unit Separator (制御文字)。コマンドパスにこの文字は含めない前提。
         private const char Separator = '';
 
         private readonly InMemoryCommandHistory _inner = new InMemoryCommandHistory();
 
-        public PlayerPrefsCommandHistory()
+        public PlayerPrefsCommandHistory() : this(PrefsKey)
         {
+        }
+
+        internal PlayerPrefsCommandHistory(string prefsKey)
+        {
+            _prefsKey = prefsKey;
             Load();
             // 終了時にまとめて flush するため Application.quitting に登録 (二重登録防止)。
             Application.quitting -= FlushOnQuit;
@@ -46,7 +54,7 @@ namespace Void2610.LiminalPalette.UI
         public void Clear()
         {
             _inner.Clear();
-            PlayerPrefs.DeleteKey(PrefsKey);
+            PlayerPrefs.DeleteKey(_prefsKey);
             // Clear はユーザー操作 (履歴消去) なので即時永続化させる。テスト側からも明示確認できる。
             PlayerPrefs.Save();
         }
@@ -56,7 +64,7 @@ namespace Void2610.LiminalPalette.UI
 
         private void Load()
         {
-            var raw = PlayerPrefs.GetString(PrefsKey, "");
+            var raw = PlayerPrefs.GetString(_prefsKey, "");
             if (string.IsNullOrEmpty(raw)) return;
 
             var parts = raw.Split(Separator);
@@ -74,12 +82,12 @@ namespace Void2610.LiminalPalette.UI
             var paths = _inner.RecentPaths;
             if (paths.Count == 0)
             {
-                PlayerPrefs.DeleteKey(PrefsKey);
+                PlayerPrefs.DeleteKey(_prefsKey);
                 return;
             }
             var arr = new string[paths.Count];
             for (var i = 0; i < paths.Count; i++) arr[i] = paths[i];
-            PlayerPrefs.SetString(PrefsKey, string.Join(Separator.ToString(), arr));
+            PlayerPrefs.SetString(_prefsKey, string.Join(Separator.ToString(), arr));
         }
 
         // Application.quitting で 1 度だけ呼ばれ、Record で書き貯めた SetString を一括 flush する。

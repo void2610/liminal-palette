@@ -11,11 +11,11 @@ namespace Void2610.LiminalPalette.Tests.UI
     /// </summary>
     public sealed class ScenarioInvocationRecorderTests
     {
-        [SetUp]
-        public void SetUp() => InvocationStore.Instance.Clear();
+        // 実ストア (Instance) は Editor の Log / History タブが参照しているので触らない。
+        private InvocationStore _store;
 
-        [TearDown]
-        public void TearDown() => InvocationStore.Instance.Clear();
+        [SetUp]
+        public void SetUp() => _store = new InvocationStore();
 
         private static StepResult OkCommandStep(string path, IReadOnlyDictionary<string, object> args = null)
         {
@@ -41,11 +41,11 @@ namespace Void2610.LiminalPalette.Tests.UI
             };
             var result = new ScenarioResult(success: true, steps, TimeSpan.FromMilliseconds(5), failedAtStep: -1, path: "Test/Smoke");
 
-            ScenarioInvocationRecorder.Record(result, "Test/Smoke");
+            ScenarioInvocationRecorder.Record(result, "Test/Smoke", _store);
 
             // 各 Command ステップ (2) + シナリオ集約 (1) = 3 件。すべて IsFromScenario=true。
-            Assert.AreEqual(3, InvocationStore.Instance.Count);
-            var entries = InvocationStore.Instance.Entries;
+            Assert.AreEqual(3, _store.Count);
+            var entries = _store.Entries;
             Assert.AreEqual("Foo/A", entries[0].Path);
             Assert.AreEqual(1, entries[0].Args["x"]);
             Assert.IsTrue(entries[0].IsFromScenario, "シナリオ内 Command は IsFromScenario=true");
@@ -60,9 +60,9 @@ namespace Void2610.LiminalPalette.Tests.UI
         public void Record_DefaultRecord_NotMarkedAsFromScenario()
         {
             // 引数 3 つの Record は手動実行 (UI 経由) 扱い。HTTP 経由は InvocationOrigin.Ipc を明示する。
-            InvocationStore.Instance.Record("Foo/Direct", null,
+            _store.Record("Foo/Direct", null,
                 CommandResult.Ok(null, Array.Empty<LogEntry>(), TimeSpan.Zero));
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(1, entries.Count);
             Assert.IsFalse(entries[0].IsFromScenario);
         }
@@ -77,9 +77,9 @@ namespace Void2610.LiminalPalette.Tests.UI
             };
             var result = new ScenarioResult(success: false, steps, TimeSpan.FromMilliseconds(3), failedAtStep: 1, path: "Test/Fails");
 
-            ScenarioInvocationRecorder.Record(result);
+            ScenarioInvocationRecorder.Record(result, null, _store);
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(3, entries.Count);
             var aggregate = entries[2];
             Assert.AreEqual("Scenario/Test/Fails", aggregate.Path);
@@ -98,9 +98,9 @@ namespace Void2610.LiminalPalette.Tests.UI
                 failedAtStep: -1,
                 path: null);
 
-            ScenarioInvocationRecorder.Record(result);
+            ScenarioInvocationRecorder.Record(result, null, _store);
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual("Scenario/(ad-hoc)", entries[1].Path);
         }
 
@@ -108,8 +108,8 @@ namespace Void2610.LiminalPalette.Tests.UI
         public void Record_AlreadyRunning_RecordsNothing()
         {
             var rejected = ScenarioResult.AlreadyRunning("Test/Busy");
-            ScenarioInvocationRecorder.Record(rejected, "Test/Busy");
-            Assert.AreEqual(0, InvocationStore.Instance.Count);
+            ScenarioInvocationRecorder.Record(rejected, "Test/Busy", _store);
+            Assert.AreEqual(0, _store.Count);
         }
 
         [Test]
@@ -120,9 +120,9 @@ namespace Void2610.LiminalPalette.Tests.UI
             var assertStep = new StepResult(ScenarioStep.AssertEquals("X", 1), true, null, null, 1, TimeSpan.Zero);
             var result = new ScenarioResult(true, new[] { waitStep, assertStep }, TimeSpan.Zero, -1, "Test/Pure");
 
-            ScenarioInvocationRecorder.Record(result, "Test/Pure");
+            ScenarioInvocationRecorder.Record(result, "Test/Pure", _store);
 
-            var entries = InvocationStore.Instance.Entries;
+            var entries = _store.Entries;
             Assert.AreEqual(1, entries.Count);
             Assert.AreEqual("Scenario/Test/Pure", entries[0].Path);
         }
@@ -130,7 +130,7 @@ namespace Void2610.LiminalPalette.Tests.UI
         [Test]
         public void Record_NullResult_DoesNotThrow()
         {
-            Assert.DoesNotThrow(() => ScenarioInvocationRecorder.Record(null));
+            Assert.DoesNotThrow(() => ScenarioInvocationRecorder.Record(null, null, _store));
         }
     }
 }

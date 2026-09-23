@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- **テストスイートが利用者の実データを消していた問題を修正。** EditMode テストは Editor と同じプロセス / 同じ `EditorPrefs` を共有するため、`CommandHistoryTests` の `SetUp` / `TearDown` が `EditorPrefs.DeleteKey(EditorCommandHistory.PrefsKey)` で**本番キーそのもの**を消していた。E2E (テスト実行) の後に Editor を再起動すると「最近使ったコマンド」が空になるのはこれが原因。`PlayerPrefs` 側 (Runtime の履歴) も同様。`EditorCommandHistory` / `PlayerPrefsCommandHistory` にキーを差し替える internal コンストラクタを足し、テストは毎回ユニークなテスト専用キーを使うようにした (`TokenStore.OverrideDirectoryForTest` と同じ流儀)。本番キーを汚さないことを確かめる回帰テストも追加。
+- 同じ理由で、テストが `InvocationStore.Instance` (Editor の Log / History タブが参照している実ストア) を `Clear()` しており、テスト実行のたびに利用者の実行記録が消えていた。`InvocationStore` に internal コンストラクタを足してテストは専用インスタンスを使うようにし、`ScenarioInvocationRecorder.Record` にも書き出し先を差し替える internal オーバーロードを追加。エンドポイント経由のテストは実ストアに書かざるを得ないため、`Clear()` をやめて差分だけを検証する形に変えた。
+
 ## [0.5.0] - 2026-09-22
 
 ### Fixed

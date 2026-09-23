@@ -1309,6 +1309,16 @@ namespace Void2610.LiminalPalette.UI
             }
         }
 
+        // 引数エディタへ focus を戻す。確定で次へ進まないケースで、続けて打てるようにするため。
+        private void RefocusParamFlowEditor()
+        {
+            schedule.Execute(() =>
+            {
+                var f = FindFocusableDescendant(_paramFlowEditorHost);
+                f?.Focus();
+            }).ExecuteLater(0);
+        }
+
         // タッチデバイス (= スマホ / タブレット, 含む WebGL on mobile) 判定。
         // プログラム的 Focus() でソフトキーボードが立ち上がらず、focus 状態が「貼り付く」挙動を避けるため、
         // モバイルでは auto-focus 系の処理をスキップする目印として使う。
@@ -1365,7 +1375,12 @@ namespace Void2610.LiminalPalette.UI
                     var editorData = _paramFlowEditorHost[j].userData;
                     if (editorData is TryCompleteAndConsume consume)
                     {
-                        if (consume()) return;
+                        if (consume())
+                        {
+                            // 同じステップに留まるので、入力欄に focus を戻して続きを打てるようにする。
+                            RefocusParamFlowEditor();
+                            return;
+                        }
                         break;
                     }
                     if (editorData is Func<bool> tryComplete && tryComplete())
@@ -1473,7 +1488,11 @@ namespace Void2610.LiminalPalette.UI
             if (_paramFlowActive)
             {
                 _ = AdvanceParamFlowAsync();
+                // StopImmediatePropagation だけでは focusController の default action
+                // (Submit に伴う focus 移動) が止まらない。NavigationMove と同じく PreventDefault を併用する。
+                // 止めないと、確定で次へ進まないケース ([Flags]) で入力欄から focus が外れて操作不能になる。
                 evt.StopImmediatePropagation();
+                evt.PreventDefault();
                 return;
             }
             // Logs モードは閲覧専用のため Submit を無視する (再実行は History モードの責務)。

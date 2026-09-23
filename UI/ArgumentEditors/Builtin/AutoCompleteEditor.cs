@@ -90,9 +90,15 @@ namespace Void2610.LiminalPalette.UI
             // フォーカス取得時に候補表示
             field.RegisterCallback<FocusInEvent>(_ => Rebuild(field.value));
 
-            // フォーカス喪失時に候補非表示（少し遅延してクリックを拾えるようにする）
+            // フォーカス喪失時に候補非表示（少し遅延してクリックを拾えるようにする）。
+            // ただし遅延中に focus が戻っていたら隠さない。複数値の確定では同じ欄に focus が戻るので、
+            // ここで隠すと「確定した直後だけ候補が消える」ことになる (再構築の後にこの遅延が走るため)。
             field.RegisterCallback<FocusOutEvent>(_ =>
-                field.schedule.Execute(() => suggestionList.style.display = DisplayStyle.None).ExecuteLater(150));
+                field.schedule.Execute(() =>
+                {
+                    if (HasFocusWithin(field)) return;
+                    suggestionList.style.display = DisplayStyle.None;
+                }).ExecuteLater(150));
 
             // PaletteViewからEnter時に呼ばれる補完確定関数
             // 戻り値: 補完が実行されたらtrue
@@ -144,6 +150,14 @@ namespace Void2610.LiminalPalette.UI
         /// <summary>
         /// 候補リストを再構築する。候補が1件だけならそのvalueを返す。
         /// </summary>
+        // 自分か子孫が focus を持っているか。TextField は内部の入力要素が focus を持つことがある。
+        private static bool HasFocusWithin(VisualElement element)
+        {
+            var focused = element.panel?.focusController?.focusedElement as VisualElement;
+            if (focused == null) return false;
+            return focused == element || element.Contains(focused);
+        }
+
         // 絞り込みに使う文字列。複数値なら「最後の区画」だけを見る。
         private static string FilterTextOf(MultiValueTextPolicy multi, string text)
             => multi == null ? text : multi.LastSegment(text);

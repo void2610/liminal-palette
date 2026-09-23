@@ -1272,7 +1272,10 @@ namespace Void2610.LiminalPalette.UI
                 _paramFlowBreadcrumbs.Add(chip);
             }
 
-            _paramFlowStepInfo.text = $"Step {i + 1}/{cmd.Parameters.Count}  —  {param.Name} : {param.Type.Name}";
+            // 選択肢を持つ引数はキーボードだけで操作できることを明示する (ドロップダウンは開けないため)
+            var choiceHint = HasChoices(param) ? "   ↑↓ で選択" : "";
+            _paramFlowStepInfo.text =
+                $"Step {i + 1}/{cmd.Parameters.Count}  —  {param.Name} : {param.Type.Name}{choiceHint}";
             _paramFlowStepDesc.text = string.IsNullOrEmpty(param.Description) ? "" : param.Description;
             _paramFlowStepDesc.style.display = string.IsNullOrEmpty(param.Description)
                 ? DisplayStyle.None
@@ -1308,6 +1311,10 @@ namespace Void2610.LiminalPalette.UI
                 }).ExecuteLater(0);
             }
         }
+
+        // 値を選ぶ形の引数か (enum / 静的候補 / 動的候補)。
+        private static bool HasChoices(ParameterDescriptor param)
+            => param.Type.IsEnum || param.Choices.Count > 0 || param.DynamicChoices != null;
 
         // タッチデバイス (= スマホ / タブレット, 含む WebGL on mobile) 判定。
         // プログラム的 Focus() でソフトキーボードが立ち上がらず、focus 状態が「貼り付く」挙動を避けるため、

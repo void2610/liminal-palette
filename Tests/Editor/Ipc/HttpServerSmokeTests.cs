@@ -6,6 +6,7 @@ using Void2610.LiminalPalette.Ipc;
 using Void2610.LiminalPalette.Ipc.Auth;
 using Void2610.LiminalPalette.Ipc.Endpoints;
 using Void2610.LiminalPalette.Ipc.Server;
+using Void2610.LiminalPalette.Ipc.TestRunning;
 using Void2610.LiminalPalette.Ipc.Threading;
 
 namespace Void2610.LiminalPalette.Tests.Ipc
@@ -36,6 +37,7 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             router.Register("GET", "/api/v1/commands", new ListCommandsEndpoint());
             router.Register("POST", "/api/v1/execute", new ExecuteCommandEndpoint());
             router.Register("GET", "/api/v1/logs", new ListLogsEndpoint());
+            router.Register("POST", "/api/v1/tests/run", new RunTestsEndpoint());
 
             _server = new HttpServer(router, TestPort);
             _server.Start();
@@ -95,6 +97,48 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             StringAssert.Contains("\"value\":\"11\"", body);
         }
 
+        // CLI (ureq) は charset=utf-8 を付けて送る。Mono の HttpListener はこれを無視して us-ascii で読んでいた
+        [TestCase("application/json; charset=utf-8")]
+        [TestCase("application/json")]
+        public async Task NonAsciiBody_IsDecodedAsUtf8(string contentType)
+        {
+            var saved = TestRunnerBridge.Current;
+            var fake = new FilterCapturingService();
+            TestRunnerBridge.Current = fake;
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Post, Url("/api/v1/tests/run"));
+                req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "smoke-token");
+                req.Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes("{\"mode\":\"editmode\",\"filter\":\"全StringTable\"}"));
+                req.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+                var res = await _client.SendAsync(req);
+
+                Assert.AreEqual(System.Net.HttpStatusCode.OK, res.StatusCode);
+                Assert.AreEqual("全StringTable", fake.LastFilter);
+            }
+            finally
+            {
+                TestRunnerBridge.Current = saved;
+            }
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("application/json")]
+        [TestCase("application/json; charset=utf-8")]
+        [TestCase("application/json; charset=\"UTF-8\"")]
+        [TestCase("application/json; charset=no-such-charset")]
+        public void ResolveBodyEncoding_DefaultsToUtf8(string contentType)
+        {
+            Assert.AreEqual(System.Text.Encoding.UTF8.WebName, HttpServer.ResolveBodyEncoding(contentType).WebName);
+        }
+
+        [Test]
+        public void ResolveBodyEncoding_HonorsExplicitCharset()
+        {
+            Assert.AreEqual(System.Text.Encoding.Unicode.WebName, HttpServer.ResolveBodyEncoding("application/json; charset=utf-16").WebName);
+        }
+
         [Test]
         public async Task UnknownPath_Returns404()
         {
@@ -136,6 +180,20 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             second.Start();
             Assert.AreNotEqual(TestPort, second.Port, "占有ポートとは違うポートにバインドされるはず");
             Assert.AreEqual(TestPort + 1, second.Port);
+        }
+
+        private sealed class FilterCapturingService : ITestRunnerService
+        {
+            public string LastFilter;
+
+            public bool TryStartRun(string mode, string filter, bool force, out string error)
+            {
+                LastFilter = filter;
+                error = null;
+                return true;
+            }
+
+            public TestRunStatus GetStatus() => TestRunStatus.Idle;
         }
     }
 }

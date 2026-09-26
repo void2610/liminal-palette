@@ -198,11 +198,35 @@ namespace Void2610.LiminalPalette.Ipc.Server
                     ms.Write(buffer, 0, read);
                     if (ms.Length > IpcSettings.MaxRequestBodyBytes) return null;
                 }
-                var encoding = req.ContentEncoding ?? Encoding.UTF8;
-                body = encoding.GetString(ms.ToArray());
+                body = ResolveBodyEncoding(req.ContentType).GetString(ms.ToArray());
             }
 
             return new IpcRequest(req.HttpMethod, req.Url.AbsolutePath, query, headers, body);
+        }
+
+        /// <summary>
+        /// Content-Type の charset からボディの文字コードを決める。charset が無い / 解釈できない場合は UTF-8。
+        /// Mono の <see cref="HttpListenerRequest.ContentEncoding"/> は charset を見ずに Encoding.Default
+        /// (Unity では us-ascii) を返し、UTF-8 の日本語が 1 バイトずつ '?' に化けるため使わない。
+        /// </summary>
+        internal static Encoding ResolveBodyEncoding(string contentType)
+        {
+            if (string.IsNullOrEmpty(contentType)) return Encoding.UTF8;
+            foreach (var part in contentType.Split(';'))
+            {
+                var kv = part.Split(new[] { '=' }, 2);
+                if (kv.Length != 2 || !kv[0].Trim().Equals("charset", StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    return Encoding.GetEncoding(kv[1].Trim().Trim('"'));
+                }
+                catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException)
+                {
+                    return Encoding.UTF8;
+                }
+            }
+            // JSON (RFC 8259) は UTF-8 と決まっているので、charset 省略時も UTF-8 で読む
+            return Encoding.UTF8;
         }
 
         private static async Task WriteResponseAsync(HttpListenerContext ctx, IpcResponse response)

@@ -10,6 +10,11 @@
   - 確定時に文字列を enum に戻すので、型付き実行経路はそのまま使える。打ちかけの文字列は値として通知しない。
 
 ### Fixed
+- **リクエストボディの日本語が `?` に化けていた問題を修正。** Mono の `HttpListenerRequest.ContentEncoding` は `Content-Type` の `charset` を見ずに `Encoding.Default` (Unity では us-ascii) を返すため、CLI が `charset=utf-8` を付けて送っても UTF-8 の日本語が 1 バイトずつ `?` になっていた (`liminal test --filter "全StringTable"` が `???StringTable` になる)。`charset` を自前で解釈し、無ければ JSON の規定どおり UTF-8 で読む。
+- **テスト実行が始まらないまま `running` が 5 分残る問題を修正。** Execute を受け付けても Test Runner が実行を始めない場合 (不正な正規表現のフィルタ、Play Mode から抜けた直後の要求など)、`RunStarted` が来ないまま既存の 300 秒の猶予を待つしかなく、その間の実行要求はすべて「実行中」で弾かれていた。
+  - `filter` が不正な正規表現なら、受け付けずに `400` を返す。
+  - 受け付けてから 90 秒 `RunStarted` (または `TestStarted`) が来なければ、実行は始まらなかったと見なして解除する。始まった実行は従来どおり 300 秒の猶予を保つ。
+  - 判定を `TestRunWatchdog` (Ipc 層の純粋関数) に切り出し、test-framework に依存せず単体テストできるようにした。
 - **「本番キーを汚さない」ことを確かめるテスト自身が本番キーを消していた問題を修正。** `EditorPrefs.SetString(本番キー, "USER-DATA")` してから `finally` で `DeleteKey` しており、テストを 1 回回すだけで利用者の「最近使ったコマンド」と Log / History の保存が消えていた。本番キーには**書き込みも削除もせず、前後で値が変化しないことを観測するだけ**に変更 (`EditorCommandHistory` / `PlayerPrefsCommandHistory` / `EditorPrefsInvocationStorage` の 3 箇所)。
 - `PaletteControllerTests` のダミー実行が `InvocationStore.Instance` (Editor の Log / History タブが参照する実ストア) に手動実行として記録され、保存領域に混入していた問題を修正。`PaletteController.UseInvocationStoreForTest` で書き出し先を差し替えられるようにし、テストは専用インスタンスを使う。
 

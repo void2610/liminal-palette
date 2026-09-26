@@ -34,13 +34,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         internal const string MutedKey = "LiminalPalette.TestRunner.Muted";
         internal const string MutePrevKey = "LiminalPalette.TestRunner.MutePrev";
         internal const string HeartbeatKey = "LiminalPalette.TestRunner.Heartbeat";
-
-        /// <summary>
-        /// Running=true のまま、この秒数どのコールバックも来なければ「中断された残骸」と見なす。
-        /// テスト 1 件ごとに TestStarted / TestFinished が来るので、実行中なら必ず更新され続ける。
-        /// 実測 (PlayMode 53 件で 155 秒) に対して十分な余裕を取り、単体で長いテストを誤検知しない値にする。
-        /// </summary>
-        internal const double StaleAfterSeconds = 300.0;
+        internal const string StartedKey = "LiminalPalette.TestRunner.Started";
 
         // 失敗一覧の肥大でレスポンスと SessionState が膨れないよう上限を切る (超過分は件数だけ分かれば十分)
         internal const int MaxFailures = 30;
@@ -61,29 +55,34 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         internal static void Beat() =>
             SessionState.SetString(HeartbeatKey, System.DateTime.UtcNow.Ticks.ToString());
 
-        // Running=true なのに一定時間どのコールバックも来ていないか。
         private static bool IsStale()
         {
-            if (!SessionState.GetBool(RunningKey, false)) return false;
-            var raw = SessionState.GetString(HeartbeatKey, "");
-            // 開始時に必ず打つので、印が無い = 旧版が残した状態。復旧対象にする。
-            if (!long.TryParse(raw, out var ticks)) return true;
-            var elapsed = (System.DateTime.UtcNow - new System.DateTime(ticks, System.DateTimeKind.Utc)).TotalSeconds;
-            return elapsed > StaleAfterSeconds;
+            System.DateTime? lastBeat = long.TryParse(SessionState.GetString(HeartbeatKey, ""), out var ticks)
+                ? new System.DateTime(ticks, System.DateTimeKind.Utc)
+                : null;
+            // Started を持たない旧版が残した状態は、開始済みとして従来どおりの猶予で扱う
+            return TestRunWatchdog.IsStale(
+                SessionState.GetBool(RunningKey, false),
+                SessionState.GetBool(StartedKey, true),
+                lastBeat,
+                System.DateTime.UtcNow);
         }
 
         /// <summary>
         /// 中断された実行の残骸を倒す。RunFinished が来ないまま終わった場合 (Test Runner ウィンドウでの
-        /// キャンセル、Editor のクラッシュ等) に Running=true が残り続け、以降の実行が全部弾かれるため。
-        /// 倒した場合 true。
+        /// キャンセル、Editor のクラッシュ、Execute を受け付けたのに実行が始まらなかった場合等) に
+        /// Running=true が残り続け、以降の実行が全部弾かれるため。倒した場合 true。
         /// </summary>
         internal static bool RecoverIfStale()
         {
             if (!IsStale()) return false;
+            var started = SessionState.GetBool(StartedKey, true);
             ForceClearRunning();
-            Debug.LogWarning(
-                "[LiminalPalette] 中断されたテスト実行の状態を検出したため解除しました " +
-                $"({StaleAfterSeconds} 秒以上コールバックがありません)。");
+            Debug.LogWarning(started
+                ? "[LiminalPalette] 中断されたテスト実行の状態を検出したため解除しました " +
+                  $"({TestRunWatchdog.StaleAfterSeconds} 秒以上コールバックがありません)。"
+                : "[LiminalPalette] テスト実行が始まらなかったため実行中の状態を解除しました " +
+                  $"(受け付けから {TestRunWatchdog.NotStartedAfterSeconds} 秒以上 RunStarted がありません)。");
             return true;
         }
 
@@ -121,6 +120,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
 
             // Execute 前に走行状態を確定させる (polling が即 running を観測できるように)。
             SessionState.SetBool(RunningKey, true);
+            SessionState.SetBool(StartedKey, false);
             Beat();
             SessionState.SetString(ModeKey, displayMode);
             SessionState.EraseString(ResultKey);
@@ -216,6 +216,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         {
             public void RunStarted(ITestAdaptor testsToRun)
             {
+                SessionState.SetBool(StartedKey, true);
                 Beat();
                 // テスト中は利用者の永続データを書き換えさせない。
                 // Test Runner ウィンドウから起動された実行でもここを通る。
@@ -244,6 +245,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             // テスト 1 件ごとに打つ。単体で長いテストでも生存が伝わる。
             public void TestStarted(ITestAdaptor test)
             {
+                SessionState.SetBool(StartedKey, true);
                 Beat();
                 // PlayMode の DomainReload で static が飛ぶので、毎テストで立て直す。
                 ProductionStateGuard.TestRunInProgress = true;

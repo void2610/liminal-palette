@@ -10,6 +10,7 @@ LiminalPalette のコマンドを HTTP 経由で叩くためのリファレン�
 - **Bearer トークン認証**。`/health` 以外のすべての endpoint で必須。
 - **既定ポート 7610**。占有時は隣接 (`7611`, `7612`, ...) に最大 5 回リトライ。
 - **JSON 応答**。サードパーティ依存なしの自前 `JsonWriter` で組み立て。
+- **リクエストボディは UTF-8**。`Content-Type` の `charset` が明示されていればそれに従い、無ければ UTF-8 で読む。
 - **メインスレッドで実行**。HTTP のリクエスト処理はワーカースレッドだが、コマンド実行は `MainThreadDispatcher` でメインスレッドへ marshal される。
 
 ## 起動条件
@@ -375,7 +376,8 @@ Unity Test Runner を起動する専用エンドポイント (コマンド経由
 | フィールド | 必須 | 説明 |
 |---|---|---|
 | `mode` | ✓ | `"playmode"` または `"editmode"` (大文字小文字無視) |
-| `filter` | | テスト full name の正規表現 (省略 / 空で全件) |
+| `filter` | | テスト full name の正規表現 (省略 / 空で全件)。不正な正規表現は `400` |
+| `force` | | `true` なら、中断された実行の残骸 (`running` のまま残った状態) を無視して開始する |
 
 **Response 200** (受理):
 ```json
@@ -384,10 +386,16 @@ Unity Test Runner を起動する専用エンドポイント (コマンド経由
 
 **ステータスコード**:
 - `200 OK` — 実行を開始 (完了は待たない)
-- `400 BadRequest` — `mode` 欠落 / 不正、body 文法エラー
+- `400 BadRequest` — `mode` 欠落 / 不正、`filter` が不正な正規表現、body 文法エラー
 - `409 Conflict` — 前回の実行が未完了 (`{"status":"running"}`)
 - `429 Too Many Requests` — レートリミット (`/execute` と共通の制限)
 - `501 Not Implemented` — `com.unity.test-framework` 未導入 (Test Runner が使えない)
+
+**実行中の状態の自動解除**: 次のどちらかに当たると、`running` を中断された残骸と見なして解除し、警告ログを出す。
+判定は `POST /api/v1/tests/run` と `GET /api/v1/tests/result` のたびに行う。
+
+- 受け付けてから 90 秒経っても実行が始まらない (`RunStarted` が来ない)。Play Mode から抜けた直後の実行要求など、Test Runner が受け付けたまま実行を始めない場合がある
+- 実行が始まった後、300 秒どのコールバック (`TestStarted` / `TestFinished` 等) も来ない。Test Runner ウィンドウでのキャンセルや Editor のクラッシュ
 
 ### `GET /api/v1/tests/result` (認証必須、**編集時専用**)
 

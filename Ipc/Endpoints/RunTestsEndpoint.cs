@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Void2610.LiminalPalette.Ipc.Json;
@@ -14,7 +15,7 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
     ///
     /// Body: {"mode": "playmode" | "editmode", "filter": "&lt;regex&gt;", "force": true}
     ///   - mode: 必須。"playmode" / "editmode" (大文字小文字無視)。
-    ///   - filter: 任意。テスト full name の正規表現 (空 / 省略で全件)。
+    ///   - filter: 任意。テスト full name の正規表現 (空 / 省略で全件)。不正な正規表現は 400。
     ///   - force: 任意。中断された実行の残骸を無視して開始する (既定 false)。
     ///
     /// 即リターンし、結果は GET /api/v1/tests/result を polling して取得する。
@@ -152,6 +153,20 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                 {
                     parseErr = $"'mode' must be \"playmode\" or \"editmode\", got \"{modeLocal}\"";
                     return false;
+                }
+
+                // 不正な正規表現は Execute を受け付けた後に Test Runner 側で握りつぶされ、実行が始まらないまま running が残る
+                if (!string.IsNullOrEmpty(filterLocal))
+                {
+                    try
+                    {
+                        _ = new Regex(filterLocal);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        parseErr = $"'filter' is not a valid regular expression: {ex.Message}";
+                        return false;
+                    }
                 }
 
                 mode = normalized;

@@ -113,6 +113,32 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             Assert.AreEqual("My.Ns.*", fake.LastFilter);
         }
 
+        // Test Runner は不正な正規表現を Execute 受付後に握りつぶし、実行が始まらないまま running が残る
+        [Test]
+        public async Task RunTests_InvalidFilterRegex_Returns400WithoutStarting()
+        {
+            var fake = new FakeService();
+            TestRunnerBridge.Current = fake;
+            var res = await new RunTestsEndpoint().HandleAsync(
+                PostJson("/api/v1/tests/run", "{\"mode\":\"editmode\",\"filter\":\"???StringTable\"}"),
+                CancellationToken.None);
+            Assert.AreEqual(400, res.StatusCode);
+            StringAssert.Contains("not a valid regular expression", res.Body);
+            Assert.IsNull(fake.LastMode);
+        }
+
+        [Test]
+        public async Task RunTests_NonAsciiFilter_PassedThrough()
+        {
+            var fake = new FakeService();
+            TestRunnerBridge.Current = fake;
+            var res = await new RunTestsEndpoint().HandleAsync(
+                PostJson("/api/v1/tests/run", "{\"mode\":\"editmode\",\"filter\":\"全StringTable\"}"),
+                CancellationToken.None);
+            Assert.AreEqual(200, res.StatusCode);
+            Assert.AreEqual("全StringTable", fake.LastFilter);
+        }
+
         [Test]
         public async Task RunTests_EditModeCaseInsensitive_Normalized()
         {

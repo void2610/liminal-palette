@@ -113,11 +113,11 @@ namespace Void2610.LiminalPalette
         }
 
         /// <summary>登録済みシナリオを Path 指定で実行する。</summary>
-        public static Task<ScenarioResult> RunScenarioAsync(string path, CancellationToken ct = default)
-            => GetOrCreateScenarioExecutor().ExecuteAsync(ScenarioRegistry.Default, path, ct);
+        public static Task<ScenarioResult> RunScenarioAsync(string path, CancellationToken ct = default, ScenarioRunOrigin origin = ScenarioRunOrigin.Unknown)
+            => GetOrCreateScenarioExecutor().ExecuteAsync(ScenarioRegistry.Default, path, ct, origin);
 
         /// <summary>ad-hoc にステップ列を指定して実行する (HTTP の /scenarios/run ad-hoc 経路と同じ)。</summary>
-        public static Task<ScenarioResult> RunScenarioAsync(IReadOnlyList<ScenarioStep> steps, CancellationToken ct = default)
-            => GetOrCreateScenarioExecutor().ExecuteAsync(steps, path: null, ct);
+        public static Task<ScenarioResult> RunScenarioAsync(IReadOnlyList<ScenarioStep> steps, CancellationToken ct = default, ScenarioRunOrigin origin = ScenarioRunOrigin.Unknown)
+            => GetOrCreateScenarioExecutor().ExecuteAsync(steps, path: null, ct, origin);
     }
 }

@@ -44,11 +44,11 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
                     ScenarioResult inner;
                     if (steps != null)
                     {
-                        inner = await LiminalPalette.RunScenarioAsync(steps, ct);
+                        inner = await LiminalPalette.RunScenarioAsync(steps, ct, ScenarioRunOrigin.Api);
                     }
                     else
                     {
-                        inner = await LiminalPalette.RunScenarioAsync(path, ct);
+                        inner = await LiminalPalette.RunScenarioAsync(path, ct, ScenarioRunOrigin.Api);
                     }
                     // UI 経由実行と同じく Log/History タブに記録する。InvocationStore はメインスレッド
                     // 限定の前提なので、MainThreadDispatcher の継続中 (= メインスレッド) で書き込む。

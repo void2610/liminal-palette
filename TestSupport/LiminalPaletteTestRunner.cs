@@ -69,7 +69,7 @@ namespace Void2610.LiminalPalette.TestSupport
                 ScenarioScanner.ScanAll();
             }
 
-            var task = LiminalPalette.RunScenarioAsync(scenarioPath);
+            var task = LiminalPalette.RunScenarioAsync(scenarioPath, origin: ScenarioRunOrigin.TestRunner);
             while (!task.IsCompleted) yield return null;
 
             var result = task.Result;

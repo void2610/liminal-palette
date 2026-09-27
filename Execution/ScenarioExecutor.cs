@@ -8,6 +8,22 @@ using UnityEngine.SceneManagement;
 
 namespace Void2610.LiminalPalette
 {
+    /// <summary>シナリオ実行を誰が起こしたか。利用側が「手動の確認」と「自動テスト」で振る舞いを分けるために使う。</summary>
+    public enum ScenarioRunOrigin
+    {
+        /// <summary>起点を渡さない呼び出し。自動実行とみなして安全側に扱うことを推奨する</summary>
+        Unknown = 0,
+
+        /// <summary>パレット UI から人が手で実行した</summary>
+        Palette = 1,
+
+        /// <summary>HTTP API (liminal CLI 等) から実行した</summary>
+        Api = 2,
+
+        /// <summary>Unity Test Runner (LiminalPaletteTestRunner) から実行した</summary>
+        TestRunner = 3,
+    }
+
     /// <summary>
     /// シナリオ実行中の進捗スナップショット。オーバーレイ UI などのリアルタイム表示用。
     /// StepIndex が -1 のときは「これから 1 ステップ目に入る」開始通知を表す。
@@ -18,13 +34,15 @@ namespace Void2610.LiminalPalette
         public int StepIndex { get; }
         public int TotalSteps { get; }
         public ScenarioStep CurrentStep { get; }
+        public ScenarioRunOrigin Origin { get; }
 
-        public ScenarioProgress(string path, int stepIndex, int totalSteps, ScenarioStep currentStep)
+        public ScenarioProgress(string path, int stepIndex, int totalSteps, ScenarioStep currentStep, ScenarioRunOrigin origin = ScenarioRunOrigin.Unknown)
         {
             Path = path;
             StepIndex = stepIndex;
             TotalSteps = totalSteps;
             CurrentStep = currentStep;
+            Origin = origin;
         }
     }
 
@@ -82,7 +100,8 @@ namespace Void2610.LiminalPalette
         public async Task<ScenarioResult> ExecuteAsync(
             IReadOnlyList<ScenarioStep> steps,
             string path,
-            CancellationToken ct)
+            CancellationToken ct,
+            ScenarioRunOrigin origin = ScenarioRunOrigin.Unknown)
         {
             if (steps == null) throw new ArgumentNullException(nameof(steps));
 
@@ -93,7 +112,7 @@ namespace Void2610.LiminalPalette
             }
             try
             {
-                return await ExecuteCoreAsync(steps, path, ct);
+                return await ExecuteCoreAsync(steps, path, ct, origin);
             }
             finally
             {
@@ -105,7 +124,8 @@ namespace Void2610.LiminalPalette
         public async Task<ScenarioResult> ExecuteAsync(
             IScenarioRegistry registry,
             string scenarioPath,
-            CancellationToken ct)
+            CancellationToken ct,
+            ScenarioRunOrigin origin = ScenarioRunOrigin.Unknown)
         {
             if (registry == null) throw new ArgumentNullException(nameof(registry));
             var descriptor = registry.Find(scenarioPath);
@@ -219,7 +239,7 @@ namespace Void2610.LiminalPalette
                 }
                 try
                 {
-                    return await ExecuteCoreAsync(stepList, scenarioPath, ct);
+                    return await ExecuteCoreAsync(stepList, scenarioPath, ct, origin);
                 }
                 finally
                 {
@@ -284,7 +304,8 @@ namespace Void2610.LiminalPalette
         private async Task<ScenarioResult> ExecuteCoreAsync(
             IReadOnlyList<ScenarioStep> steps,
             string path,
-            CancellationToken ct)
+            CancellationToken ct,
+            ScenarioRunOrigin origin)
         {
             var results = new List<StepResult>(steps.Count);
             var sw = Stopwatch.StartNew();
@@ -292,7 +313,7 @@ namespace Void2610.LiminalPalette
             ScenarioResult finalResult = null;
 
             // 開始通知。StepIndex=-1 はオーバーレイ側で「シナリオ起動直後」を表す。
-            try { ScenarioRunStarted?.Invoke(new ScenarioProgress(path, -1, steps.Count, null)); }
+            try { ScenarioRunStarted?.Invoke(new ScenarioProgress(path, -1, steps.Count, null, origin)); }
             catch (Exception ex) { UnityEngine.Debug.LogWarning($"[LiminalPalette] ScenarioRunStarted handler threw: {ex}"); }
 
             try
@@ -302,7 +323,7 @@ namespace Void2610.LiminalPalette
                     ct.ThrowIfCancellationRequested();
                     var step = steps[i];
                     // 各ステップ実行直前にも進捗を通知。オーバーレイは「現在 N/M」を更新する用途。
-                    try { ScenarioRunStepChanged?.Invoke(new ScenarioProgress(path, i, steps.Count, step)); }
+                    try { ScenarioRunStepChanged?.Invoke(new ScenarioProgress(path, i, steps.Count, step, origin)); }
                     catch (Exception ex) { UnityEngine.Debug.LogWarning($"[LiminalPalette] ScenarioRunStepChanged handler threw: {ex}"); }
                     var stepSw = Stopwatch.StartNew();
                     StepResult sr;

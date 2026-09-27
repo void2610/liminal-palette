@@ -121,6 +121,28 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public async Task Execute_PassesOriginToProgressEvents()
+        {
+            var ce = new FakeCommandExecutor();
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, new FakeFrameWaiter());
+            var origins = new List<ScenarioRunOrigin>();
+            void OnProgress(ScenarioProgress p) => origins.Add(p.Origin);
+            ScenarioExecutor.ScenarioRunStarted += OnProgress;
+            ScenarioExecutor.ScenarioRunStepChanged += OnProgress;
+            try
+            {
+                await ex.ExecuteAsync(new[] { ScenarioStep.Run("Foo/Bar") }, "test", CancellationToken.None, ScenarioRunOrigin.Api);
+            }
+            finally
+            {
+                ScenarioExecutor.ScenarioRunStarted -= OnProgress;
+                ScenarioExecutor.ScenarioRunStepChanged -= OnProgress;
+            }
+            // 開始通知とステップ通知の両方に、呼び出し側が渡した起点が載る
+            CollectionAssert.AreEqual(new[] { ScenarioRunOrigin.Api, ScenarioRunOrigin.Api }, origins);
+        }
+
+        [Test]
         public async Task Execute_CommandFailure_StopsImmediately()
         {
             var ce = new FakeCommandExecutor { ShouldFail = true };

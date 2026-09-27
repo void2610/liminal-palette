@@ -1625,7 +1625,7 @@ namespace Void2610.LiminalPalette.UI
                 ScenarioResult result;
                 try
                 {
-                    result = await LiminalPalette.RunScenarioAsync(d.Path);
+                    result = await LiminalPalette.RunScenarioAsync(d.Path, origin: ScenarioRunOrigin.Palette);
                 }
                 catch (Exception ex)
                 {

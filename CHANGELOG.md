@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Added
+- **シナリオ実行の起点 (`ScenarioRunOrigin`: Palette / Api / TestRunner / Unknown) を `ScenarioProgress.Origin` で渡すようにした。** パレット UI・HTTP API・`LiminalPaletteTestRunner` の各入口が自分の起点を `RunScenarioAsync` に渡す。利用側は開始イベントで「人が手で押した確認」と「自動テスト」を見分け、自動テストのときだけセーブの隔離などを掛けられる。起点を渡さない呼び出しは `Unknown` になる。
+
 ### Changed
 - **enum / [Flags] enum の引数を、既存の文字列候補と同じ「打って絞り込み → Enter で確定」に統一した。** `EnumField` のドロップダウンも `EnumFlagsField` も Toggle 列も、いずれもマウス無しでは操作できず、キーボードのホームポジションから手を離さずに操作するというパレット全体の前提から外れていた。矢印キーでの選択移動は足さない (選択の移動は絞り込みで代替するのが既存の規約)。
   - `[Flags]` はカンマ区切りで複数値を打つ (`Fire, Ice`)。絞り込みと確定は「最後の区画」に対して行い、確定した Enter は消費して次のステップへ進まない (1 回目の Enter で進むと 2 つ目を選べないため)。もう一度 Enter を押すと次へ進む。単一値の enum / string は従来どおり確定と同時に次へ進む。

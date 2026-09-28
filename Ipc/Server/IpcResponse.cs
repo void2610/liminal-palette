@@ -33,6 +33,7 @@ namespace Void2610.LiminalPalette.Ipc.Server
         public static IpcResponse Unauthorized(string error = "Unauthorized") => Json(401, ErrorBody(error));
         public static IpcResponse NotFound(string error) => Json(404, ErrorBody(error));
         public static IpcResponse MethodNotAllowed(string error) => Json(405, ErrorBody(error));
+        public static IpcResponse PreconditionFailed(string error) => Json(412, ErrorBody(error));
         public static IpcResponse PayloadTooLarge(string error) => Json(413, ErrorBody(error));
         public static IpcResponse TooManyRequests(string error) => Json(429, ErrorBody(error));
         public static IpcResponse InternalError(string error) => Json(500, ErrorBody(error));

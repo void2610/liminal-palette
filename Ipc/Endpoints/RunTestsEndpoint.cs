@@ -48,11 +48,15 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
 
             bool started;
             string startError = null;
+            string precondition = null;
             try
             {
                 var captured = new string[1];
                 started = await MainThreadDispatcher.RunAsync(() =>
                 {
+                    // 実行中の判定より先に見る。前提を満たさない開始要求を「実行中」と取り違えて古い結果を返さないため
+                    precondition = service.CheckPreconditions();
+                    if (precondition != null) return Task.FromResult(false);
                     var ok = service.TryStartRun(mode, filter, force, out var err);
                     captured[0] = err;
                     return Task.FromResult(ok);
@@ -67,6 +71,8 @@ namespace Void2610.LiminalPalette.Ipc.Endpoints
             {
                 return IpcResponse.InternalError(ex.Message);
             }
+
+            if (precondition != null) return IpcResponse.PreconditionFailed(precondition);
 
             if (!started)
             {

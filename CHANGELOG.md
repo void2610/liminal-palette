@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- **テスト実行の開始前に前提条件を確かめ、満たさなければ `412` で理由を返すようにした。** 未保存のシーンがあると Test Runner が保存確認のモーダルを出し、CLI 駆動の `liminal test` が応答なしで止まっていた。勝手に保存 / 破棄すると人の作業を壊すため、開始せずに理由を返して呼び出し側に判断させる。以前はこの種の失敗も「実行中」(409) として返っており、CLI が前回の結果を今回の結果のように表示していた。`ITestRunnerService.CheckPreconditions` (既定実装あり) で判定する。
 - **シナリオ実行の起点 (`ScenarioRunOrigin`: Palette / Api / TestRunner / Unknown) を `ScenarioProgress.Origin` で渡すようにした。** パレット UI・HTTP API・`LiminalPaletteTestRunner` の各入口が自分の起点を `RunScenarioAsync` に渡す。利用側は開始イベントで「人が手で押した確認」と「自動テスト」を見分け、自動テストのときだけセーブの隔離などを掛けられる。起点を渡さない呼び出しは `Unknown` になる。
 
 ### Changed

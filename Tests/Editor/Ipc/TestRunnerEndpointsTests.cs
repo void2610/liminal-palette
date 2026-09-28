@@ -162,6 +162,17 @@ namespace Void2610.LiminalPalette.Tests.Ipc
             StringAssert.Contains("\"status\":\"running\"", res.Body);
         }
 
+        [Test]
+        public async Task RunTests_前提条件を満たさなければ412で開始しない()
+        {
+            TestRunnerBridge.Current = new FakeService { Precondition = "unsaved changes in open scene(s): Main" };
+            var res = await new RunTestsEndpoint().HandleAsync(
+                PostJson("/api/v1/tests/run", "{\"mode\":\"playmode\"}"), CancellationToken.None);
+            Assert.AreEqual(412, res.StatusCode);
+            StringAssert.Contains("unsaved changes", res.Body);
+            Assert.IsNull(((FakeService)TestRunnerBridge.Current).LastMode, "前提を満たさない要求では開始を試みない");
+        }
+
         // ---------- 結果 ----------
 
         [Test]
@@ -279,10 +290,13 @@ namespace Void2610.LiminalPalette.Tests.Ipc
         private sealed class FakeService : ITestRunnerService
         {
             public bool StartSucceeds = true;
+            public string Precondition;
             public TestRunStatus Status = TestRunStatus.Idle;
             public string LastMode;
             public string LastFilter;
             public bool LastForce;
+
+            public string CheckPreconditions() => Precondition;
 
             public bool TryStartRun(string mode, string filter, bool force, out string error)
             {

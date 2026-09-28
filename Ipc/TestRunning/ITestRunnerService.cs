@@ -30,6 +30,12 @@ namespace Void2610.LiminalPalette.Ipc.TestRunning
         /// RunFinished が来なかった状態) を無視して開始する。
         bool TryStartRun(string mode, string filter, bool force, out string error);
 
+        /// <summary>
+        /// 開始できない前提条件 (未保存シーン等) があればその理由を返す (無ければ null)。
+        /// 「実行中なので待てば良い」とは区別して、呼び出し側に対処させるための判定
+        /// </summary>
+        string CheckPreconditions() => null;
+
         /// <summary>直近の実行状態を返す。</summary>
         TestRunStatus GetStatus();
     }

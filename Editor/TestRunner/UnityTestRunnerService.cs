@@ -156,6 +156,27 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             return true;
         }
 
+        // 未保存のシーンがあると Test Runner が保存確認のモーダルを出し、CLI 駆動の実行が応答なしで止まる。
+        // 勝手に保存 / 破棄すると人の作業を壊すため、モーダルを出す前に理由を返して呼び出し側に判断させる
+        public string CheckPreconditions()
+        {
+            var dirtyScenes = DirtySceneNames();
+            if (dirtyScenes.Count == 0) return null;
+            return $"unsaved changes in open scene(s): {string.Join(", ", dirtyScenes)} "
+                + "(保存するか開き直して破棄してから実行してください。テストランナーが保存確認のダイアログで止まるため開始しません)";
+        }
+
+        private static List<string> DirtySceneNames()
+        {
+            var names = new List<string>();
+            for (var i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+            {
+                var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+                if (scene.isDirty) names.Add(string.IsNullOrEmpty(scene.name) ? "(untitled)" : scene.name);
+            }
+            return names;
+        }
+
         public TestRunStatus GetStatus()
         {
             // 結果の polling でも残骸を倒す。ここで倒さないと `test result` が running を返し続ける。

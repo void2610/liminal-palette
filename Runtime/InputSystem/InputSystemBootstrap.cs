@@ -5,9 +5,9 @@ namespace Void2610.LiminalPalette.Runtime.InputSystemImpl
 {
     /// <summary>
     /// パレット表示中だけゲーム側 InputSystem ActionMap を一括停止／復元するブートストラップ。
-    /// Runtime のホットキー検出自体は EventPaletteInput (IMGUI) に一本化したので、
-    /// 本 asmdef はもはや「パレットを開閉する側」の入力には関与しない。
-    /// 残っている責務はパレット展開中にゲーム入力をブロックするための ActionMap 停止のみ。
+    /// Runtime のホットキー検出自体は EventPaletteInput (IMGUI) に一本化した。
+    /// 本 asmdef が開閉に関わるのはタッチ端末向けの 4 本指タップ (<see cref="TouchPaletteToggle"/>) だけで、
+    /// このクラスの責務はパレット展開中にゲーム入力をブロックするための ActionMap 停止のみ。
     ///
     /// 本 asmdef は LIMINAL_PALETTE_INPUTSYSTEM が立っている環境でのみリンクされるため、
     /// InputSystem 未導入プロジェクトでは Hook が呼ばれず ActionMap の自動停止も発生しない (パレットは普通に開閉する)。

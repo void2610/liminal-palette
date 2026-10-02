@@ -39,7 +39,7 @@
 
 | 入り口 | 誰が使う | どう呼ぶ |
 |---|---|---|
-| **GUI** | 人間 | `Cmd/Ctrl + K` でパレットを開き、ファジー検索 → 引数入力 → Run。Editor / Play Mode の両方で動く |
+| **GUI** | 人間 | `Cmd/Ctrl + K` (タッチ端末では 4 本指タップ) でパレットを開き、ファジー検索 → 引数入力 → Run。Editor / Play Mode の両方で動く |
 | **HTTP API** | AI Agent / CLI / Discord bot | `curl -X POST /api/v1/execute` 一発。Claude Code 向け Agent Skills と `liminal` CLI を同梱 |
 | **C# API** | テスト / CI | `[LiminalScenario]` でコマンドチェインを宣言し、Unity Test Runner や `liminal run` から実行 |
 

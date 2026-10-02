@@ -112,7 +112,7 @@ Runtime のパレット toggle (Cmd+K / Ctrl+K) は **必ず IMGUI (`UnityEngine
 - `PaletteInputBlocker.OnEngage` に全 ActionMap 停止処理を登録
 - `PaletteInputBlocker.OnDisengage` に復元処理を登録
 
-> **注**: 旧実装ではここで `PaletteInputFactory.OverrideFactory` に `InputSystemPaletteInput` を登録し、ホットキー検出も InputSystem に任せていた。現在は IMGUI ベースに一本化したためこの asmdef はホットキー検出に関与しない。`InputSystemPaletteInput` は削除済み、`PaletteInputFactory.OverrideFactory` も廃止済み。詳細は本ファイル「Runtime ホットキー検出に InputSystem を使わない理由」節を参照。
+> **注**: 旧実装ではここで `PaletteInputFactory.OverrideFactory` に `InputSystemPaletteInput` を登録し、ホットキー検出も InputSystem に任せていた。現在は IMGUI ベースに一本化したためこの asmdef はホットキー検出に関与しない (関与するのはタッチ端末向けの 4 本指タップ `TouchPaletteToggle` だけ)。`InputSystemPaletteInput` は削除済み、`PaletteInputFactory.OverrideFactory` も廃止済み。詳細は本ファイル「Runtime ホットキー検出に InputSystem を使わない理由」節を参照。
 
 ### 6. `Void2610.LiminalPalette.Ipc`
 

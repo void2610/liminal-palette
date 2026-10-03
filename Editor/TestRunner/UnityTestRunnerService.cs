@@ -90,6 +90,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
         private static void ForceClearRunning()
         {
             SessionState.SetBool(RunningKey, false);
+            ProductionStateGuard.TestRunInProgress = false;
             if (SessionState.GetBool(MutedKey, false))
             {
                 EditorUtility.audioMasterMute = SessionState.GetBool(MutePrevKey, false);
@@ -121,6 +122,8 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             // Execute 前に走行状態を確定させる (polling が即 running を観測できるように)。
             SessionState.SetBool(RunningKey, true);
             SessionState.SetBool(StartedKey, false);
+            // PlayMode に入った直後 (RunStarted より前) の初期化からテスト中だと分かるよう、Execute 前に立てる
+            ProductionStateGuard.TestRunInProgress = true;
             Beat();
             SessionState.SetString(ModeKey, displayMode);
             SessionState.EraseString(ResultKey);
@@ -147,6 +150,7 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             {
                 // Execute が同期例外を投げたら走行状態とミュートを巻き戻して失敗を返す (RunFinished は来ない)。
                 SessionState.SetBool(RunningKey, false);
+                ProductionStateGuard.TestRunInProgress = false;
                 EditorUtility.audioMasterMute = SessionState.GetBool(MutePrevKey, false);
                 SessionState.SetBool(MutedKey, false);
                 error = $"failed to start test run: {ex.Message}";
@@ -268,8 +272,6 @@ namespace Void2610.LiminalPalette.Editor.TestRunning
             {
                 SessionState.SetBool(StartedKey, true);
                 Beat();
-                // PlayMode の DomainReload で static が飛ぶので、毎テストで立て直す。
-                ProductionStateGuard.TestRunInProgress = true;
             }
 
             public void TestFinished(ITestResultAdaptor result)

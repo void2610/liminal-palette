@@ -17,8 +17,20 @@ namespace Void2610.LiminalPalette
         /// <summary>
         /// テスト実行中か。Test Runner のコールバックから設定する
         /// (Test Runner ウィンドウ / HTTP API のどちらから起動されても効く)。
+        /// 利用側がテスト中だけ保存先を切り替える判定にも使える。
         /// </summary>
+#if UNITY_EDITOR
+        // PlayMode に入る DomainReload を跨ぎ、RuntimeInitializeOnLoadMethod の時点でも読めるよう SessionState に持つ
+        public static bool TestRunInProgress
+        {
+            get => UnityEditor.SessionState.GetBool(TestRunInProgressKey, false);
+            set => UnityEditor.SessionState.SetBool(TestRunInProgressKey, value);
+        }
+
+        private const string TestRunInProgressKey = "LiminalPalette.ProductionStateGuard.TestRunInProgress";
+#else
         public static bool TestRunInProgress { get; set; }
+#endif
 
         /// <summary>テスト実行中なら例外を投げる。<paramref name="what"/> は診断用の対象名。</summary>
         public static void ThrowIfTestRun(string what)

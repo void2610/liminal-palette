@@ -51,6 +51,9 @@ namespace Void2610.LiminalPalette.Runtime.InputSystemImpl
 
         private void Update()
         {
+            // InputTestFixture が Input System をリセットすると無効に戻され、activeTouches が例外を投げる
+            if (!EnhancedTouchSupport.enabled) return;
+
             var count = ETouch.activeTouches.Count;
             if (count == 0)
             {

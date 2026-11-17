@@ -32,3 +32,5 @@ __pycache__/
 
 # pr-review-fix 等が生成する作業ファイル
 outputs/
+# ゲームから file: で参照すると Unity が無視したフォルダにも .meta を作る
+outputs.meta

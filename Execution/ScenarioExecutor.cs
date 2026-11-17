@@ -393,18 +393,19 @@ namespace Void2610.LiminalPalette
         }
 
         // LoadScene 直後の DI 構築中は instance が一過性で未解決になるため、固定待ちに頼らずこの範囲でリトライする
-        private static readonly TimeSpan CommandInstanceResolveTimeout = TimeSpan.FromSeconds(5);
+        private const float CommandInstanceResolveTimeoutSeconds = 5f;
 
         private async Task<StepResult> RunCommandStep(CommandStep step, CancellationToken ct)
         {
-            var sw = Stopwatch.StartNew();
+            var budget = new WaitBudget(_frameWaiter as IFrameTimeSource, CommandInstanceResolveTimeoutSeconds);
             while (true)
             {
                 var result = await _commandExecutor.ExecuteWithTypedArgsAsync(step.CommandPath, step.Args, ct);
                 // instance 未解決 (シーン DI 構築中) のみ一過性としてリトライ。他の失敗・成功は即返す。
-                if (result.Success || !(result.Exception is InstanceUnresolvedException) || sw.Elapsed >= CommandInstanceResolveTimeout)
+                if (result.Success || !(result.Exception is InstanceUnresolvedException) || budget.IsExhausted)
                     return new StepResult(step, result.Success, result.Error, result, null, TimeSpan.Zero);
                 await _frameWaiter.WaitFramesAsync(1, ct);
+                budget.AdvanceFrame();
             }
         }
 
@@ -448,8 +449,7 @@ namespace Void2610.LiminalPalette
             if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
                 return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
 
-            var sw = Stopwatch.StartNew();
-            var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
+            var budget = new WaitBudget(_frameWaiter as IFrameTimeSource, step.TimeoutSeconds);
             string lastError = null;
             object lastActual = null;
             CommandResult lastResult = null;
@@ -478,12 +478,51 @@ namespace Void2610.LiminalPalette
                     lastError = $"command '{step.CommandPath}' returned '{actual}', expected '{step.Expected}'";
                 }
 
-                if (sw.Elapsed >= timeout)
+                if (budget.IsExhausted)
                     return new StepResult(step, false,
-                        $"not satisfied within {step.TimeoutSeconds}s: {lastError}", lastResult, lastActual, TimeSpan.Zero);
+                        $"not satisfied within {budget.Describe()}: {lastError}", lastResult, lastActual, TimeSpan.Zero);
 
                 await _frameWaiter.WaitFramesAsync(1, ct);
+                budget.AdvanceFrame();
             }
+        }
+
+        /// <summary>
+        /// AssertEventually の待ちの打ち切り。ゲームの進みを読める待ち手では、ゲーム内の時間と
+        /// フレーム数の両方を使い切るまで打ち切らないので、マシンが遅くても演出やフレームを要する処理を待ち切れる
+        /// </summary>
+        private sealed class WaitBudget
+        {
+            // フレームで進む処理に、毎秒この数のフレームぶんの余裕を与える
+            private const float NOMINAL_FRAMES_PER_SECOND = 60f;
+
+            private readonly IFrameTimeSource _timeSource;
+            private readonly float _timeoutSeconds;
+            private readonly int _minFrames;
+            private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+            private float _gameSeconds;
+            private int _frames;
+
+            public WaitBudget(IFrameTimeSource timeSource, float timeoutSeconds)
+            {
+                _timeSource = timeSource;
+                _timeoutSeconds = timeoutSeconds;
+                _minFrames = (int)Math.Ceiling(timeoutSeconds * NOMINAL_FRAMES_PER_SECOND);
+            }
+
+            public bool IsExhausted => _timeSource == null
+                ? _stopwatch.Elapsed.TotalSeconds >= _timeoutSeconds
+                : _gameSeconds >= _timeoutSeconds && _frames >= _minFrames;
+
+            public void AdvanceFrame()
+            {
+                _frames++;
+                if (_timeSource != null) _gameSeconds += _timeSource.FrameDeltaSeconds;
+            }
+
+            public string Describe() => _timeSource == null
+                ? $"{_timeoutSeconds}s"
+                : $"{_timeoutSeconds}s of game time and {_minFrames} frames";
         }
 
         private async Task<StepResult> RunWaitSecondsStep(WaitStep step, CancellationToken ct)
@@ -566,8 +605,7 @@ namespace Void2610.LiminalPalette
             if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
                 return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
 
-            var sw = Stopwatch.StartNew();
-            var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
+            var budget = new WaitBudget(_frameWaiter as IFrameTimeSource, step.TimeoutSeconds);
             string lastError = null;
             object lastActual = null;
             while (true)
@@ -587,11 +625,12 @@ namespace Void2610.LiminalPalette
                 var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
                 lastError = $"expected '{expectedStr}' but got '{actualStr}'";
 
-                if (sw.Elapsed >= timeout)
+                if (budget.IsExhausted)
                     return new StepResult(step, false,
-                        $"not satisfied within {step.TimeoutSeconds}s: {lastError}", null, lastActual, TimeSpan.Zero);
+                        $"not satisfied within {budget.Describe()}: {lastError}", null, lastActual, TimeSpan.Zero);
 
                 await _frameWaiter.WaitFramesAsync(1, ct);
+                budget.AdvanceFrame();
             }
         }
 

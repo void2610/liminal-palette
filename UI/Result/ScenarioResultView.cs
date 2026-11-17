@@ -158,12 +158,12 @@ namespace Void2610.LiminalPalette.UI
                 case AssertEventuallyStep aes:
                     sb.Append("AssertEventually ").Append(aes.ObservableFieldPath).Append(" == ");
                     sb.Append(aes.Expected == null ? "null" : TypeConverterRegistry.ToDisplayString(aes.Expected));
-                    sb.Append($" (within {aes.TimeoutSeconds}s)");
+                    if (!float.IsPositiveInfinity(aes.TimeoutSeconds)) sb.Append($" (within {aes.TimeoutSeconds}s)");
                     break;
                 case AssertCommandEventuallyStep ace:
                     sb.Append("AssertCommandEventually ").Append(ace.CommandPath).Append(" == ");
                     sb.Append(ace.Expected ?? "null");
-                    sb.Append($" (within {ace.TimeoutSeconds}s)");
+                    if (!float.IsPositiveInfinity(ace.TimeoutSeconds)) sb.Append($" (within {ace.TimeoutSeconds}s)");
                     break;
                 default:
                     sb.Append(sr.Step?.Kind.ToString() ?? "(null)");

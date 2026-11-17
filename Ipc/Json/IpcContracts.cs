@@ -237,7 +237,9 @@ namespace Void2610.LiminalPalette.Ipc.Json
             {
                 w.WriteString("observableFieldPath", aes.ObservableFieldPath);
                 w.WriteString("expected", aes.Expected == null ? null : TypeConverterRegistry.ToDisplayString(aes.Expected));
-                w.WriteNumber("timeoutSeconds", aes.TimeoutSeconds);
+                // JSON は無限大を表せないので、打ち切らない待ちは null で返す
+                if (float.IsPositiveInfinity(aes.TimeoutSeconds)) w.WriteNull("timeoutSeconds");
+                else w.WriteNumber("timeoutSeconds", aes.TimeoutSeconds);
             }
             else if (s.Step is LoadSceneStep lss)
             {

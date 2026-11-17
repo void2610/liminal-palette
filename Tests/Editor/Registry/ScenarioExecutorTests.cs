@@ -447,6 +447,20 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
+        public async Task Execute_AssertCommandEventually_WithoutTimeout_WaitsUntilSatisfied()
+        {
+            // 時間で打ち切らないので、実時間がどれだけかかっても一致するまで待つ
+            var ce = new FakeCommandExecutorWithValue { ReturnValue = "never" };
+            var fw = new FakeFrameWaiter { OnWait = n => { if (n == 2000) ce.ReturnValue = "ready"; if (n == 1) System.Threading.Thread.Sleep(50); } };
+            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
+            var result = await ex.ExecuteAsync(
+                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready") },
+                null, CancellationToken.None);
+            Assert.IsTrue(result.Success, result.Steps[0].Error);
+            Assert.AreEqual(2000, fw.CallCount);
+        }
+
+        [Test]
         public async Task Execute_AssertCommandEventually_NullExpected_PassesWhenSucceeds()
         {
             var ce = new FakeCommandExecutorWithValue { ReturnValue = "whatever" };

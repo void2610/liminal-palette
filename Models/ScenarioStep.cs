@@ -104,28 +104,28 @@ namespace Void2610.LiminalPalette
 
         /// <summary>
         /// LiminalObservableField の現在値が expected と一致するまで毎フレーム再評価するステップ。
-        /// timeoutSeconds 以内に一致すれば成功、超過したら最後の不一致内容を添えて失敗する。
+        /// 既定では時間で打ち切らず、一致するまで待つ (マシンの速さで結果が変わらない)。
+        /// timeoutSeconds を渡したときだけ、超過したら最後の不一致内容を添えて失敗する。
         /// 演出 (LitMotion / UniTask) 完了後に確定する値を、固定待ち (WaitSeconds) なしで検証するためのもの。
         /// 比較規則は `AssertEquals` と同じ (expected が string なら field の型へ変換して比較)。
         /// </summary>
         public static ScenarioStep AssertEventually(
             string observableFieldPath,
             object expected,
-            float timeoutSeconds = 5f,
+            float timeoutSeconds = float.PositiveInfinity,
             string description = null)
         {
             if (string.IsNullOrEmpty(observableFieldPath))
                 throw new ArgumentException("observableFieldPath must not be null or empty", nameof(observableFieldPath));
-            // NaN / Infinity は TimeSpan.FromSeconds で例外になり「待っても解決しない」値なので、
-            // 「有限かつ > 0」を保証してここで弾く (timeoutSeconds <= 0f だけだと NaN/Infinity が通り抜ける)。
-            if (!(timeoutSeconds > 0f) || float.IsInfinity(timeoutSeconds))
-                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be a finite value > 0");
+            // NaN と 0 以下は弾く (正の無限大は「打ち切らない」)
+            if (!(timeoutSeconds > 0f))
+                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be > 0 (PositiveInfinity waits without a time limit)");
             return new AssertEventuallyStep(observableFieldPath, expected, timeoutSeconds, description);
         }
 
         /// <summary>
         /// 指定コマンドを毎フレーム実行し、戻り値の文字列が expected と一致するまでポーリングするステップ。
-        /// timeoutSeconds 以内に一致すれば成功、超過したら最後の結果を添えて失敗する。
+        /// 既定では時間で打ち切らず、一致するまで待つ。timeoutSeconds を渡したときだけ、超過したら最後の結果を添えて失敗する。
         /// `AssertEventually` の観測コマンド版: ObservableField を持たない状態 (bool/enum を返す観測コマンド等) を、
         /// 演出 (LitMotion / UniTask) や非同期遷移の完了後に確定する値として固定待ちなしで検証する。
         /// expected を null にすると「コマンドが成功するまで待つ」モードになる。
@@ -135,14 +135,14 @@ namespace Void2610.LiminalPalette
             string commandPath,
             IReadOnlyDictionary<string, object> args = null,
             string expected = null,
-            float timeoutSeconds = 5f,
+            float timeoutSeconds = float.PositiveInfinity,
             string description = null)
         {
             if (string.IsNullOrEmpty(commandPath))
                 throw new ArgumentException("commandPath must not be null or empty", nameof(commandPath));
-            // AssertEventually と同じく NaN / Infinity / <= 0 を弾く (待っても解決しない値)。
-            if (!(timeoutSeconds > 0f) || float.IsInfinity(timeoutSeconds))
-                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be a finite value > 0");
+            // AssertEventually と同じく NaN と 0 以下を弾く (正の無限大は「打ち切らない」)
+            if (!(timeoutSeconds > 0f))
+                throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeoutSeconds must be > 0 (PositiveInfinity waits without a time limit)");
             return new AssertCommandEventuallyStep(commandPath, args, expected, timeoutSeconds, description);
         }
 

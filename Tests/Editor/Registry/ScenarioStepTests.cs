@@ -81,12 +81,17 @@ namespace Void2610.LiminalPalette.Tests
         }
 
         [Test]
-        public void AssertEventually_RejectsNonFiniteTimeout()
+        public void AssertEventually_RejectsNaNAndNegativeInfinityTimeout()
         {
-            // NaN / Infinity は TimeSpan.FromSeconds で例外になる「待っても解決しない」値なので Factory で弾く。
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.NaN));
-            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.PositiveInfinity));
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertEventually("Hp", 1, float.NegativeInfinity));
+        }
+
+        [Test]
+        public void Eventually_DefaultsToNoTimeLimit()
+        {
+            Assert.That(((AssertEventuallyStep)ScenarioStep.AssertEventually("Hp", 1)).TimeoutSeconds, Is.EqualTo(float.PositiveInfinity));
+            Assert.That(((AssertCommandEventuallyStep)ScenarioStep.AssertCommandEventually("Foo/Bar")).TimeoutSeconds, Is.EqualTo(float.PositiveInfinity));
         }
 
         [Test]
@@ -187,7 +192,6 @@ namespace Void2610.LiminalPalette.Tests
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: 0f));
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: -1f));
             Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: float.NaN));
-            Assert.Throws<System.ArgumentOutOfRangeException>(() => ScenarioStep.AssertCommandEventually("Foo/Bar", timeoutSeconds: float.PositiveInfinity));
         }
     }
 }

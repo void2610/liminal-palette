@@ -145,7 +145,7 @@ public static IEnumerable<ScenarioStep> EnemyTakesDamage()
     yield return ScenarioStep.Run("Enemy/Spawn", new() { ["type"] = "Goblin" });
     yield return ScenarioStep.AssertEquals("Enemy/Hp", 100);
     yield return ScenarioStep.Run("Enemy/Damage", new() { ["amount"] = 30 });
-    yield return ScenarioStep.AssertEventually("Enemy/Hp", 70, timeoutSeconds: 2f);
+    yield return ScenarioStep.AssertEventually("Enemy/Hp", 70);
 }
 ```
 

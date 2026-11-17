@@ -445,11 +445,12 @@ namespace Void2610.LiminalPalette
         // AssertEventually の観測コマンド版 (ObservableField を持たない状態を毎フレームコマンド再実行でポーリング)。
         private async Task<StepResult> RunAssertCommandEventuallyStep(AssertCommandEventuallyStep step, CancellationToken ct)
         {
-            if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
-                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
+            if (!(step.TimeoutSeconds > 0f))
+                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be > 0)");
 
             var sw = Stopwatch.StartNew();
-            var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
+            var hasTimeout = !float.IsPositiveInfinity(step.TimeoutSeconds);
+            var timeout = hasTimeout ? TimeSpan.FromSeconds(step.TimeoutSeconds) : TimeSpan.MaxValue;
             string lastError = null;
             object lastActual = null;
             CommandResult lastResult = null;
@@ -478,7 +479,7 @@ namespace Void2610.LiminalPalette
                     lastError = $"command '{step.CommandPath}' returned '{actual}', expected '{step.Expected}'";
                 }
 
-                if (sw.Elapsed >= timeout)
+                if (hasTimeout && sw.Elapsed >= timeout)
                     return new StepResult(step, false,
                         $"not satisfied within {step.TimeoutSeconds}s: {lastError}", lastResult, lastActual, TimeSpan.Zero);
 
@@ -563,11 +564,12 @@ namespace Void2610.LiminalPalette
             // Factory のバリデーションをすり抜けた経路 (直接 internal step 生成 / 将来の IPC 入力等) に備え、
             // TimeSpan.FromSeconds で ArgumentException → 外側 catch の "unexpected" 扱いになる前に
             // finite チェックして StepResult.Fail で回収する。
-            if (!(step.TimeoutSeconds > 0f) || float.IsInfinity(step.TimeoutSeconds))
-                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be a finite value > 0)");
+            if (!(step.TimeoutSeconds > 0f))
+                return StepResult.Fail(step, $"invalid timeoutSeconds: {step.TimeoutSeconds} (must be > 0)");
 
             var sw = Stopwatch.StartNew();
-            var timeout = TimeSpan.FromSeconds(step.TimeoutSeconds);
+            var hasTimeout = !float.IsPositiveInfinity(step.TimeoutSeconds);
+            var timeout = hasTimeout ? TimeSpan.FromSeconds(step.TimeoutSeconds) : TimeSpan.MaxValue;
             string lastError = null;
             object lastActual = null;
             while (true)
@@ -587,7 +589,7 @@ namespace Void2610.LiminalPalette
                 var actualStr = actual == null ? "null" : TypeConverterRegistry.ToDisplayString(actual);
                 lastError = $"expected '{expectedStr}' but got '{actualStr}'";
 
-                if (sw.Elapsed >= timeout)
+                if (hasTimeout && sw.Elapsed >= timeout)
                     return new StepResult(step, false,
                         $"not satisfied within {step.TimeoutSeconds}s: {lastError}", null, lastActual, TimeSpan.Zero);
 

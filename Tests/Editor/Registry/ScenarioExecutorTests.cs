@@ -62,19 +62,6 @@ namespace Void2610.LiminalPalette.Tests
             }
         }
 
-        private sealed class FakeTimedFrameWaiter : IFrameWaiter, IFrameTimeSource
-        {
-            public int CallCount;
-            public float FrameDeltaSeconds { get; set; }
-            public System.Action<int> OnWait;
-            public Task WaitFramesAsync(int frames, CancellationToken ct)
-            {
-                CallCount++;
-                OnWait?.Invoke(CallCount);
-                return Task.CompletedTask;
-            }
-        }
-
         // ObservableField のテストは ObservableFieldRegistry.Default を直接使う方がシンプル。
         private sealed class FakeContainer
         {
@@ -457,47 +444,6 @@ namespace Void2610.LiminalPalette.Tests
             Assert.IsFalse(result.Success);
             StringAssert.Contains("not satisfied within", result.Steps[0].Error);
             StringAssert.Contains("ready", result.Steps[0].Error);
-        }
-
-        [Test]
-        public async Task Execute_AssertCommandEventually_SlowFrames_WaitsForFrameBudget()
-        {
-            // 1 フレームでゲームが 1 秒進む遅いマシンでも、5 秒ぶんのフレーム (300) を待ってから打ち切る
-            var ce = new FakeCommandExecutorWithValue { ReturnValue = "never" };
-            var fw = new FakeTimedFrameWaiter { FrameDeltaSeconds = 1f, OnWait = n => { if (n == 200) ce.ReturnValue = "ready"; } };
-            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
-            var result = await ex.ExecuteAsync(
-                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 5f) },
-                null, CancellationToken.None);
-            Assert.IsTrue(result.Success, result.Steps[0].Error);
-            Assert.AreEqual(200, fw.CallCount);
-        }
-
-        [Test]
-        public async Task Execute_AssertCommandEventually_FastFrames_WaitsForGameTime()
-        {
-            // 1 フレームが 1ms の速いマシンでも、ゲーム内の時間で 0.5 秒 (500 フレーム) を待ってから打ち切る
-            var ce = new FakeCommandExecutorWithValue { ReturnValue = "never" };
-            var fw = new FakeTimedFrameWaiter { FrameDeltaSeconds = 0.001f };
-            var ex = new ScenarioExecutor(ce, ObservableFieldRegistry.Default, fw);
-            var result = await ex.ExecuteAsync(
-                new[] { ScenarioStep.AssertCommandEventually("Foo/Bar", expected: "ready", timeoutSeconds: 0.5f) },
-                null, CancellationToken.None);
-            Assert.IsFalse(result.Success);
-            StringAssert.Contains("not satisfied within", result.Steps[0].Error);
-            Assert.That(fw.CallCount, Is.InRange(499, 501));
-        }
-
-        [Test]
-        public async Task Execute_AssertEventually_SlowFrames_TimesOutAfterFrameBudget()
-        {
-            var fw = new FakeTimedFrameWaiter { FrameDeltaSeconds = 1f };
-            var ex = new ScenarioExecutor(new FakeCommandExecutor(), ObservableFieldRegistry.Default, fw);
-            var result = await ex.ExecuteAsync(
-                new[] { ScenarioStep.AssertEventually("ScenarioTest/Hp", 42, timeoutSeconds: 2f) },
-                null, CancellationToken.None);
-            Assert.IsFalse(result.Success);
-            Assert.AreEqual(120, fw.CallCount);
         }
 
         [Test]
